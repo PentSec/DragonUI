@@ -1638,10 +1638,11 @@ if TargetFrameSpellBar then
     end)
 end
 
--- SEGURO: Hook para detectar apertura del mapa mundial sin modificar funciones protegidas
+-- [[ O P R A V A ]] --
+-- Hook pro detekci otevření mapy světa, což může pozastavit kouzlení.
+-- Přejmenovali jsme lokální proměnné, abychom předešli "taint" chybě způsobené konfliktem názvů.
 if WorldMapFrame then
-    -- Usar event handlers seguros en lugar de sobrescribir Show/Hide
-    WorldMapFrame:HookScript("OnShow", function(self)
+    hooksecurefunc(WorldMapFrame, "Show", function()
         -- Sincronizar castbar del player cuando se abre el mapa
         local state = CastbarModule.states.player
         if state and (state.casting or state.isChanneling) then
@@ -1649,7 +1650,7 @@ if WorldMapFrame then
         end
     end)
     
-    WorldMapFrame:HookScript("OnHide", function(self)
+    hooksecurefunc(WorldMapFrame, "Hide", function()
         -- Sincronizar castbar del player cuando se cierra el mapa
         local state = CastbarModule.states.player
         if state and (state.casting or state.isChanneling) then
