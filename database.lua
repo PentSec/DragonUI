@@ -212,7 +212,7 @@ local defaults = {
                 artstyle = false
             },
             totem = {
-                x_position = -210,
+                x_position = -113,
                 y_offset = 0 -- Additional Y offset for fine-tuning position
             }
         },

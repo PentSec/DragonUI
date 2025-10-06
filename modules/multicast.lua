@@ -73,6 +73,8 @@ end
 local anchor = CreateFrame('Frame', 'DragonUI_MulticastAnchor', UIParent)
 anchor:SetPoint('BOTTOM', UIParent, 'BOTTOM', 0, 52)
 anchor:SetSize(37, 37)
+-- CRÍTICO: Inicialmente oculto hasta que se active el módulo
+anchor:Hide()
 
 -- Track created frames
 MulticastModule.frames.anchor = anchor
@@ -149,14 +151,13 @@ end
 -- =============================================================================
 local possessbar = CreateFrame('Frame', 'DragonUI_PossessBar', UIParent, 'SecureHandlerStateTemplate')
 possessbar:SetAllPoints(anchor)
+-- CRÍTICO: Inicialmente oculto hasta que se active el módulo
+possessbar:Hide()
 
 -- Track created frames
 MulticastModule.frames.possessbar = possessbar
 
--- Properly parent and position the PossessBarFrame
-PossessBarFrame:SetParent(possessbar)
-PossessBarFrame:ClearAllPoints()
-PossessBarFrame:SetPoint('BOTTOMLEFT', possessbar, 'BOTTOMLEFT', -68, 0)
+-- NO MODIFICAR PossessBarFrame aquí - solo cuando el módulo esté habilitado
 
 -- =============================================================================
 -- POSSESS BUTTON POSITIONING FUNCTION
@@ -187,7 +188,9 @@ local function PositionPossessButtons()
                 end
             end
             
-            button:Show()
+            -- CRÍTICO: NO mostrar botones de possess por defecto
+            -- Solo se mostrarán cuando se entre en un vehículo
+            button:Hide()
             possessbar:SetAttribute('addchild', button)
         end
     end
@@ -197,40 +200,28 @@ local function PositionPossessButtons()
         addon.possessbuttons_template()
     end
     
-    -- Set visibility driver for vehicle UI
-    RegisterStateDriver(possessbar, 'visibility', '[vehicleui][@vehicle,exists] hide; show')
+    -- Set visibility driver for vehicle UI - pero solo si no hay totems de chamán
+    -- Para chamanes, el possessbar debe mantenerse visible para mostrar totems
+    local visibilityCondition
+    if class == 'SHAMAN' and MultiCastActionBarFrame then
+        -- Para chamanes: siempre visible (totems y possess)
+        visibilityCondition = 'show'
+    else
+        -- Para otros: ocultar en vehículo, mostrar cuando no
+        visibilityCondition = '[vehicleui][@vehicle,exists] hide; show'
+    end
+    
+    RegisterStateDriver(possessbar, 'visibility', visibilityCondition)
     
     -- Track state driver for cleanup
-    MulticastModule.stateDrivers.possessbar_visibility = {frame = possessbar, state = 'visibility', condition = '[vehicleui][@vehicle,exists] hide; show'}
+    MulticastModule.stateDrivers.possessbar_visibility = {frame = possessbar, state = 'visibility', condition = visibilityCondition}
 end
 
 -- =============================================================================
 -- SHAMAN MULTICAST (TOTEM) BAR SETUP
 -- =============================================================================
-if MultiCastActionBarFrame and class == 'SHAMAN' then
-    -- Track MultiCastActionBarFrame
-    MulticastModule.frames.multiCastActionBarFrame = MultiCastActionBarFrame
-    
-    -- Remove default scripts that might interfere
-    MultiCastActionBarFrame:SetScript('OnUpdate', nil)
-    MultiCastActionBarFrame:SetScript('OnShow', nil)
-    MultiCastActionBarFrame:SetScript('OnHide', nil)
-    
-    -- Parent and position the MultiCastActionBarFrame
-    MultiCastActionBarFrame:SetParent(possessbar)
-    MultiCastActionBarFrame:ClearAllPoints()
-    MultiCastActionBarFrame:SetPoint('BOTTOMLEFT', possessbar, 'BOTTOMLEFT', 0, 0)
-    MultiCastActionBarFrame:Show()
-    
-    -- Prevent the frame from being moved by other addons
-    MultiCastActionBarFrame.SetParent = noop
-    MultiCastActionBarFrame.SetPoint = noop
-    
-    -- Also protect the recall button if it exists
-    if MultiCastRecallSpellButton then
-        MultiCastRecallSpellButton.SetPoint = noop
-    end
-end
+-- CRÍTICO: No modificar nada aquí - todo se hace en ApplyMulticastSystem()
+-- Esto evita que se rompan los frames de Blizzard cuando el módulo está deshabilitado
 
 -- =============================================================================
 -- HOOK ACTION BAR VISIBILITY CHANGES
@@ -258,6 +249,14 @@ end
 -- =============================================================================
 local function InitializeMulticast()
     if not IsModuleEnabled() then return end
+    
+    -- Ensure anchor and possessbar are visible
+    if anchor then
+        anchor:Show()
+    end
+    if possessbar then
+        possessbar:Show()
+    end
     
     -- Position possess buttons
     PositionPossessButtons()
@@ -308,25 +307,54 @@ local function RestoreMulticastSystem()
     -- Restore MultiCastActionBarFrame to original state (Shaman only)
     if MultiCastActionBarFrame and class == 'SHAMAN' and MulticastModule.originalStates.multiCastActionBarFrame then
         local original = MulticastModule.originalStates.multiCastActionBarFrame
+        
+        -- CRÍTICO: Restaurar funciones originales ANTES de mover el frame
+        if original.originalSetParent then
+            MultiCastActionBarFrame.SetParent = original.originalSetParent
+        else
+            MultiCastActionBarFrame.SetParent = nil
+        end
+        
+        if original.originalSetPoint then
+            MultiCastActionBarFrame.SetPoint = original.originalSetPoint
+        else
+            MultiCastActionBarFrame.SetPoint = nil
+        end
+        
+        -- Restaurar scripts originales
+        if original.originalScripts then
+            MultiCastActionBarFrame:SetScript('OnUpdate', original.originalScripts.OnUpdate)
+            MultiCastActionBarFrame:SetScript('OnShow', original.originalScripts.OnShow)
+            MultiCastActionBarFrame:SetScript('OnHide', original.originalScripts.OnHide)
+        end
+        
+        -- Restaurar parent y posición
         MultiCastActionBarFrame:SetParent(original.parent or UIParent)
         MultiCastActionBarFrame:ClearAllPoints()
         
         -- Restore original anchor points
-        for _, pointData in ipairs(original.points) do
-            local point, relativeTo, relativePoint, x, y = unpack(pointData)
-            if relativeTo then
-                MultiCastActionBarFrame:SetPoint(point, relativeTo, relativePoint, x, y)
-            else
-                MultiCastActionBarFrame:SetPoint(point, relativePoint, x, y)
+        if original.points and #original.points > 0 then
+            for _, pointData in ipairs(original.points) do
+                local point, relativeTo, relativePoint, x, y = unpack(pointData)
+                if relativeTo then
+                    MultiCastActionBarFrame:SetPoint(point, relativeTo, relativePoint, x, y)
+                else
+                    MultiCastActionBarFrame:SetPoint(point, relativePoint, x, y)
+                end
             end
+        else
+            -- Fallback to default Blizzard positioning
+            MultiCastActionBarFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 52)
         end
         
-        -- Restore original scripts and behavior
-        MultiCastActionBarFrame.SetParent = nil
-        MultiCastActionBarFrame.SetPoint = nil
-        
-        if MultiCastRecallSpellButton then
-            MultiCastRecallSpellButton.SetPoint = nil
+        -- Restore recall button if it was modified
+        if MultiCastRecallSpellButton and MulticastModule.originalStates.multiCastRecallButton then
+            local recallOriginal = MulticastModule.originalStates.multiCastRecallButton
+            if recallOriginal.originalSetPoint then
+                MultiCastRecallSpellButton.SetPoint = recallOriginal.originalSetPoint
+            else
+                MultiCastRecallSpellButton.SetPoint = nil
+            end
         end
     end
     
@@ -356,17 +384,68 @@ local function ApplyMulticastSystem()
             local point, relativeTo, relativePoint, x, y = PossessBarFrame:GetPoint(i)
             table.insert(MulticastModule.originalStates.possessBarFrame.points, {point, relativeTo, relativePoint, x, y})
         end
+        
+        -- CONFIGURAR PossessBarFrame para DragonUI
+        PossessBarFrame:SetParent(possessbar)
+        PossessBarFrame:ClearAllPoints()
+        -- CRÍTICO: Para chamanes, ocultar PossessBarFrame para evitar conflictos con totems
+        if class == 'SHAMAN' then
+            PossessBarFrame:SetPoint('BOTTOMRIGHT', possessbar, 'BOTTOMLEFT', -10, 0)
+        else
+            PossessBarFrame:SetPoint('BOTTOMLEFT', possessbar, 'BOTTOMLEFT', -68, 0)
+        end
     end
     
+    -- SHAMAN MULTICAST (TOTEM) BAR SETUP - SOLO CUANDO SE HABILITA
     if MultiCastActionBarFrame and class == 'SHAMAN' then
+        -- Store original state BEFORE modifying
         MulticastModule.originalStates.multiCastActionBarFrame = {
             parent = MultiCastActionBarFrame:GetParent(),
-            points = {}
+            points = {},
+            originalSetParent = MultiCastActionBarFrame.SetParent,
+            originalSetPoint = MultiCastActionBarFrame.SetPoint,
+            originalScripts = {
+                OnUpdate = MultiCastActionBarFrame:GetScript('OnUpdate'),
+                OnShow = MultiCastActionBarFrame:GetScript('OnShow'),
+                OnHide = MultiCastActionBarFrame:GetScript('OnHide')
+            }
         }
+        
         -- Store all anchor points
         for i = 1, MultiCastActionBarFrame:GetNumPoints() do
             local point, relativeTo, relativePoint, x, y = MultiCastActionBarFrame:GetPoint(i)
             table.insert(MulticastModule.originalStates.multiCastActionBarFrame.points, {point, relativeTo, relativePoint, x, y})
+        end
+        
+        -- Track MultiCastActionBarFrame
+        MulticastModule.frames.multiCastActionBarFrame = MultiCastActionBarFrame
+        
+        -- Remove default scripts that might interfere
+        MultiCastActionBarFrame:SetScript('OnUpdate', nil)
+        MultiCastActionBarFrame:SetScript('OnShow', nil)
+        MultiCastActionBarFrame:SetScript('OnHide', nil)
+        
+        -- Parent and position the MultiCastActionBarFrame
+        MultiCastActionBarFrame:SetParent(possessbar)
+        MultiCastActionBarFrame:ClearAllPoints()
+        -- CRÍTICO: Posicionar totems en el centro del possessbar, no donde están los possess buttons
+        MultiCastActionBarFrame:SetPoint('BOTTOM', possessbar, 'BOTTOM', 0, 0)
+        MultiCastActionBarFrame:Show()
+        
+        -- CRÍTICO: Asegurar que possessbar esté visible para mostrar totems
+        possessbar:Show()
+        anchor:Show()
+        
+        -- Prevent the frame from being moved by other addons
+        MultiCastActionBarFrame.SetParent = noop
+        MultiCastActionBarFrame.SetPoint = noop
+        
+        -- Also protect the recall button if it exists
+        if MultiCastRecallSpellButton then
+            MulticastModule.originalStates.multiCastRecallButton = {
+                originalSetPoint = MultiCastRecallSpellButton.SetPoint
+            }
+            MultiCastRecallSpellButton.SetPoint = noop
         end
     end
     
@@ -495,33 +574,45 @@ end
 -- =============================================================================
 local eventFrame = CreateFrame("Frame")
 local function RegisterEvents()
+    -- CRÍTICO: Solo registrar eventos mínimos para detección de carga
     eventFrame:RegisterEvent("ADDON_LOADED")
-    eventFrame:RegisterEvent("PLAYER_LOGOUT")
-    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    eventFrame:RegisterEvent("PLAYER_LOGIN")
     
     eventFrame:SetScript("OnEvent", function(self, event, addonName)
         if event == "ADDON_LOADED" and addonName == "DragonUI" then
-            -- Initialize multicast system only if module is enabled
-            if IsModuleEnabled() then
-                if addon.core and addon.core.RegisterMessage then
-                    addon.core.RegisterMessage(addon, "DRAGONUI_READY", function() ApplyMulticastSystem() end)
-                else
-                    -- Fallback initialization
-                    DelayedCall(1, function() ApplyMulticastSystem() end)
-                end
-            end
-            
-            -- Register profile callbacks after a short delay
+            -- SOLO inicializar si el módulo está habilitado
             DelayedCall(0.5, function()
-                if addon.db and addon.db.RegisterCallback then
-                    addon.db.RegisterCallback(addon, "OnProfileChanged", OnProfileChanged)
-                    addon.db.RegisterCallback(addon, "OnProfileCopied", OnProfileChanged)
-                    addon.db.RegisterCallback(addon, "OnProfileReset", OnProfileChanged)
+                if IsModuleEnabled() then
+                    -- Registrar eventos adicionales solo si está habilitado
+                    eventFrame:RegisterEvent("PLAYER_LOGOUT")
+                    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+                else
+                    -- Module disabled - do nothing
                 end
-                
-                -- Also register with addon core if available
-                if addon.core and addon.core.RegisterMessage then
-                    addon.core.RegisterMessage(addon, "DRAGONUI_PROFILE_CHANGED", OnProfileChanged)
+            end)
+            
+        elseif event == "PLAYER_LOGIN" then
+            -- CRÍTICO: Inicializar después del login cuando todo esté cargado
+            DelayedCall(0.3, function()
+                if IsModuleEnabled() then
+                    ApplyMulticastSystem()
+                    
+                    -- Initialize multicast system
+                    if addon.core and addon.core.RegisterMessage then
+                        addon.core.RegisterMessage(addon, "DRAGONUI_READY", function() ApplyMulticastSystem() end)
+                    end
+                    
+                    -- Register profile callbacks
+                    if addon.db and addon.db.RegisterCallback then
+                        addon.db.RegisterCallback(addon, "OnProfileChanged", OnProfileChanged)
+                        addon.db.RegisterCallback(addon, "OnProfileCopied", OnProfileChanged)
+                        addon.db.RegisterCallback(addon, "OnProfileReset", OnProfileChanged)
+                    end
+                    
+                    -- Also register with addon core if available
+                    if addon.core and addon.core.RegisterMessage then
+                        addon.core.RegisterMessage(addon, "DRAGONUI_PROFILE_CHANGED", OnProfileChanged)
+                    end
                 end
             end)
             
@@ -536,7 +627,7 @@ local function RegisterEvents()
         elseif event == "PLAYER_REGEN_ENABLED" then
             -- Update position after combat ends (with delay for stability)
             DelayedCall(0.5, function()
-                if anchor and anchor.update_position then
+                if IsModuleEnabled() and anchor and anchor.update_position then
                     anchor:update_position()
                 end
             end)
