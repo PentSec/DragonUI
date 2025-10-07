@@ -195,7 +195,7 @@ local defaults = {
         },
 
         additional = {
-            size = 27,
+            size = 32,
             spacing = 6,
             stance = {
                 x_position = -215,
