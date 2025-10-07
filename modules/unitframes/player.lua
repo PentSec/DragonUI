@@ -612,6 +612,33 @@ local function UpdateMasterIconPosition()
     end
 end
 
+-- Función para poner el timer PVP por encima del dragón Y reposicionarlo
+local function UpdatePVPTimerPosition(isEliteMode)
+    local pvpTimerText = _G["PlayerPVPTimerText"]
+    if not pvpTimerText then
+        return
+    end
+    
+    -- SOLO modificar si hay decoración elite (elite, rareelite, worldboss, etc.)
+    if isEliteMode then
+        -- Con decoración elite: usar el MISMO parent que el icono PVP (que ya está por encima)
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        if dragonFrame and dragonFrame.EliteIconContainer then
+            -- 1. Reparentar al mismo contenedor que el icono PVP
+            pvpTimerText:SetParent(dragonFrame.EliteIconContainer)
+            pvpTimerText:SetDrawLayer("OVERLAY", 7)
+            
+            -- 2. Reposicionar el timer (ajusta estas coordenadas como quieras)
+            pvpTimerText:ClearAllPoints()
+            pvpTimerText:SetPoint("CENTER", PlayerPVPIcon, "LEFT", 22, 38)  -- A la izquierda del icono
+            
+            -- Opcional: ajustar tamaño del texto para mejor visibilidad
+            pvpTimerText:SetFont(pvpTimerText:GetFont(), 11, "OUTLINE")
+        end
+    end
+    -- SIN decoración elite: NO tocar nada, dejar parent, layer y posición originales de Blizzard
+end
+
 local function UpdatePVPIconPosition()
     if not PlayerPVPIcon then
         return
@@ -645,6 +672,9 @@ local function UpdatePVPIconPosition()
             PlayerPVPIcon:SetPoint("TOPRIGHT", PlayerFrame, "TOPRIGHT", -155, -22)
         end
     end
+    
+    -- NUEVO: Reposicionar el timer de PVP según el modo
+    UpdatePVPTimerPosition(isEliteMode)
 end
 
 -- Master function to update all leadership icons positioning
@@ -1395,6 +1425,24 @@ local function InitializePlayerFrame()
             UpdatePlayerHealthBarColor()
         end
     end)
+
+    -- Hook para actualizar posición del timer PVP cuando aparece/cambia
+    local pvpTimerText = _G["PlayerPVPTimerText"]
+    if pvpTimerText and pvpTimerText.HookScript then
+        pvpTimerText:HookScript("OnShow", function()
+            local config = GetPlayerConfig()
+            local decorationType = config.dragon_decoration or "none"
+            local isEliteMode = decorationType == "elite" or decorationType == "rareelite"
+            UpdatePVPTimerPosition(isEliteMode)
+        end)
+        -- También actualizar cuando el texto cambia
+        pvpTimerText:HookScript("OnTextChanged", function()
+            local config = GetPlayerConfig()
+            local decorationType = config.dragon_decoration or "none"
+            local isEliteMode = decorationType == "elite" or decorationType == "rareelite"
+            UpdatePVPTimerPosition(isEliteMode)
+        end)
+    end
 
     -- Create auxiliary frame
     Module.playerFrame = addon.CreateUIFrame(200, 75, "PlayerFrame")
