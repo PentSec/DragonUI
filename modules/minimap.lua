@@ -19,14 +19,36 @@ end
 -- ##        Based on RetailUI pattern                            ##
 -- #################################################################
 
-local MinimapModule = {};
+-- Convertir el módulo para usar DragonUI module pattern
+local MinimapModule = {
+    initialized = false,
+    applied = false,
+    originalStates = {},
+    registeredEvents = {},
+    hooks = {},
+    stateDrivers = {},
+    frames = {},
+    -- Legacy properties for compatibility
+    minimapFrame = nil,
+    borderFrame = nil,
+    isEnabled = false,
+    originalMinimapSettings = {},
+    originalMask = nil
+}
 addon.MinimapModule = MinimapModule;
 
-MinimapModule.minimapFrame = nil
-MinimapModule.borderFrame = nil
-MinimapModule.isEnabled = false
-MinimapModule.originalMinimapSettings = {} -- Store original Blizzard settings
-MinimapModule.originalMask = nil -- Store original minimap mask
+-- Función para obtener configuración del módulo
+local function GetModuleConfig()
+    return addon.db and addon.db.profile and addon.db.profile.modules and addon.db.profile.modules.minimap
+end
+
+local function IsModuleEnabled()
+    local config = GetModuleConfig()
+    if config and config.enabled ~= nil then
+        return config.enabled
+    end
+    return true -- Default enabled
+end
 
 local DEFAULT_MINIMAP_WIDTH = Minimap:GetWidth() * 1.36
 local DEFAULT_MINIMAP_HEIGHT = Minimap:GetHeight() * 1.36
@@ -70,9 +92,48 @@ local function GetAtlasFunction()
     elseif SetAtlasTexture then
         return SetAtlasTexture
     else
-
         return nil
     end
+end
+
+-- SECURE HOOKS: Agregar hooks seguros para funciones críticas
+local function SetupSecureHooks()
+    if MinimapModule.hooks.CloseDropDownMenus then
+        return -- Already hooked
+    end
+
+    -- Hook seguro para CloseDropDownMenus
+    MinimapModule.hooks.CloseDropDownMenus = function()
+        if MiniMapTrackingIcon and MiniMapTrackingIcon:GetAlpha() > 0 then
+            MiniMapTrackingIcon:ClearAllPoints()
+            MiniMapTrackingIcon:SetPoint('CENTER', MiniMapTracking, 'CENTER', 0, 0)
+        end
+    end
+    hooksecurefunc("CloseDropDownMenus", MinimapModule.hooks.CloseDropDownMenus)
+
+    -- Hook seguro para SetTracking
+    MinimapModule.hooks.SetTracking = function()
+        if MinimapModule.applied then
+            MinimapModule:UpdateTrackingIcon()
+        end
+    end
+    hooksecurefunc("SetTracking", MinimapModule.hooks.SetTracking)
+
+    -- Hook para Minimap_UpdateRotationSetting si existe
+    if Minimap_UpdateRotationSetting then
+        MinimapModule.hooks.Minimap_UpdateRotationSetting = function()
+            if MinimapModule.applied then
+                Minimap_UpdateRotationSetting()
+            end
+        end
+        hooksecurefunc("Minimap_UpdateRotationSetting", MinimapModule.hooks.Minimap_UpdateRotationSetting)
+    end
+end
+
+-- CLEANUP: Función para limpiar hooks
+local function CleanupSecureHooks()
+    -- No hay manera directa de unhook en WoW 3.3.5a, pero trackear para debugging
+    MinimapModule.hooks = {}
 end
 
 local function UpdateCalendarDate()
@@ -94,6 +155,37 @@ local function UpdateCalendarDate()
 end
 
 local function ReplaceBlizzardFrame(frame)
+    -- Check combat lockdown before making secure frame changes
+    if InCombatLockdown() then
+        MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = function()
+            ReplaceBlizzardFrame(frame)
+            MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = nil
+        end
+        return
+    end
+
+    -- Store original states before modification
+    if not MinimapModule.originalStates.MinimapCluster then
+        MinimapModule.originalStates.MinimapCluster = {
+            points = {},
+            scale = MinimapCluster:GetScale()
+        }
+        for i = 1, MinimapCluster:GetNumPoints() do
+            MinimapModule.originalStates.MinimapCluster.points[i] = {MinimapCluster:GetPoint(i)}
+        end
+    end
+
+    -- Store DurabilityFrame original state
+    if DurabilityFrame and not MinimapModule.originalStates.DurabilityFrame then
+        MinimapModule.originalStates.DurabilityFrame = {
+            points = {},
+            scale = DurabilityFrame:GetScale()
+        }
+        for i = 1, DurabilityFrame:GetNumPoints() do
+            MinimapModule.originalStates.DurabilityFrame.points[i] = {DurabilityFrame:GetPoint(i)}
+        end
+    end
+
     local minimapCluster = MinimapCluster
     minimapCluster:ClearAllPoints()
     minimapCluster:SetPoint("CENTER", frame, "CENTER", 0, 0)
@@ -139,6 +231,16 @@ local function ReplaceBlizzardFrame(frame)
 
     UpdateCalendarDate()
 
+    -- Configurar DurabilityFrame correctamente
+    local durabilityFrame = DurabilityFrame
+    if durabilityFrame then
+        durabilityFrame:ClearAllPoints()
+        -- Posicionar debajo del minimap con offset apropiado
+        durabilityFrame:SetPoint("TOP", Minimap, "BOTTOM", 0, 0)
+        -- Ajustar escala para que coincida con el minimap
+        durabilityFrame:SetScale(3 / blipScale)
+    end
+
     local minimapBattlefieldFrame = MiniMapBattlefieldFrame
     minimapBattlefieldFrame:ClearAllPoints()
     minimapBattlefieldFrame:SetPoint("BOTTOMLEFT", 8, 2)
@@ -146,7 +248,7 @@ local function ReplaceBlizzardFrame(frame)
     local minimapInstanceFrame = MiniMapInstanceDifficulty
     minimapInstanceFrame:ClearAllPoints()
     minimapInstanceFrame:SetPoint("TOP", minimapBorderTop, 'BOTTOMRIGHT', -20, 6)
-    minimapInstanceFrame:SetScale(0.85)  -- Escala fija para el icono de dificultad
+    minimapInstanceFrame:SetScale(0.85) -- Escala fija para el icono de dificultad
 
     local minimapTracking = MiniMapTracking
     minimapTracking:ClearAllPoints()
@@ -401,8 +503,11 @@ local function ReplaceBlizzardFrame(frame)
         end
     end
 
-    -- Hook al cierre del dropdown
+    -- Hook al cierre del dropdown (legacy - mantenido por compatibilidad)
     hooksecurefunc("CloseDropDownMenus", ResetTrackingIconPosition)
+
+    -- Setup secure hooks after frame modifications
+    SetupSecureHooks()
 
 end -- End of ReplaceBlizzardFrame function
 
@@ -748,13 +853,13 @@ local function MiniMapInstanceDifficulty_OnEvent(self)
         end
 
         MiniMapInstanceDifficultyText:SetText(maxPlayers)
-        
+
         -- Posicionar texto: ligeramente a la izquierda y hacia abajo (escala 0.85 maneja el tamaño)
         MiniMapInstanceDifficultyText:ClearAllPoints()
         MiniMapInstanceDifficultyText:SetPoint("CENTER", self, "CENTER", -1, -8)
 
         local minimapInstanceTexture = MiniMapInstanceDifficultyTexture
-        self:SetScale(0.85)  -- Escala fija para el icono de dificultad
+        self:SetScale(0.85) -- Escala fija para el icono de dificultad
         self:Show()
     else
         self:Hide()
@@ -780,6 +885,19 @@ function MinimapModule:StoreOriginalSettings()
         }
     end
 
+    -- NUEVO: Store original DurabilityFrame settings
+    if DurabilityFrame then
+        local point, relativeTo, relativePoint, xOfs, yOfs = DurabilityFrame:GetPoint(1)
+        self.originalMinimapSettings.durability = {
+            scale = DurabilityFrame:GetScale(),
+            point = point,
+            relativeTo = relativeTo,
+            relativePoint = relativePoint,
+            xOfs = xOfs,
+            yOfs = yOfs
+        }
+    end
+
     -- Store that we need to restore to Blizzard default mask
     if not self.originalMask then
         self.originalMask = "Textures\\MinimapMask" -- Standard Blizzard default
@@ -788,35 +906,84 @@ function MinimapModule:StoreOriginalSettings()
 end
 
 function MinimapModule:ApplyMinimapSystem()
-    if self.isEnabled then
-        return -- Already enabled
+    if self.applied then
+        return -- Already applied
+    end
+
+    -- Check module enabled state
+    if not IsModuleEnabled() then
+        return
+    end
+
+    -- Check combat lockdown
+    if InCombatLockdown() then
+        self.registeredEvents.PLAYER_REGEN_ENABLED = function()
+            self:ApplyMinimapSystem()
+        end
+        return
     end
 
     -- Store original settings before applying DragonUI changes
     self:StoreOriginalSettings()
-
+    
     -- Initialize the DragonUI minimap system
     self:InitializeMinimapSystem()
+    
+    self.applied = true
+    self.isEnabled = true -- Legacy compatibility
+    
+    print("DragonUI: Minimap module applied")
+end
 
-    self.isEnabled = true
-
+-- EVENT HANDLING: Proper event registration/cleanup
+local function RegisterModuleEvents()
+    if MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED then
+        local eventFrame = CreateFrame("Frame")
+        eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+        eventFrame:SetScript("OnEvent", function(self, event)
+            if MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED then
+                MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED()
+                MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = nil
+                self:UnregisterAllEvents()
+            end
+        end)
+        MinimapModule.frames.eventFrame = eventFrame
+    end
 end
 
 function MinimapModule:RestoreMinimapSystem()
-    if not self.isEnabled then
-        return -- Already disabled
+    if not self.applied then
+        return -- Already restored
+    end
+
+    -- Check combat lockdown
+    if InCombatLockdown() then
+        self.registeredEvents.PLAYER_REGEN_ENABLED = function()
+            self:RestoreMinimapSystem()
+        end
+        return
     end
 
     -- Hide DragonUI frames
     if self.minimapFrame then
         self.minimapFrame:Hide()
+        self.frames.minimapFrame = nil
     end
     if self.borderFrame then
         self.borderFrame:Hide()
+        self.frames.borderFrame = nil
     end
 
-    -- Restore original Blizzard minimap settings
-    if MinimapCluster and self.originalMinimapSettings.isStored then
+    -- Restore original MinimapCluster state
+    if MinimapCluster and self.originalStates.MinimapCluster then
+        MinimapCluster:ClearAllPoints()
+        local originalState = self.originalStates.MinimapCluster
+        for _, point in ipairs(originalState.points) do
+            MinimapCluster:SetPoint(unpack(point))
+        end
+        MinimapCluster:SetScale(originalState.scale)
+    elseif MinimapCluster and self.originalMinimapSettings.isStored then
+        -- Fallback to legacy method
         MinimapCluster:ClearAllPoints()
         MinimapCluster:SetPoint(self.originalMinimapSettings.point or "TOPRIGHT",
             self.originalMinimapSettings.relativeTo or UIParent,
@@ -825,29 +992,51 @@ function MinimapModule:RestoreMinimapSystem()
         MinimapCluster:SetScale(self.originalMinimapSettings.scale or 1.0)
     end
 
-    -- Restore original Blizzard frames that were hidden
+    -- Restore original DurabilityFrame state
+    if DurabilityFrame and self.originalStates.DurabilityFrame then
+        DurabilityFrame:ClearAllPoints()
+        local originalState = self.originalStates.DurabilityFrame
+        for _, point in ipairs(originalState.points) do
+            DurabilityFrame:SetPoint(unpack(point))
+        end
+        DurabilityFrame:SetScale(originalState.scale)
+    elseif DurabilityFrame and self.originalMinimapSettings.durability then
+        -- Fallback to legacy method
+        local durSettings = self.originalMinimapSettings.durability
+        DurabilityFrame:ClearAllPoints()
+        DurabilityFrame:SetPoint(
+            durSettings.point or "TOPLEFT",
+            durSettings.relativeTo or MinimapCluster,
+            durSettings.relativePoint or "BOTTOMLEFT",
+            durSettings.xOfs or -15,
+            durSettings.yOfs or -10
+        )
+        DurabilityFrame:SetScale(durSettings.scale or 1.0)
+    end
+
+    -- Restore other original states
     if MiniMapWorldMapButton then
         MiniMapWorldMapButton:Show()
     end
-
-    -- Restore original textures and positions
     if MinimapBorder then
         MinimapBorder:Show()
     end
-
     if Minimap.Circle then
         Minimap.Circle:Hide()
     end
 
     -- CRITICAL: Restore original Blizzard minimap mask
-    if Minimap then
-        local maskToRestore = self.originalMask or "Textures\\MinimapMask"
-        Minimap:SetMaskTexture(maskToRestore)
-
+    if Minimap and self.originalMask then
+        Minimap:SetMaskTexture(self.originalMask)
     end
 
-    self.isEnabled = false
+    -- Cleanup hooks (tracked for debugging)
+    CleanupSecureHooks()
 
+    self.applied = false
+    self.isEnabled = false -- Legacy compatibility
+    
+    print("DragonUI: Minimap module restored to Blizzard defaults")
 end
 
 function MinimapModule:InitializeMinimapSystem()
@@ -900,23 +1089,20 @@ function MinimapModule:InitializeMinimapSystem()
 end
 
 function MinimapModule:Initialize()
-    -- Check if minimap module is enabled
-    local isEnabled =
-        addon.db and addon.db.profile and addon.db.profile.modules and addon.db.profile.modules.minimap and
-            addon.db.profile.modules.minimap.enabled
-
-    if isEnabled == nil then
-        isEnabled = true -- Default to enabled for existing installations
+    if self.initialized then
+        return -- Already initialized
     end
-
-    if not isEnabled then
-
+    
+    -- Check if minimap module is enabled
+    if not IsModuleEnabled() then
         -- Don't apply any DragonUI modifications when disabled
         return
     end
 
     -- Only apply DragonUI modifications if module is enabled
     self:ApplyMinimapSystem()
+    
+    self.initialized = true
 end
 
 -- Eliminar las funciones que no existen más y convertir en funciones DragonUI
@@ -942,6 +1128,13 @@ function MinimapModule:UpdateSettings()
 
         end
 
+        -- NUEVO: Actualizar posición del DurabilityFrame cuando cambien las configuraciones
+        if DurabilityFrame then
+            DurabilityFrame:ClearAllPoints()
+            DurabilityFrame:SetPoint("TOP", Minimap, "BOTTOM", 0, 0)
+            DurabilityFrame:SetScale(scale)
+        end
+        
         --  APLICAR POSICIÓN
         self.minimapFrame:ClearAllPoints()
         self.minimapFrame:SetPoint(anchor, UIParent, anchor, x, y)
@@ -1153,6 +1346,19 @@ function addon:RefreshMinimap()
         --  NUEVO: Refrescar skinning de iconos de addons
         RemoveAllMinimapIconBorders()
     end
+end
+
+-- Profile Callbacks para manejo de cambios de configuración
+MinimapModule.OnProfileChanged = function()
+    addon:RefreshMinimapSystem()
+end
+
+MinimapModule.OnProfileCopied = function()
+    addon:RefreshMinimapSystem()
+end
+
+MinimapModule.OnProfileReset = function()
+    addon:RefreshMinimapSystem()
 end
 
 -- Función de refresh del sistema para habilitar/deshabilitar

@@ -95,7 +95,7 @@ local defaults = {
         -- Quest Tracker
         questtracker = {
             anchor = "TOPRIGHT",
-            x = -140,
+            x = -210,
             y = -255,
             show_header = false
         },
