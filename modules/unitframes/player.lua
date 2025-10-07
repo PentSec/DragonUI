@@ -145,6 +145,12 @@ local function GetPlayerConfig()
             config[key] = value
         end
     end
+    
+    -- Defaults específicos para runas DK si no están en database
+    if config.show_runes == nil then
+        config.show_runes = true -- Mostrar runas por defecto
+    end
+    
     return config
 end
 
@@ -464,12 +470,11 @@ local function UpdateRune(button)
     end
 end
 
--- Setup Death Knight rune frame
+-- Setup Death Knight rune frame (improved like RetailUI)
 local function SetupRuneFrame()
-    if select(2, UnitClass("player")) ~= "DEATHKNIGHT" then
-        return
-    end
-
+    -- WoW automáticamente maneja la disponibilidad de runas para DKs
+    -- No necesitamos verificar la clase manualmente
+    
     for index = 1, 6 do
         local button = _G['RuneButtonIndividual' .. index]
         if button then
@@ -477,9 +482,24 @@ local function SetupRuneFrame()
             if index > 1 then
                 button:SetPoint('LEFT', _G['RuneButtonIndividual' .. (index - 1)], 'RIGHT', 4, 0)
             else
-                button:SetPoint('CENTER', PlayerFrame, 'BOTTOM', -20, 0)
+                button:SetPoint('CENTER', PlayerFrame, 'BOTTOM', -10, 15)
             end
             UpdateRune(button)
+        end
+    end
+end
+
+-- Handle Death Knight runes in vehicle transitions (like RetailUI)
+local function HandleRuneFrameVehicleTransition(toVehicle)
+    for index = 1, 6 do
+        local button = _G['RuneButtonIndividual' .. index]
+        if button then
+            if toVehicle then
+                button:Hide() -- Ocultar runas en vehículo
+            else
+                button:Show() -- Mostrar runas fuera de vehículo
+                UpdateRune(button) -- Actualizar al salir de vehículo
+            end
         end
     end
 end
@@ -1121,7 +1141,10 @@ local function ChangePlayerframe()
     end
 
     -- Setup class-specific elements
-    SetupRuneFrame()
+    local config = GetPlayerConfig()
+    if config.show_runes ~= false then -- Solo setup si no est\u00e1 expl\u00edcitamente deshabilitado
+        SetupRuneFrame()
+    end
     UpdatePlayerRoleIcon()
     UpdateGroupIndicator()
     UpdateHealthBarColor(PlayerFrameHealthBar, "player")
@@ -1274,10 +1297,20 @@ local function InitializePlayerFrame()
         return
     end
 
+    -- Setup vehicle transition hooks
     if _G.PlayerFrame_ToVehicleArt then
         hooksecurefunc("PlayerFrame_ToVehicleArt", function()
             -- Reconfigurar textures para vehículo
             ChangePlayerframe()
+            -- Ocultar runas DK en vehículo
+            HandleRuneFrameVehicleTransition(true)
+        end)
+    end
+    
+    if _G.PlayerFrame_ToPlayerArt then
+        hooksecurefunc("PlayerFrame_ToPlayerArt", function()
+            -- Mostrar runas DK al salir de vehículo
+            HandleRuneFrameVehicleTransition(false)
         end)
     end
 
@@ -1393,8 +1426,12 @@ local function SetupPlayerEvents()
         end,
 
         RUNE_TYPE_UPDATE = function(runeIndex)
-            if runeIndex then
-                UpdateRune(_G['RuneButtonIndividual' .. runeIndex])
+            -- Mejorado: manejo más robusto del evento
+            if runeIndex and runeIndex >= 1 and runeIndex <= 6 then
+                local button = _G['RuneButtonIndividual' .. runeIndex]
+                if button then
+                    UpdateRune(button)
+                end
             end
         end,
 
