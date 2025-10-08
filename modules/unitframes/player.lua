@@ -1563,10 +1563,6 @@ local function SetupPlayerEvents()
             end
         end,
 
-        PLAYER_REGEN_ENABLED = function()
-            UpdateBothBars()
-            SetCombatFlashVisible(false)
-        end,
 
         ADDON_LOADED = function(addonName)
             if addonName == "DragonUI" then
