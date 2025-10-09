@@ -2,12 +2,19 @@
     DragonUI MicroMenu Module
     Refactored version maintaining all functionality with better organization
     Now with module enable/disable system
-]] local addon = select(2, ...);
+
+    -- MODULAR VERSION FOR VANILLA & ASCENSION --
+]]
+local addon = select(2, ...);
 local config = addon.config;
 
 -- ============================================================================
--- MODULE STATE TRACKING
+-- SERVER DETECTION & MODULE STATE
 -- ============================================================================
+
+-- Detect if we are on an Ascension server by checking for one of its custom buttons.
+-- This is the most reliable method.
+local isAscensionServer = (_G.PathToAscensionMicroButton ~= nil)
 
 local MicromenuModule = {
     initialized = false,
@@ -55,10 +62,39 @@ local MainMenuBarBackpackButton = _G.MainMenuBarBackpackButton;
 local HelpMicroButton = _G.HelpMicroButton;
 local KeyRingButton = _G.KeyRingButton;
 
--- Button collections
-local MICRO_BUTTONS = {_G.CharacterMicroButton, _G.SpellbookMicroButton, _G.TalentMicroButton,
-                       _G.AchievementMicroButton, _G.QuestLogMicroButton, _G.SocialsMicroButton, _G.LFDMicroButton,
-                       _G.CollectionsMicroButton, _G.PVPMicroButton, _G.MainMenuMicroButton, _G.HelpMicroButton};
+-- Button collections (dynamically set based on server)
+local MICRO_BUTTONS
+
+if isAscensionServer then
+    MICRO_BUTTONS = {
+        _G.CharacterMicroButton,
+        _G.SpellbookMicroButton,
+        _G.TalentMicroButton,
+        _G.AchievementMicroButton,
+        _G.QuestLogMicroButton,
+        _G.SocialsMicroButton,
+        _G.LFDMicroButton,
+        _G.PathToAscensionMicroButton,
+        _G.ChallengesMicroButton,
+        _G.MainMenuMicroButton,
+        _G.HelpMicroButton
+    }
+else
+    MICRO_BUTTONS = {
+        _G.CharacterMicroButton,
+        _G.SpellbookMicroButton,
+        _G.TalentMicroButton,
+        _G.AchievementMicroButton,
+        _G.QuestLogMicroButton,
+        _G.SocialsMicroButton,
+        _G.LFDMicroButton,
+        _G.CollectionsMicroButton,
+        _G.PVPMicroButton,
+        _G.MainMenuMicroButton,
+        _G.HelpMicroButton
+    }
+end
+
 
 local bagslots = {_G.CharacterBag0Slot, _G.CharacterBag1Slot, _G.CharacterBag2Slot, _G.CharacterBag3Slot};
 
@@ -76,11 +112,6 @@ local MicromenuAtlas = {
     ["UI-HUD-MicroMenu-Achievements-Down"] = {0.000976562, 0.0634766, 0.166016, 0.326172},
     ["UI-HUD-MicroMenu-Achievements-Mouseover"] = {0.000976562, 0.0634766, 0.330078, 0.490234},
     ["UI-HUD-MicroMenu-Achievements-Up"] = {0.000976562, 0.0634766, 0.494141, 0.654297},
-
-    ["UI-HUD-MicroMenu-Collections-Disabled"] = {0.0654297, 0.12793, 0.658203, 0.818359},
-    ["UI-HUD-MicroMenu-Collections-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422},
-    ["UI-HUD-MicroMenu-Collections-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109},
-    ["UI-HUD-MicroMenu-Collections-Up"] = {0.129883, 0.192383, 0.166016, 0.326172},
 
     ["UI-HUD-MicroMenu-GameMenu-Disabled"] = {0.129883, 0.192383, 0.330078, 0.490234},
     ["UI-HUD-MicroMenu-GameMenu-Down"] = {0.129883, 0.192383, 0.494141, 0.654297},
@@ -118,6 +149,24 @@ local MicromenuAtlas = {
     ["UI-HUD-MicroMenu-Shop-Up"] = {0.387695, 0.450195, 0.658203, 0.818359}
 }
 
+-- Add server-specific atlas data
+if isAscensionServer then
+    MicromenuAtlas["UI-HUD-MicroMenu-Challenges-Disabled"] = {0.000976562, 0.0634766, 0.658203, 0.818359}
+    MicromenuAtlas["UI-HUD-MicroMenu-Challenges-Down"] = {0.000976562, 0.0634766, 0.822266, 0.982422}
+    MicromenuAtlas["UI-HUD-MicroMenu-Challenges-Mouseover"] = {0.0654297, 0.12793, 0.00195312, 0.162109}
+    MicromenuAtlas["UI-HUD-MicroMenu-Challenges-Up"] = {0.0654297, 0.12793, 0.166016, 0.326172}
+    MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Disabled"] = {0.0654297, 0.12793, 0.658203, 0.818359}
+    MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422}
+    MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109}
+    MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Up"] = {0.129883, 0.192383, 0.166016, 0.326172}
+else
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Disabled"] = {0.0654297, 0.12793, 0.658203, 0.818359}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Up"] = {0.129883, 0.192383, 0.166016, 0.326172}
+end
+
+
 -- ============================================================================
 -- SECTION 3: UTILITY FUNCTIONS (ALL ORIGINAL CODE PRESERVED)
 -- ============================================================================
@@ -138,19 +187,36 @@ end
 
 -- Atlas helpers
 local function GetAtlasKey(buttonName)
-    local buttonMap = {
-        character = nil,
-        spellbook = "UI-HUD-MicroMenu-SpellbookAbilities",
-        talent = "UI-HUD-MicroMenu-SpecTalents",
-        achievement = "UI-HUD-MicroMenu-Achievements",
-        questlog = "UI-HUD-MicroMenu-Questlog",
-        socials = "UI-HUD-MicroMenu-GuildCommunities",
-        lfd = "UI-HUD-MicroMenu-Groupfinder",
-        collections = "UI-HUD-MicroMenu-Collections",
-        pvp = nil,
-        mainmenu = "UI-HUD-MicroMenu-Shop",
-        help = "UI-HUD-MicroMenu-GameMenu"
-    }
+    local buttonMap
+    if isAscensionServer then
+        buttonMap = {
+            character = nil, -- Uses portrait
+            spellbook = "UI-HUD-MicroMenu-SpellbookAbilities",
+            talent = "UI-HUD-MicroMenu-SpecTalents",
+            achievement = "UI-HUD-MicroMenu-Achievements",
+            questlog = "UI-HUD-MicroMenu-Questlog",
+            socials = "UI-HUD-MicroMenu-GuildCommunities",
+            lfd = "UI-HUD-MicroMenu-Groupfinder",
+            pathtoascension = "UI-HUD-MicroMenu-PathToAscension",
+            challenges = "UI-HUD-MicroMenu-Challenges",
+            mainmenu = "UI-HUD-MicroMenu-Shop",
+            help = "UI-HUD-MicroMenu-GameMenu"
+        }
+    else
+        buttonMap = {
+            character = nil,
+            spellbook = "UI-HUD-MicroMenu-SpellbookAbilities",
+            talent = "UI-HUD-MicroMenu-SpecTalents",
+            achievement = "UI-HUD-MicroMenu-Achievements",
+            questlog = "UI-HUD-MicroMenu-Questlog",
+            socials = "UI-HUD-MicroMenu-GuildCommunities",
+            lfd = "UI-HUD-MicroMenu-Groupfinder",
+            collections = "UI-HUD-MicroMenu-Collections",
+            pvp = nil,
+            mainmenu = "UI-HUD-MicroMenu-Shop",
+            help = "UI-HUD-MicroMenu-GameMenu"
+        }
+    end
     return buttonMap[buttonName]
 end
 
@@ -218,30 +284,32 @@ end
 local function StoreOriginalMicroButtonStates()
     -- Store original positions and parents for all micro buttons
     for _, button in pairs(MICRO_BUTTONS) do
-        local buttonName = button:GetName()
-        if not MicromenuModule.originalStates[buttonName] then
-            MicromenuModule.originalStates[buttonName] = {
-                parent = button:GetParent(),
-                points = {},
-                size = {button:GetSize()},
-                scripts = {
-                    OnEnter = button:GetScript('OnEnter'),
-                    OnLeave = button:GetScript('OnLeave'),
-                    OnClick = button:GetScript('OnClick'),
-                    OnUpdate = button:GetScript('OnUpdate')
-                },
-                textures = {
-                    normal = button:GetNormalTexture() and button:GetNormalTexture():GetTexture(),
-                    pushed = button:GetPushedTexture() and button:GetPushedTexture():GetTexture(),
-                    highlight = button:GetHighlightTexture() and button:GetHighlightTexture():GetTexture(),
-                    disabled = button:GetDisabledTexture() and button:GetDisabledTexture():GetTexture()
-                },
-                SetPoint = button.SetPoint
-            }
-            -- Store all anchor points
-            for i = 1, button:GetNumPoints() do
-                local point, relativeTo, relativePoint, x, y = button:GetPoint(i)
-                table.insert(MicromenuModule.originalStates[buttonName].points, {point, relativeTo, relativePoint, x, y})
+        if button then -- Check if button exists (e.g. PVPMicroButton might not)
+            local buttonName = button:GetName()
+            if not MicromenuModule.originalStates[buttonName] then
+                MicromenuModule.originalStates[buttonName] = {
+                    parent = button:GetParent(),
+                    points = {},
+                    size = {button:GetSize()},
+                    scripts = {
+                        OnEnter = button:GetScript('OnEnter'),
+                        OnLeave = button:GetScript('OnLeave'),
+                        OnClick = button:GetScript('OnClick'),
+                        OnUpdate = button:GetScript('OnUpdate')
+                    },
+                    textures = {
+                        normal = button:GetNormalTexture() and button:GetNormalTexture():GetTexture(),
+                        pushed = button:GetPushedTexture() and button:GetPushedTexture():GetTexture(),
+                        highlight = button:GetHighlightTexture() and button:GetHighlightTexture():GetTexture(),
+                        disabled = button:GetDisabledTexture() and button:GetDisabledTexture():GetTexture()
+                    },
+                    SetPoint = button.SetPoint
+                }
+                -- Store all anchor points
+                for i = 1, button:GetNumPoints() do
+                    local point, relativeTo, relativePoint, x, y = button:GetPoint(i)
+                    table.insert(MicromenuModule.originalStates[buttonName].points, {point, relativeTo, relativePoint, x, y})
+                end
             end
         end
     end
@@ -326,73 +394,75 @@ local function RestoreMicromenuSystem()
 
     -- Restore micro buttons to original state
     for _, button in pairs(MICRO_BUTTONS) do
-        local buttonName = button:GetName()
-        local original = MicromenuModule.originalStates[buttonName]
+        if button then
+            local buttonName = button:GetName()
+            local original = MicromenuModule.originalStates[buttonName]
 
-        if original then
-            -- Restore SetPoint function if it was nooped
-            if original.SetPoint then
-                button.SetPoint = original.SetPoint
-            end
-
-            -- Restore parent
-            if original.parent then
-                button:SetParent(original.parent)
-            end
-
-            -- Clear and restore points
-            button:ClearAllPoints()
-            for _, pointData in ipairs(original.points) do
-                local point, relativeTo, relativePoint, x, y = unpack(pointData)
-                if relativeTo then
-                    button:SetPoint(point, relativeTo, relativePoint, x, y)
-                else
-                    button:SetPoint(point, relativePoint, x, y)
+            if original then
+                -- Restore SetPoint function if it was nooped
+                if original.SetPoint then
+                    button.SetPoint = original.SetPoint
                 end
-            end
 
-            -- Restore size
-            if original.size then
-                button:SetSize(unpack(original.size))
-            end
+                -- Restore parent
+                if original.parent then
+                    button:SetParent(original.parent)
+                end
 
-            -- Restore textures
-            if original.textures then
-                if original.textures.normal and button:GetNormalTexture() then
-                    button:GetNormalTexture():SetTexture(original.textures.normal)
+                -- Clear and restore points
+                button:ClearAllPoints()
+                for _, pointData in ipairs(original.points) do
+                    local point, relativeTo, relativePoint, x, y = unpack(pointData)
+                    if relativeTo then
+                        button:SetPoint(point, relativeTo, relativePoint, x, y)
+                    else
+                        button:SetPoint(point, relativePoint, x, y)
+                    end
                 end
-                if original.textures.pushed and button:GetPushedTexture() then
-                    button:GetPushedTexture():SetTexture(original.textures.pushed)
-                end
-                if original.textures.highlight and button:GetHighlightTexture() then
-                    button:GetHighlightTexture():SetTexture(original.textures.highlight)
-                end
-                if original.textures.disabled and button:GetDisabledTexture() then
-                    button:GetDisabledTexture():SetTexture(original.textures.disabled)
-                end
-            end
 
-            -- Restore scripts
-            if original.scripts then
-                for scriptName, scriptFunc in pairs(original.scripts) do
-                    button:SetScript(scriptName, scriptFunc)
+                -- Restore size
+                if original.size then
+                    button:SetSize(unpack(original.size))
                 end
-            end
 
-            -- Clean up DragonUI custom textures
-            if button.DragonUIBackground then
-                button.DragonUIBackground:Hide()
-                button.DragonUIBackground = nil
-            end
-            if button.DragonUIBackgroundPushed then
-                button.DragonUIBackgroundPushed:Hide()
-                button.DragonUIBackgroundPushed = nil
-            end
+                -- Restore textures
+                if original.textures then
+                    if original.textures.normal and button:GetNormalTexture() then
+                        button:GetNormalTexture():SetTexture(original.textures.normal)
+                    end
+                    if original.textures.pushed and button:GetPushedTexture() then
+                        button:GetPushedTexture():SetTexture(original.textures.pushed)
+                    end
+                    if original.textures.highlight and button:GetHighlightTexture() then
+                        button:GetHighlightTexture():SetTexture(original.textures.highlight)
+                    end
+                    if original.textures.disabled and button:GetDisabledTexture() then
+                        button:GetDisabledTexture():SetTexture(original.textures.disabled)
+                    end
+                end
 
-            button.dragonUIState = nil
-            button.dragonUITimer = nil
-            button.dragonUILastState = nil
-            button.HandleDragonUIState = nil
+                -- Restore scripts
+                if original.scripts then
+                    for scriptName, scriptFunc in pairs(original.scripts) do
+                        button:SetScript(scriptName, scriptFunc)
+                    end
+                end
+
+                -- Clean up DragonUI custom textures
+                if button.DragonUIBackground then
+                    button.DragonUIBackground:Hide()
+                    button.DragonUIBackground = nil
+                end
+                if button.DragonUIBackgroundPushed then
+                    button.DragonUIBackgroundPushed:Hide()
+                    button.DragonUIBackgroundPushed = nil
+                end
+
+                button.dragonUIState = nil
+                button.dragonUITimer = nil
+                button.dragonUILastState = nil
+                button.HandleDragonUIState = nil
+            end
         end
     end
 
@@ -822,7 +892,7 @@ local function ApplyMicromenuSystem()
         -- PASO 2: Solo background (como otros botones)
         if not button.DragonUIBackground then
             local microTexture = 'Interface\\AddOns\\DragonUI\\Textures\\Micromenu\\uimicromenu2x'
-            local dx, dy = -1, 1
+            local dx, dy = -1, -1 -- OPRAVA: Sjednocení vertikálního posunu
             local offX, offY = button:GetPushedTextOffset()
             local sizeX, sizeY = button:GetSize()
 
@@ -1166,58 +1236,61 @@ local function ApplyMicromenuSystem()
         menu:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMRIGHT', xPosition, yPosition)
 
         if not menu.registeredInEditor then
-            -- Crear frame contenedor usando el sistema estándar
+            -- Create container frame
             local microMenuFrame = addon.CreateUIFrame(240, 40, "MicroMenu")
 
-            -- CORREGIDO: Aplicar posición desde widgets O usar fallback
+            -- Define conditional offset
+            local menuXOffset = isAscensionServer and -170 or -140
+
+            -- Apply position from widgets DB or use fallback
             local microMenuConfig = addon.db and addon.db.profile.widgets and addon.db.profile.widgets.micromenu
             if microMenuConfig and microMenuConfig.posX and microMenuConfig.posY then
-                -- Usar posición guardada del editor
+                -- Use saved editor position
                 microMenuFrame:SetPoint(microMenuConfig.anchor or "BOTTOMRIGHT", UIParent,
-                    microMenuConfig.anchor or "BOTTOMRIGHT", 
+                    microMenuConfig.anchor or "BOTTOMRIGHT",
                     microMenuConfig.posX, microMenuConfig.posY)
             else
-                -- Usar posición por defecto solo si no hay configuración de widgets
-                microMenuFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 
+                -- Use default position only if no widget config exists
+                microMenuFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT",
                     xOffset + config.x_position, config.y_position)
             end
 
-            -- Asegurar que el menú real siga al frame contenedor
+            -- Anchor the real menu to the container frame
             menu:SetParent(UIParent)
             menu:ClearAllPoints()
-            menu:SetPoint("CENTER", microMenuFrame, "CENTER", -140, -70) -- Ajustar posición: izquierda y arriba
+            menu:SetPoint("CENTER", microMenuFrame, "CENTER", menuXOffset, -70) -- Use variable
 
-            -- Hook para que el menú siga al contenedor cuando se mueva
+            -- Hook for the menu to follow the container when moved
             microMenuFrame:HookScript("OnDragStop", function(self)
                 menu:ClearAllPoints()
-                menu:SetPoint("CENTER", self, "CENTER", -140, -70)
+                menu:SetPoint("CENTER", self, "CENTER", menuXOffset, -70) -- Use variable
             end)
 
             microMenuFrame:HookScript("OnShow", function(self)
                 menu:ClearAllPoints()
-                menu:SetPoint("CENTER", self, "CENTER", -140, -70)
+                menu:SetPoint("CENTER", self, "CENTER", menuXOffset, -70) -- Use variable
             end)
 
-            -- Hook continuo para mantener la posición
+            -- Continuous hook to maintain position
             microMenuFrame:HookScript("OnUpdate", function(self)
                 if not menu:GetPoint() then
                     menu:ClearAllPoints()
-                    menu:SetPoint("CENTER", self, "CENTER", -140, -70)
+                    menu:SetPoint("CENTER", self, "CENTER", menuXOffset, -70) -- Use variable
                 end
             end)
 
-            -- CORREGIDO: Añadir función de actualización de widgets
+            -- Widget update function
             local function UpdateMicroMenuWidgets()
                 local microMenuConfig = addon.db and addon.db.profile.widgets and addon.db.profile.widgets.micromenu
                 if microMenuConfig and microMenuConfig.posX and microMenuConfig.posY then
                     microMenuFrame:ClearAllPoints()
                     microMenuFrame:SetPoint(microMenuConfig.anchor or "BOTTOMRIGHT", UIParent,
-                        microMenuConfig.anchor or "BOTTOMRIGHT", 
+                        microMenuConfig.anchor or "BOTTOMRIGHT",
                         microMenuConfig.posX, microMenuConfig.posY)
-                    
-                    -- Actualizar posición del menú real
+
+                    -- Update real menu position
                     menu:ClearAllPoints()
-                    menu:SetPoint("CENTER", microMenuFrame, "CENTER", -140, -70)
+                    menu:SetPoint("CENTER", microMenuFrame, "CENTER", menuXOffset, -70) -- Use variable
                 end
             end
 
@@ -1227,187 +1300,199 @@ local function ApplyMicromenuSystem()
                 blizzardFrame = menu,
                 configPath = {"widgets", "micromenu"},
                 module = addon.MicroMenuModule or {},
-                UpdateWidgets = UpdateMicroMenuWidgets  -- AÑADIDO: Función de actualización
+                UpdateWidgets = UpdateMicroMenuWidgets -- Added update function
             })
 
             menu.registeredInEditor = true
         end
 
         for _, button in pairs(MICRO_BUTTONS) do
-            local buttonName = button:GetName():gsub('MicroButton', '')
-            local name = string.lower(buttonName);
+            if button then
+                local buttonName = button:GetName():gsub('MicroButton', '')
+                local name = string.lower(buttonName);
 
-            CaptureOriginalHandlers(button)
+                CaptureOriginalHandlers(button)
 
-            local wasEnabled = button.IsEnabled and button:IsEnabled() or true
-            local wasVisible = button.IsVisible and button:IsVisible() or true
+                local wasEnabled = button.IsEnabled and button:IsEnabled() or true
+                local wasVisible = button.IsVisible and button:IsVisible() or true
 
-            button:texture_strip()
-            CharacterMicroButton:SetDisabledTexture ''
+                button:texture_strip()
+                CharacterMicroButton:SetDisabledTexture ''
 
-            button:SetParent(menu)
+                button:SetParent(menu)
 
-            if useGrayscale then
-                button:SetSize(14, 19)
-            else
-                button:SetSize(32, 40)
-            end
-
-            button:ClearAllPoints()
-            button:SetPoint('BOTTOMLEFT', menu, 'BOTTOMRIGHT', buttonxOffset, 55)
-            button.SetPoint = addon._noop
-            button:SetHitRectInsets(0, 0, 0, 0)
-
-            button:EnableMouse(true)
-            if button.SetEnabled and wasEnabled then
-                button:SetEnabled(true)
-            end
-            if wasVisible then
-                button:Show()
-            end
-
-            local isCharacterButton = (buttonName == "Character")
-            local isPVPButton = (buttonName == "PVP")
-
-            local upCoords = not isCharacterButton and not isPVPButton and GetColoredTextureCoords(name, "Up") or nil
-            local shouldUseGrayscale = useGrayscale or (not isPVPButton and not upCoords and not isCharacterButton)
-
-            if shouldUseGrayscale then
-                -- Grayscale icons
-                local normalTexture = button:GetNormalTexture()
-                local pushedTexture = button:GetPushedTexture()
-                local disabledTexture = button:GetDisabledTexture()
-                local highlightTexture = button:GetHighlightTexture()
-
-                if normalTexture then
-                    normalTexture:set_atlas('ui-hud-micromenu-' .. name .. '-up-2x')
-                end
-                if pushedTexture then
-                    pushedTexture:set_atlas('ui-hud-micromenu-' .. name .. '-down-2x')
-                end
-                if disabledTexture then
-                    disabledTexture:set_atlas('ui-hud-micromenu-' .. name .. '-disabled-2x')
-                end
-                if highlightTexture then
-                    highlightTexture:set_atlas('ui-hud-micromenu-' .. name .. '-mouseover-2x')
-                end
-            elseif isPVPButton then
-                SetupPVPButton(button)
-            elseif isCharacterButton then
-                SetupCharacterButton(button)
-            else
-                -- Colored icons
-                local microTexture = 'Interface\\AddOns\\DragonUI\\Textures\\Micromenu\\uimicromenu2x'
-
-                local downCoords = GetColoredTextureCoords(name, "Down")
-                local disabledCoords = GetColoredTextureCoords(name, "Disabled")
-                local mouseoverCoords = GetColoredTextureCoords(name, "Mouseover")
-
-                if upCoords and #upCoords >= 4 then
-                    button:GetNormalTexture():SetTexture(microTexture)
-                    button:GetNormalTexture():SetTexCoord(upCoords[1], upCoords[2], upCoords[3], upCoords[4])
+                if useGrayscale then
+                    button:SetSize(14, 19)
+                else
+                    button:SetSize(32, 40)
                 end
 
-                if downCoords and #downCoords >= 4 then
-                    button:GetPushedTexture():SetTexture(microTexture)
-                    button:GetPushedTexture():SetTexCoord(downCoords[1], downCoords[2], downCoords[3], downCoords[4])
+                button:ClearAllPoints()
+                button:SetPoint('BOTTOMLEFT', menu, 'BOTTOMRIGHT', buttonxOffset, 55)
+                button.SetPoint = addon._noop
+                button:SetHitRectInsets(0, 0, 0, 0)
+
+                button:EnableMouse(true)
+                if button.SetEnabled and wasEnabled then
+                    button:SetEnabled(true)
+                end
+                if wasVisible then
+                    button:Show()
                 end
 
-                if disabledCoords and #disabledCoords >= 4 then
-                    button:GetDisabledTexture():SetTexture(microTexture)
-                    button:GetDisabledTexture():SetTexCoord(disabledCoords[1], disabledCoords[2], disabledCoords[3],
-                        disabledCoords[4])
-                end
+                local isCharacterButton = (buttonName == "Character")
+                local isPVPButton = (buttonName == "PVP")
 
-                if mouseoverCoords and #mouseoverCoords >= 4 then
-                    button:GetHighlightTexture():SetTexture(microTexture)
-                    button:GetHighlightTexture():SetTexCoord(mouseoverCoords[1], mouseoverCoords[2], mouseoverCoords[3],
-                        mouseoverCoords[4])
-                end
+                local upCoords = not isCharacterButton and not isPVPButton and GetColoredTextureCoords(name, "Up") or nil
+                local shouldUseGrayscale = useGrayscale or (not isPVPButton and not upCoords and not isCharacterButton)
 
-                -- Add background
-                if not button.DragonUIBackground then
-                    local backgroundTexture = 'Interface\\AddOns\\DragonUI\\Textures\\Micromenu\\uimicromenu2x'
-                    local dx, dy = -1, 1
-                    local offX, offY = button:GetPushedTextOffset()
-                    local sizeX, sizeY = button:GetSize()
+                if shouldUseGrayscale then
+                    -- Grayscale icons
+                    local normalTexture = button:GetNormalTexture()
+                    local pushedTexture = button:GetPushedTexture()
+                    local disabledTexture = button:GetDisabledTexture()
+                    local highlightTexture = button:GetHighlightTexture()
 
-                    local bg = button:CreateTexture('DragonUIBackground', 'BACKGROUND')
-                    bg:SetTexture(backgroundTexture)
-                    bg:SetSize(sizeX, sizeY + 1)
-                    bg:SetTexCoord(0.0654297, 0.12793, 0.330078, 0.490234)
-                    bg:SetPoint('CENTER', dx, dy)
-                    button.DragonUIBackground = bg
-
-                    local bgPushed = button:CreateTexture('DragonUIBackgroundPushed', 'BACKGROUND')
-                    bgPushed:SetTexture(backgroundTexture)
-                    bgPushed:SetSize(sizeX, sizeY + 1)
-                    bgPushed:SetTexCoord(0.0654297, 0.12793, 0.494141, 0.654297)
-                    bgPushed:SetPoint('CENTER', dx + offX, dy + offY)
-                    bgPushed:Hide()
-                    button.DragonUIBackgroundPushed = bgPushed
-
-                    -- Initialize state tracking properties
-                    button.dragonUIState = {
-                        pushed = false
-                    }
-                    button.dragonUITimer = 0
-                    button.dragonUILastState = false
-
-                    button.HandleDragonUIState = function()
-                        local state = button.dragonUIState
-                        if state and state.pushed then
-                            button.DragonUIBackground:Hide()
-                            button.DragonUIBackgroundPushed:Show()
-                        else
-                            button.DragonUIBackground:Show()
-                            button.DragonUIBackgroundPushed:Hide()
-                        end
+                    if normalTexture then
+                        normalTexture:set_atlas('ui-hud-micromenu-' .. name .. '-up-2x')
                     end
-                    button.HandleDragonUIState()
+                    if pushedTexture then
+                        pushedTexture:set_atlas('ui-hud-micromenu-' .. name .. '-down-2x')
+                    end
+                    if disabledTexture then
+                        disabledTexture:set_atlas('ui-hud-micromenu-' .. name .. '-disabled-2x')
+                    end
+                    if highlightTexture then
+                        highlightTexture:set_atlas('ui-hud-micromenu-' .. name .. '-mouseover-2x')
+                    end
+                elseif isPVPButton then
+                    SetupPVPButton(button)
+                elseif isCharacterButton then
+                    SetupCharacterButton(button)
+                else
+                    -- Colored icons
+                    local microTexture = 'Interface\\AddOns\\DragonUI\\Textures\\Micromenu\\uimicromenu2x'
 
-                    if buttonName ~= "MainMenu" then
-                        button:SetScript('OnUpdate', function(self, elapsed)
-                            -- Ensure timer is initialized
-                            if not self.dragonUITimer then
-                                self.dragonUITimer = 0
+                    local downCoords = GetColoredTextureCoords(name, "Down")
+                    local disabledCoords = GetColoredTextureCoords(name, "Disabled")
+                    local mouseoverCoords = GetColoredTextureCoords(name, "Mouseover")
+
+                    if upCoords and #upCoords >= 4 then
+                        local tex = button:GetNormalTexture()
+                        tex:SetTexture(microTexture)
+                        tex:SetTexCoord(upCoords[1], upCoords[2], upCoords[3], upCoords[4])
+                        tex:ClearAllPoints()
+                        tex:SetAllPoints(button)
+                    end
+
+                    if downCoords and #downCoords >= 4 then
+                        local tex = button:GetPushedTexture()
+                        tex:SetTexture(microTexture)
+                        tex:SetTexCoord(downCoords[1], downCoords[2], downCoords[3], downCoords[4])
+                        tex:ClearAllPoints()
+                        tex:SetAllPoints(button)
+                    end
+
+                    if disabledCoords and #disabledCoords >= 4 then
+                        local tex = button:GetDisabledTexture()
+                        tex:SetTexture(microTexture)
+                        tex:SetTexCoord(disabledCoords[1], disabledCoords[2], disabledCoords[3], disabledCoords[4])
+                        tex:ClearAllPoints()
+                        tex:SetAllPoints(button)
+                    end
+
+                    if mouseoverCoords and #mouseoverCoords >= 4 then
+                        local tex = button:GetHighlightTexture()
+                        tex:SetTexture(microTexture)
+                        tex:SetTexCoord(mouseoverCoords[1], mouseoverCoords[2], mouseoverCoords[3], mouseoverCoords[4])
+                        tex:ClearAllPoints()
+                        tex:SetAllPoints(button)
+                    end
+
+                    -- Add background
+                    if not button.DragonUIBackground then
+                        local backgroundTexture = 'Interface\\AddOns\\DragonUI\\Textures\\Micromenu\\uimicromenu2x'
+                        local dx, dy = -1, -1
+                        local offX, offY = button:GetPushedTextOffset()
+                        local sizeX, sizeY = button:GetSize()
+
+                        local bg = button:CreateTexture('DragonUIBackground', 'BACKGROUND')
+                        bg:SetTexture(backgroundTexture)
+                        bg:SetSize(sizeX, sizeY + 1)
+                        bg:SetTexCoord(0.0654297, 0.12793, 0.330078, 0.490234)
+                        bg:SetPoint('CENTER', dx, dy)
+                        button.DragonUIBackground = bg
+
+                        local bgPushed = button:CreateTexture('DragonUIBackgroundPushed', 'BACKGROUND')
+                        bgPushed:SetTexture(backgroundTexture)
+                        bgPushed:SetSize(sizeX, sizeY + 1)
+                        bgPushed:SetTexCoord(0.0654297, 0.12793, 0.494141, 0.654297)
+                        bgPushed:SetPoint('CENTER', dx + offX, dy + offY)
+                        bgPushed:Hide()
+                        button.DragonUIBackgroundPushed = bgPushed
+
+                        -- Initialize state tracking properties
+                        button.dragonUIState = {
+                            pushed = false
+                        }
+                        button.dragonUITimer = 0
+                        button.dragonUILastState = false
+
+                        button.HandleDragonUIState = function()
+                            local state = button.dragonUIState
+                            if state and state.pushed then
+                                button.DragonUIBackground:Hide()
+                                button.DragonUIBackgroundPushed:Show()
+                            else
+                                button.DragonUIBackground:Show()
+                                button.DragonUIBackgroundPushed:Hide()
                             end
+                        end
+                        button.HandleDragonUIState()
 
-                            self.dragonUITimer = self.dragonUITimer + elapsed
-                            if self.dragonUITimer >= 0.1 then
-                                self.dragonUITimer = 0
-                                local currentState = self:GetButtonState() == "PUSHED"
-                                if currentState ~= self.dragonUILastState then
-                                    self.dragonUILastState = currentState
-                                    if self.dragonUIState then
-                                        self.dragonUIState.pushed = currentState
-                                    end
-                                    if self.HandleDragonUIState then
-                                        self.HandleDragonUIState()
+                        if buttonName ~= "MainMenu" then
+                            button:SetScript('OnUpdate', function(self, elapsed)
+                                -- Ensure timer is initialized
+                                if not self.dragonUITimer then
+                                    self.dragonUITimer = 0
+                                end
+
+                                self.dragonUITimer = self.dragonUITimer + elapsed
+                                if self.dragonUITimer >= 0.1 then
+                                    self.dragonUITimer = 0
+                                    local currentState = self:GetButtonState() == "PUSHED"
+                                    if currentState ~= self.dragonUILastState then
+                                        self.dragonUILastState = currentState
+                                        if self.dragonUIState then
+                                            self.dragonUIState.pushed = currentState
+                                        end
+                                        if self.HandleDragonUIState then
+                                            self.HandleDragonUIState()
+                                        end
                                     end
                                 end
-                            end
-                        end)
+                            end)
+                        end
                     end
                 end
-            end
 
-            local highlightTexture = button:GetHighlightTexture()
-            if highlightTexture then
-                highlightTexture:SetBlendMode('ADD')
-                highlightTexture:SetAlpha(1)
-            end
+                local highlightTexture = button:GetHighlightTexture()
+                if highlightTexture then
+                    highlightTexture:SetBlendMode('ADD')
+                    highlightTexture:SetAlpha(1)
+                end
 
-            button:EnableMouse(true)
-            if button.SetEnabled and wasEnabled then
-                button:SetEnabled(true)
-            end
+                button:EnableMouse(true)
+                if button.SetEnabled and wasEnabled then
+                    button:SetEnabled(true)
+                end
 
-            if buttonName ~= "Character" then
-                RestoreOriginalHandlers(button)
-            end
+                if buttonName ~= "Character" then
+                    RestoreOriginalHandlers(button)
+                end
 
-            buttonxOffset = buttonxOffset + iconSpacing
+                buttonxOffset = buttonxOffset + iconSpacing
+            end
         end
         UpdateCharacterPortraitVisibility()
     end
@@ -1428,9 +1513,11 @@ local function ApplyMicromenuSystem()
 
         local buttonxOffset = 0
         for _, button in pairs(MICRO_BUTTONS) do
-            button:ClearAllPoints()
-            button:SetPoint('BOTTOMLEFT', _G.pUiMicroMenu, 'BOTTOMRIGHT', buttonxOffset, 55)
-            buttonxOffset = buttonxOffset + iconSpacing
+            if button then
+                button:ClearAllPoints()
+                button:SetPoint('BOTTOMLEFT', _G.pUiMicroMenu, 'BOTTOMRIGHT', buttonxOffset, 55)
+                buttonxOffset = buttonxOffset + iconSpacing
+            end
         end
     end
 
@@ -1445,41 +1532,44 @@ local function ApplyMicromenuSystem()
 
     local frameInfo = addon:GetEditableFrameInfo("micromenu")
     if frameInfo and frameInfo.frame then
-        -- CORREGIDO: Usar configuración del sistema de widgets en lugar de la antigua
+        -- Corrected: Use widget system config instead of old one
         local microMenuConfig = addon.db and addon.db.profile.widgets and addon.db.profile.widgets.micromenu
-        
+
         if microMenuConfig and microMenuConfig.posX and microMenuConfig.posY then
-            -- Usar posición guardada del editor
+            -- Use saved editor position
             frameInfo.frame:ClearAllPoints()
             frameInfo.frame:SetPoint(microMenuConfig.anchor or "BOTTOMRIGHT", UIParent,
-                microMenuConfig.anchor or "BOTTOMRIGHT", 
+                microMenuConfig.anchor or "BOTTOMRIGHT",
                 microMenuConfig.posX, microMenuConfig.posY)
         else
-            -- Solo usar fallback si no hay configuración de widgets
+            -- Fallback only if no widget config
             local useGrayscale = addon.db.profile.micromenu.grayscale_icons
             local configMode = useGrayscale and "grayscale" or "normal"
             local config = addon.db.profile.micromenu[configMode]
             local xOffset = IsAddOnLoaded('ezCollections') and -180 or -166
-            
+
             frameInfo.frame:ClearAllPoints()
-            frameInfo.frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 
+            frameInfo.frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT",
                 xOffset + config.x_position, config.y_position)
         end
 
-        -- Asegurar que el menú siga al contenedor con posicionamiento corregido
+        -- Define conditional offset
+        local menuXOffset = isAscensionServer and -170 or -140
+
+        -- Ensure the menu follows the container with corrected positioning
         _G.pUiMicroMenu:ClearAllPoints()
-        _G.pUiMicroMenu:SetPoint("CENTER", frameInfo.frame, "CENTER", -50, 10)
+        _G.pUiMicroMenu:SetPoint("CENTER", frameInfo.frame, "CENTER", menuXOffset, -70)
     else
-        -- Fallback al método anterior si no hay contenedor
+        -- Fallback to old method if no container
         local useGrayscale = addon.db.profile.micromenu.grayscale_icons
         local configMode = useGrayscale and "grayscale" or "normal"
         local config = addon.db.profile.micromenu[configMode]
-        
+
         local microMenu = _G.pUiMicroMenu
         microMenu:SetScale(config.scale_menu)
         local xOffset = IsAddOnLoaded('ezCollections') and -180 or -166
         microMenu:ClearAllPoints()
-        microMenu:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMRIGHT', 
+        microMenu:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMRIGHT',
             xOffset + config.x_position, config.y_position)
     end
 
@@ -1574,7 +1664,7 @@ end
 
     -- CORREGIDO: Solo aplicar escala, NO posición (eso lo maneja el editor)
     _G.pUiMicroMenu:SetScale(config.scale_menu)
-    
+
     -- ELIMINADO: No sobrescribir posición del editor
     -- _G.pUiMicroMenu:ClearAllPoints()
     -- _G.pUiMicroMenu:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMRIGHT', xOffset + config.x_position, config.y_position)
@@ -1583,19 +1673,21 @@ end
 
     local buttonxOffset = 0
     for _, button in pairs(MICRO_BUTTONS) do
-        local originalSetPoint = button.SetPoint
-        if button.SetPoint == addon._noop then
-            button.SetPoint = UIParent.SetPoint
+        if button then
+            local originalSetPoint = button.SetPoint
+            if button.SetPoint == addon._noop then
+                button.SetPoint = UIParent.SetPoint
+            end
+
+            button:ClearAllPoints()
+            button:SetPoint('BOTTOMLEFT', _G.pUiMicroMenu, 'BOTTOMRIGHT', buttonxOffset, 55)
+
+            if originalSetPoint == addon._noop then
+                button.SetPoint = originalSetPoint
+            end
+
+            buttonxOffset = buttonxOffset + config.icon_spacing
         end
-
-        button:ClearAllPoints()
-        button:SetPoint('BOTTOMLEFT', _G.pUiMicroMenu, 'BOTTOMRIGHT', buttonxOffset, 55)
-
-        if originalSetPoint == addon._noop then
-            button.SetPoint = originalSetPoint
-        end
-
-        buttonxOffset = buttonxOffset + config.icon_spacing
     end
 
     addon.RefreshMicromenuVehicle()
@@ -1797,7 +1889,9 @@ end
         local xOffset
         if IsAddOnLoaded('ezCollections') then
             xOffset = -180
-            _G.CollectionsMicroButton:UnregisterEvent('UPDATE_BINDINGS')
+            if _G.CollectionsMicroButton then
+                _G.CollectionsMicroButton:UnregisterEvent('UPDATE_BINDINGS')
+            end
         else
             xOffset = -166
         end
@@ -1956,13 +2050,13 @@ local function LoadDefaultWidgetSettings()
     if not addon.db.profile.widgets then
         addon.db.profile.widgets = {}
     end
-    
+
     if not addon.db.profile.widgets.micromenu then
         -- Calcular posición por defecto basada en configuración actual
         local useGrayscale = addon.db.profile.micromenu and addon.db.profile.micromenu.grayscale_icons
         local configMode = useGrayscale and "grayscale" or "normal"
         local config = addon.db.profile.micromenu and addon.db.profile.micromenu[configMode]
-        
+
         if config then
             local xOffset = IsAddOnLoaded('ezCollections') and -180 or -166
             addon.db.profile.widgets.micromenu = {
@@ -1973,7 +2067,7 @@ local function LoadDefaultWidgetSettings()
         else
             -- Fallback absoluto
             addon.db.profile.widgets.micromenu = {
-                anchor = "BOTTOMRIGHT", 
+                anchor = "BOTTOMRIGHT",
                 posX = -166,
                 posY = 4
             }
