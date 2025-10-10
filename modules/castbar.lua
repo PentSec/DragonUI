@@ -174,9 +174,11 @@ local function ForceStatusBarLayer(statusBar)
         return
     end
 
+    -- ✅ SOLO configurar UNA VEZ, no en cada frame
     local texture = statusBar:GetStatusBarTexture()
-    if texture and texture.SetDrawLayer then
+    if texture and texture.SetDrawLayer and not statusBar._layerForced then
         texture:SetDrawLayer('BORDER', 0)
+        statusBar._layerForced = true -- Marcar como configurado
     end
 end
 
@@ -204,29 +206,21 @@ local function CreateTextureClipping(statusBar)
             return
         end
 
-        -- Asegurar que la textura esté correctamente posicionada
-        texture:ClearAllPoints()
-        texture:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, 0)
-        texture:SetPoint('BOTTOMRIGHT', self, 'BOTTOMRIGHT', 0, 0)
-
-        -- Forzar layer correcto
-        ForceStatusBarLayer(self)
-
-        --  Clamping más suave para evitar parpadeos
-        local clampedProgress = max(0.001, min(0.999, progress))
-
-        --  Lógica correcta para channels
         if isChanneling then
-            -- Channel: La barra se vacía de derecha a izquierda
-            -- Progress va de 1 -> 0, pero SetTexCoord necesita 0 -> 1
+            -- ✅ CHANNELING: Ocultar desde la derecha
+            local clampedProgress = math.max(0.01, math.min(0.99, progress))
+            texture:ClearAllPoints()
+            texture:SetAllPoints(self)
             texture:SetTexCoord(0, clampedProgress, 0, 1)
         else
-            -- Cast: La barra se llena de izquierda a derecha (normal)
+            -- ✅ CASTING: Normal
+            local clampedProgress = math.max(0.01, math.min(0.99, progress))
             texture:SetTexCoord(0, clampedProgress, 0, 1)
+            texture:ClearAllPoints()
+            texture:SetAllPoints(self)
         end
     end
 end
-
 -- ============================================================================
 -- BLIZZARD CASTBAR MANAGEMENT
 -- ============================================================================
@@ -675,7 +669,6 @@ local function SetCastText(unitType, text)
         end
     end
 end
-
 local function UpdateTimeText(unitType)
     local frames = CastbarModule.frames[unitType]
     local state = CastbarModule.states[unitType]
@@ -699,9 +692,11 @@ local function UpdateTimeText(unitType)
     local secondsMax = state.maxValue or 0
 
     if state.casting or state.isChanneling then
-        if state.casting and not state.isChanneling then
+        if state.casting then
+            -- CASTING: Mostrar tiempo restante (cuenta atrás)
             seconds = max(0, state.maxValue - state.currentValue)
         else
+            -- ✅ CHANNELING: Mostrar tiempo restante directo (ya decrece)
             seconds = max(0, state.currentValue)
         end
     end
@@ -783,7 +778,6 @@ local function CreateTextElements(parent, unitType)
 
     return elements
 end
-
 local function CreateCastbar(unitType)
     if CastbarModule.frames[unitType].castbar then
         return
@@ -809,7 +803,6 @@ local function CreateCastbar(unitType)
     -- StatusBar texture
     frames.castbar:SetStatusBarTexture(TEXTURES.standard)
     frames.castbar:SetStatusBarColor(1, 0.7, 0, 1)
-    ForceStatusBarLayer(frames.castbar)
 
     -- Border
     local border = frames.castbar:CreateTexture(nil, 'ARTWORK', nil, 0)
@@ -830,7 +823,7 @@ local function CreateCastbar(unitType)
     frames.flash:SetAllPoints()
     frames.flash:Hide()
 
-    -- Icon
+    -- Icon y otros elementos...
     frames.icon = frames.castbar:CreateTexture(frameName .. "Icon", 'ARTWORK')
     frames.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     frames.icon:Hide()
@@ -848,11 +841,10 @@ local function CreateCastbar(unitType)
         frames.shield = CreateShield(frames.castbar, frames.icon, frameName, 20)
     end
 
-    -- Apply systems
-    SetupVertexColor(frames.castbar)
+    -- ✅ APLICAR SOLO TEXTURE CLIPPING SIMPLE
     CreateTextureClipping(frames.castbar)
 
-    -- Text background frame
+    -- Text background frame y elementos de texto...
     frames.textBackground = CreateFrame('Frame', frameName .. 'TextBG', UIParent)
     frames.textBackground:SetFrameStrata("MEDIUM")
     frames.textBackground:SetFrameLevel(9)
@@ -910,7 +902,7 @@ function CastbarModule:HandleCastStart_Simple(unitType, unit, isChanneling)
     local frames = self.frames[unitType]
     local state = self.states[unitType]
 
-    -- Clean state initialization (sin flags debug)
+    -- Clean state initialization
     state.casting = not isChanneling
     state.isChanneling = isChanneling
     state.spellName = spell
@@ -922,8 +914,27 @@ function CastbarModule:HandleCastStart_Simple(unitType, unit, isChanneling)
 
     -- Configure castbar
     frames.castbar:SetMinMaxValues(0, duration)
+    
+    if isChanneling then
+        -- ✅ CHANNELING: Empieza LLENO, como casting pero al revés
+        frames.castbar:SetValue(duration)  -- ← Empezar lleno
+        state.currentValue = duration
+        
+        if frames.castbar.UpdateTextureClipping then
+            frames.castbar:UpdateTextureClipping(1.0, true)  -- ← Progreso inicial = 1.0
+        end
+    else
+        -- CASTING: Empieza vacío, se llena normalmente
+        frames.castbar:SetValue(0)  
+        state.currentValue = 0
+        
+        if frames.castbar.UpdateTextureClipping then
+            frames.castbar:UpdateTextureClipping(0.0, false)  -- ← Progreso inicial = 0.0
+        end
+    end
+    
     frames.castbar:Show()
-
+    
     if frames.background and frames.background ~= frames.textBackground then
         frames.background:Show()
     end
@@ -950,7 +961,9 @@ function CastbarModule:HandleCastStart_Simple(unitType, unit, isChanneling)
     ForceStatusBarLayer(frames.castbar)
     SetCastText(unitType, displayName)
 
-    -- Configure icon
+ 
+
+    -- Configure icon and other elements...
     local cfg = GetConfig(unitType)
     if frames.icon and cfg and cfg.showIcon then
         frames.icon:SetTexture(GetSpellIcon(displayName, icon))
@@ -978,7 +991,6 @@ function CastbarModule:HandleCastStop_Simple(unitType, wasInterrupted)
     local frames = self.frames[unitType]
     local state = self.states[unitType]
 
-    -- Allow interrupts to be processed even if state is clean
     if not (state.casting or state.isChanneling) and not wasInterrupted then
         return
     end
@@ -988,60 +1000,43 @@ function CastbarModule:HandleCastStop_Simple(unitType, wasInterrupted)
         return
     end
 
-    -- Restore minimal state for interrupts if needed
-    if not (state.casting or state.isChanneling) and wasInterrupted then
-        state.maxValue = state.maxValue > 0 and state.maxValue or 1.0
-        if not frames.castbar:IsVisible() then
-            frames.castbar:Show()
-            if frames.textBackground then
-                frames.textBackground:Show()
-            end
-        end
-    end
-
     if wasInterrupted then
         -- Show interrupted state
         state.casting = false
         state.isChanneling = false
 
-        if frames.shield then
-            frames.shield:Hide()
-        end
-        if frames.spark then
-            frames.spark:Hide()
-        end
-        if frames.flash then
-            frames.flash:Hide()
-        end
+        if frames.shield then frames.shield:Hide() end
+        if frames.spark then frames.spark:Hide() end
+        if frames.flash then frames.flash:Hide() end
         HideAllTicks(frames.ticks)
 
         frames.castbar:SetStatusBarTexture(TEXTURES.interrupted)
         frames.castbar:SetStatusBarColor(1, 0, 0, 1)
         frames.castbar:SetValue(state.maxValue)
 
-        -- Reset texture coordinates to show full texture
+        -- ✅ RESETEAR TEXTURE CLIPPING para mostrar textura completa
         local texture = frames.castbar:GetStatusBarTexture()
         if texture then
-            texture:SetTexCoord(0, 1, 0, 1)
+            texture:SetTexCoord(0, 1, 0, 1)  -- Mostrar completo para interrupted
         end
 
-        ForceStatusBarLayer(frames.castbar)
         SetCastText(unitType, "Interrupted")
-
         state.holdTime = cfg.holdTimeInterrupt or 0.8
 
     else
         -- Normal completion
-        if frames.spark then
-            frames.spark:Hide()
-        end
-        if frames.shield then
-            frames.shield:Hide()
-        end
+        if frames.spark then frames.spark:Hide() end
+        if frames.shield then frames.shield:Hide() end
         HideAllTicks(frames.ticks)
 
         state.casting = false
         state.isChanneling = false
+
+        -- ✅ RESETEAR CLIPPING para completion flash
+        local texture = frames.castbar:GetStatusBarTexture()
+        if texture then
+            texture:SetTexCoord(0, 1, 0, 1)  -- Mostrar completo para flash
+        end
 
         if frames.flash then
             frames.flash:Show()
@@ -1056,10 +1051,10 @@ function CastbarModule:HandleCastStop_Simple(unitType, wasInterrupted)
     end
 end
 
+
 -- ============================================================================
 -- UPDATE HANDLER
 -- ============================================================================
-
 function CastbarModule:OnUpdate(unitType, castbar, elapsed)
     local state = self.states[unitType]
     local frames = self.frames[unitType]
@@ -1072,56 +1067,52 @@ function CastbarModule:OnUpdate(unitType, castbar, elapsed)
     local currentTime = GetTime()
 
     if state.casting or state.isChanneling then
-        local value, progress
+        local progress
 
         if state.casting then
-            -- Cast normal: progreso hacia adelante (0 -> 1)
-            local elapsed = min(currentTime, state.endTime) - state.startTime
-            value = elapsed
-            progress = elapsed / state.maxValue -- 0 -> 1
+            -- CASTING: Progreso normal de 0 a maxValue
+            local elapsed = math.min(currentTime, state.endTime) - state.startTime
+            local value = elapsed
+            progress = elapsed / state.maxValue
+            
+            castbar:SetValue(value)  -- StatusBar se llena normalmente
+            state.currentValue = value
         else
-            -- Channel: progreso hacia atrás (maxValue -> 0)
-            local remaining = state.endTime - currentTime
-            value = max(0, remaining) -- El valor de la barra (tiempo restante)
-            progress = value / state.maxValue -- 1 -> 0 para texture clipping
+            -- ✅ CHANNELING: EXACTAMENTE IGUAL QUE CASTING PERO AL REVÉS
+            local elapsed = math.min(currentTime, state.endTime) - state.startTime
+            local remaining = state.maxValue - elapsed  -- ← INVERTIR: remaining en lugar de elapsed
+            progress = remaining / state.maxValue  -- ← INVERTIR: progress de 1→0
+            
+            castbar:SetValue(remaining)  -- ← INVERTIR: StatusBar se vacía
+            state.currentValue = remaining
         end
 
-        -- Validar expiración
         if currentTime > state.endTime then
             self:HandleCastStop_Simple(unitType, false)
             return
         end
 
-        -- ✅ CORREGIDO: SetValue correcto para cada tipo
-        castbar:SetValue(value)
-
-        -- ✅ TEXTURE CLIPPING: Una sola llamada en OnUpdate
+        -- ✅ APLICAR TEXTURE CLIPPING (IGUAL PARA AMBOS)
         if frames.castbar.UpdateTextureClipping then
             frames.castbar:UpdateTextureClipping(progress, state.isChanneling)
         end
 
-        -- ✅ SPARK: Sincronizado con TextureClipping
+        -- ✅ SPARK: Posición basada en el progreso visual
         if frames.spark and frames.spark:IsShown() then
-            local actualWidth = castbar:GetWidth() * progress
+            local sparkPosition = castbar:GetWidth() * progress
             frames.spark:ClearAllPoints()
-            frames.spark:SetPoint('CENTER', castbar, 'LEFT', actualWidth, 0)
+            frames.spark:SetPoint('CENTER', castbar, 'LEFT', sparkPosition, 0)
         end
 
-        -- ✅ ACTUALIZAR STATE: Mantener sincronizado
-        state.currentValue = value
-
-        -- Actualizar texto de tiempo
         UpdateTimeText(unitType)
 
     elseif state.holdTime > 0 then
-        -- Fade out después de completar
         state.holdTime = state.holdTime - elapsed
         if state.holdTime <= 0 then
             self:HideCastbar(unitType)
         end
     end
 end
-
 -- ============================================================================
 -- CASTBAR REFRESH
 -- ============================================================================
@@ -1457,7 +1448,6 @@ end
 -- ============================================================================
 -- Función de manejo de delays 
 -- ============================================================================
-
 function CastbarModule:HandleCastDelayed_Simple(unitType, unit)
     local state = self.states[unitType]
 
@@ -1485,6 +1475,13 @@ function CastbarModule:HandleCastDelayed_Simple(unitType, unit)
 
     local frames = self.frames[unitType]
     frames.castbar:SetMinMaxValues(0, state.maxValue)
+    
+    -- ✅ Para channeling después de delay, mantener StatusBar lleno
+    if state.isChanneling then
+        frames.castbar:SetValue(state.maxValue)  -- Mantener lleno
+        local currentTime = GetTime()
+        state.currentValue = math.max(0, state.endTime - currentTime)
+    end
 end
 
 -- ============================================================================
