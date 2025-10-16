@@ -437,7 +437,7 @@ local function ApplyPetbarSystem()
     -- Update editor frame registration with actual anchor frame
     UpdateEditorFrameRegistration()
     
-    print("Petbar module applied (legacy + DragonUI hybrid)")
+   
 end
 
 local function RestorePetbarSystem()
@@ -478,7 +478,7 @@ local function RestorePetbarSystem()
     PetbarModule.petbar = nil
     PetbarModule.applied = false
     
-    print("Petbar module restored to Blizzard defaults")
+  
 end
 
 -- ============================================================================

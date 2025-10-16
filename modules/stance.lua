@@ -127,7 +127,7 @@ local function CreateStanceFrames()
     -- Apply static positioning immediately
     stancebar_update()
     
-    print("DragonUI: Stance frames created with static positioning")
+    
 end
 
 -- ============================================================================
@@ -330,7 +330,7 @@ local function ApplyStanceSystem()
     InitializeStanceBar()
     
     StanceModule.applied = true
-    print("DragonUI: Stance system enabled (simple static positioning)")
+    
 end
 
 local function RestoreStanceSystem()
