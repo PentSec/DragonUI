@@ -2610,7 +2610,7 @@ function addon:CreateOptionsTable()
                             alwaysShowAlternateManaText = {
                                 type = 'toggle',
                                 name = "Always Show Alternate Mana Text",
-                                desc = "For Druids: Show mana text always visible vs only on hover (DragonUI text system replaces Blizzard text)",
+                                desc = "Show mana text always visible (default: hover only)",
                                 get = function()
                                     return addon.db.profile.unitframe.player.alwaysShowAlternateManaText
                                 end,
@@ -2626,7 +2626,7 @@ function addon:CreateOptionsTable()
                             alternateManaFormat = {
                                 type = 'select',
                                 name = "Alternate Mana Text Format",
-                                desc = "For Druids: Choose how alternate mana text is displayed using DragonUI formatting (works in both hover and always-visible modes)",
+                                desc = "Choose text format for alternate mana display",
                                 values = {
                                     numeric = "Current Value Only",
                                     formatted = "Current / Max",
