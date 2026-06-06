@@ -1282,6 +1282,8 @@ addon.ModuleRegistry = addon.ModuleRegistry or {
     -- Counter for auto-ordering
     orderCounter = 0,
     legacyRefreshTargets = {},
+    -- Hooks for third-party compatibility: { [targetName] = { { phase = "pre"|"post", cb = function }, ... } }
+    hooks = {},
 }
 
 local MR = addon.ModuleRegistry
@@ -1453,6 +1455,23 @@ function MR:Register(name, moduleTable, displayName, description, orderOrOptions
     return true
 end
 
+-- Register a hook that runs before ("pre") or after ("post") a module's lifecycle
+-- @param targetName: Module name to hook into (e.g., "player")
+-- @param phase: "pre" (before Apply) or "post" (after Apply)
+-- @param callback: function(moduleInfo) — receives the target module's info table
+function MR:RegisterHook(targetName, phase, callback)
+    if not targetName or not phase or not callback then
+        return false
+    end
+    if phase ~= "pre" and phase ~= "post" then
+        return false
+    end
+
+    self.hooks[targetName] = self.hooks[targetName] or {}
+    table.insert(self.hooks[targetName], {phase = phase, cb = callback})
+    return true
+end
+
 function MR:RegisterLegacyRefreshTarget(name, funcName, order)
     if not name or not funcName then
         return false
@@ -1557,6 +1576,19 @@ function MR:Refresh(name)
         return false
     end
 
+    -- Run pre-hooks before module lifecycle
+    local hooks = self.hooks[name]
+    if hooks then
+        for _, hook in ipairs(hooks) do
+            if hook.phase == "pre" then
+                local ok, err = pcall(hook.cb, info)
+                if not ok then
+                    addon:Error((L and L["ModuleRegistry: pre-hook failed for"]) or "ModuleRegistry: pre-hook failed for", name, "-", err)
+                end
+            end
+        end
+    end
+
     local enabled = self:IsEnabled(name)
     local fn, useModuleSelf = ResolveRegistryFunction(info, enabled and "refresh" or "restore")
 
@@ -1584,6 +1616,18 @@ function MR:Refresh(name)
 
     if not success then
         addon:Error((L and L["ModuleRegistry: Refresh failed for"]) or "ModuleRegistry: Refresh failed for", name, "-", err)
+    end
+
+    -- Run post-hooks after module lifecycle
+    if hooks then
+        for _, hook in ipairs(hooks) do
+            if hook.phase == "post" then
+                local ok, err = pcall(hook.cb, info)
+                if not ok then
+                    addon:Error((L and L["ModuleRegistry: post-hook failed for"]) or "ModuleRegistry: post-hook failed for", name, "-", err)
+                end
+            end
+        end
     end
 
     return success
@@ -1721,6 +1765,10 @@ end
 -- @param description: Description (optional)
 function addon:RegisterModule(name, moduleTable, displayName, description, options)
     return MR:Register(name, moduleTable, displayName, description, options)
+end
+
+function addon:RegisterHook(targetName, phase, callback)
+    return MR:RegisterHook(targetName, phase, callback)
 end
 
 function addon:RegisterLegacyRefreshTarget(name, funcName, order)

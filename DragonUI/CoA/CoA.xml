@@ -1,0 +1,8 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Conquest of Azeroth compatibility module -->
+    <!-- Detection and initialization -->
+    <Script file="detection.lua"/>
+    <Script file="init.lua"/>
+    <!-- Unit frame overrides -->
+    <Include file="unitframes\unitframes.xml"/>
+</Ui>

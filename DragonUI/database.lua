@@ -778,7 +778,24 @@ local defaults = {
         },
 
         -- LAYOUT PRESETS (user-saved UI snapshots within this profile)
-        presets = {}
+        presets = {},
+
+        -- Conquest of Azeroth settings
+        CoA = {
+            herocolor = { r = 1, g = 1, b = 1 },
+            classbar = {
+                enable = true,
+                height = 8,
+                detachFromFrame = false,
+                fill = "normal",
+            },
+            energy = {
+                enable = true,
+            },
+            rage = {
+                enable = true,
+            },
+        },
     }
 };
 

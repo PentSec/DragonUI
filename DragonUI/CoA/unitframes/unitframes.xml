@@ -1,0 +1,4 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Script file="player.lua"/>
+    <Script file="power.lua"/>
+</Ui>

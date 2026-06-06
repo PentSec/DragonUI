@@ -21,5 +21,8 @@
 	<!-- All modules -->
 	<Include file="modules\modules.xml"/>
 	
+	<!-- Conquest of Azeroth compatibility module -->
+	<Include file="CoA\CoA.xml"/>
+
 	<!-- Options are now in DragonUI_Options addon (loaded on demand) -->
 </Ui>

@@ -50,6 +50,14 @@ function addon.core:OnInitialize()
 end
 
 function addon.core:OnEnable()
+    -- Initialize Conquest of Azeroth compatibility detection
+    if addon.CoA and addon.CoA.Detect then
+        addon.CoA.active = addon.CoA:Detect()
+        if addon.CoA.active then
+            addon:Debug("Conquest of Azeroth server detected — loading compatibility layer.")
+        end
+    end
+
     -- Register slash commands (using new commands.lua system)
     if addon.LoadCommands then
         addon.LoadCommands()
