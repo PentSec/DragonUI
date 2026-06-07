@@ -1,3 +1,28 @@
+# 🐉 DragonUI for Asencion Wow, Conquest of Azeroth - Bronzebeard
+## 📥 Download for Ascension Server
+
+| Method | Link |
+|--------|------|
+| **Latest stable release** | [Download](https://github.com/PentSec/DragonUI/releases/download/v2.5/DragonUI-2.5.zip) |
+| **Cutting-edge (main branch)** | [Download](https://github.com/PentSec/DragonUI/archive/refs/heads/main.zip) |
+
+
+<div align="center">
+
+![Interface Version](https://img.shields.io/badge/Interface-30300-blue)
+![WoW Version](https://img.shields.io/badge/WoW-3.3.5a-orange)
+[![Version](https://img.shields.io/badge/Version-2.5-green)](https://github.com/PentSec/DragonUI/releases/tag/v2.5)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+![Downloads](https://img.shields.io/github/downloads/PentSec/DragonUI/total?label=Downloads&color=%23a400ff)
+
+<img width="1917" height="1042" alt="image" src="https://github.com/user-attachments/assets/bd79945d-6b50-40df-a5fa-f3662b42dcc4" />
+**A modular, retail-inspired UI addon for Ascension Wow, Conquest of Azeroth.**
+
+Found a bug? [Open an issue](https://github.com/PentSec/DragonUI/issues).
+
+</div>
+
+
 # 🐉 DragonUI for 3.3.5a
 
 <div align="center">
