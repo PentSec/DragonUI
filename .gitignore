@@ -17,3 +17,6 @@ __pycache__/
 
 # Reference forks
 _ref-*/
+copy-to-*.sh
+.atl
+docs/
