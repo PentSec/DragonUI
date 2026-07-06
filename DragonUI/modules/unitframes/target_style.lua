@@ -48,6 +48,7 @@ function UF.TargetStyle.Create(opts)
 
     -- Shared texture / constant tables from uf_core
     local TEXTURES    = UF.TEXTURES.targetStyle
+    local BASE_NO_PORTRAIT = TEXTURES.BASE_NO_PORTRAIT
     local BOSS_COORDS = UF.BOSS_COORDS.targetStyle
     local POWER_MAP   = UF.POWER_MAP
 
@@ -144,6 +145,12 @@ function UF.TargetStyle.Create(opts)
 
     local function GetConfig()
         return UF.GetConfig(configKey)
+    end
+
+    local function IsNoPortraitActive()
+        if UnitHasVehicleUI("player") then return false end
+        local config = GetConfig()
+        return config and config.no_portrait or false
     end
 
     -- ================================================================
@@ -244,6 +251,8 @@ function UF.TargetStyle.Create(opts)
     end
 
     local function UpdateClassPortrait()
+        if IsNoPortraitActive() then return end
+
         local config = GetConfig()
         if not config then return end
 
@@ -309,7 +318,7 @@ function UF.TargetStyle.Create(opts)
         if not texture then return end
 
         if config.classcolor and UnitIsPlayer(unitToken) then
-            local statusPath = TEXTURES.BAR_PREFIX .. "Health-Status"
+            local statusPath = IsNoPortraitActive() and TEXTURES.HEALTH_STATUS or TEXTURES.BAR_PREFIX .. "Health-Status"
             if texture:GetTexture() ~= statusPath then
                 texture:SetTexture(statusPath)
                 texture:SetDrawLayer("ARTWORK", 1)
@@ -322,7 +331,7 @@ function UF.TargetStyle.Create(opts)
                 texture:SetVertexColor(1, 1, 1, 1)
             end
         else
-            local normalPath = TEXTURES.BAR_PREFIX .. "Health"
+            local normalPath = IsNoPortraitActive() and TEXTURES.HEALTH_BAR or TEXTURES.BAR_PREFIX .. "Health"
             if texture:GetTexture() ~= normalPath then
                 texture:SetTexture(normalPath)
                 texture:SetDrawLayer("ARTWORK", 1)
@@ -344,7 +353,7 @@ function UF.TargetStyle.Create(opts)
 
         local powerType = UnitPowerType(unitToken)
         local powerName = POWER_MAP[powerType] or "Mana"
-        texture:SetTexture(TEXTURES.BAR_PREFIX .. powerName)
+        texture:SetTexture(IsNoPortraitActive() and (TEXTURES.POWER_BARS[string.upper(powerName)] or TEXTURES.POWER_BARS.MANA) or TEXTURES.BAR_PREFIX .. powerName)
         texture:SetDrawLayer("ARTWORK", 1)
         texture:SetVertexColor(1, 1, 1)
 
@@ -352,6 +361,50 @@ function UF.TargetStyle.Create(opts)
         local current = ManaBar:GetValue()
         if max > 0 and current then
             texture:SetTexCoord(0, current / max, 0, 1)
+        end
+    end
+
+    local function GetBaseTexture()
+        return IsNoPortraitActive() and BASE_NO_PORTRAIT or TEXTURES.BACKGROUND
+    end
+
+    local function ApplyNoPortraitLayout()
+        local noPortrait = IsNoPortraitActive()
+
+        if frameElements.background then
+            frameElements.background:SetTexture(GetBaseTexture())
+            frameElements.background:SetTexCoord(0, 1, 0, 1)
+            frameElements.background:ClearAllPoints()
+            if noPortrait then
+                frameElements.background:SetSize(131, 130)
+                frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 1, 74)
+            else
+                frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "TOPLEFT", 0, -8)
+            end
+        end
+
+        if noPortrait then
+            Portrait:Hide()
+            if frameElements.border then
+                frameElements.border:Hide()
+            end
+            ManaBar:ClearAllPoints()
+            ManaBar:SetSize(125, 20)
+            ManaBar:SetPoint("TOPLEFT", HealthBar, "BOTTOMLEFT", 0, -2)
+        else
+            Portrait:Show()
+            if frameElements.border then
+                frameElements.border:Show()
+            end
+            UpdateClassPortrait()
+            ManaBar:ClearAllPoints()
+            ManaBar:SetSize(132, 9.5)
+            ManaBar:SetPoint("RIGHT", Portrait, "LEFT", 6.5, -16.5)
+        end
+
+        if UnitExists(unitToken) then
+            ForceUpdatePowerBar()
+            UpdateHealthBarColor(true)
         end
     end
 
@@ -401,6 +454,8 @@ function UF.TargetStyle.Create(opts)
                 DeadText:SetDrawLayer("OVERLAY", 2)
             end
         end
+
+        ApplyNoPortraitLayout()
     end
 
     -- ================================================================
@@ -473,7 +528,7 @@ function UF.TargetStyle.Create(opts)
 
                 local powerType = UnitPowerType(unitToken)
                 local powerName = POWER_MAP[powerType] or "Mana"
-                texture:SetTexture(TEXTURES.BAR_PREFIX .. powerName)
+        texture:SetTexture(IsNoPortraitActive() and (TEXTURES.POWER_BARS[string.upper(powerName)] or TEXTURES.POWER_BARS.MANA) or TEXTURES.BAR_PREFIX .. powerName)
                 texture:SetDrawLayer("ARTWORK", 1)
                 texture:SetVertexColor(1, 1, 1)
                 ManaBar:SetStatusBarColor(1, 1, 1)
@@ -916,6 +971,9 @@ function UF.TargetStyle.Create(opts)
         end
         ApplyWidgetPosition()
 
+        -- ---- Apply no-portrait layout ----
+        ApplyNoPortraitLayout()
+
         Module.configured = true
 
         -- ---- After-init callback (frame-specific hooks) ----
@@ -945,17 +1003,17 @@ function UF.TargetStyle.Create(opts)
                     ForceReapplyLayout()
                 end
 
-                -- Custom textures
+                -- Custom textures (no-portrait has its own background, border hidden)
                 if frameElements.background then
                     frameElements.background:Show()
                 end
-                if frameElements.border then
-                    frameElements.border:Show()
-                end
-
-                -- Player portrait
-                if Portrait then
-                    SetPortraitTexture(Portrait, "player")
+                if not IsNoPortraitActive() then
+                    if frameElements.border then
+                        frameElements.border:Show()
+                    end
+                    if Portrait then
+                        SetPortraitTexture(Portrait, "player")
+                    end
                 end
 
                 -- Name background with player color
@@ -1005,7 +1063,7 @@ function UF.TargetStyle.Create(opts)
                         local cfg = GetConfig()
                         if cfg.classcolor then
                             tex:SetTexture(
-                                TEXTURES.BAR_PREFIX .. "Health-Status")
+                                IsNoPortraitActive() and TEXTURES.HEALTH_STATUS or TEXTURES.BAR_PREFIX .. "Health-Status")
                             local _, cls = UnitClass("player")
                             local clr = RAID_CLASS_COLORS[cls]
                             if clr then
@@ -1016,7 +1074,7 @@ function UF.TargetStyle.Create(opts)
                             end
                         else
                             tex:SetTexture(
-                                TEXTURES.BAR_PREFIX .. "Health")
+                                IsNoPortraitActive() and TEXTURES.HEALTH_BAR or TEXTURES.BAR_PREFIX .. "Health")
                             tex:SetVertexColor(1, 1, 1, 1)
                         end
                         if maxHP > 0 then
@@ -1037,7 +1095,7 @@ function UF.TargetStyle.Create(opts)
                     local tex = ManaBar:GetStatusBarTexture()
                     if tex then
                         local pName = POWER_MAP[pType] or "Mana"
-                        tex:SetTexture(TEXTURES.BAR_PREFIX .. pName)
+                        tex:SetTexture(IsNoPortraitActive() and (TEXTURES.POWER_BARS[string.upper(pName)] or TEXTURES.POWER_BARS.MANA) or TEXTURES.BAR_PREFIX .. pName)
                         tex:SetDrawLayer("ARTWORK", 1)
                         tex:SetVertexColor(1, 1, 1, 1)
                         if maxPwr > 0 then
@@ -1304,6 +1362,8 @@ function UF.TargetStyle.Create(opts)
         end
 
         ApplyWidgetPosition()
+
+        ApplyNoPortraitLayout()
 
         if UnitExists(unitToken) then
             if opts.forceLayoutOnUnitChange then

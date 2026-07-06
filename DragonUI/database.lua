@@ -651,11 +651,12 @@ local defaults = {
                 enableNumericThreat = true,
                 enableThreatGlow = true,
                 show_name_background = true,
-                scale = 1.0,
                 -- Also fades Target of Target and the target cast bar (see target_style.lua)
                 show_on_hover = false,
                 show_in_combat = false,
                 visibility_logic = "and",
+                no_portrait = false, -- No portrait mode (hides portrait, no class icon)
+                scale = 1.0
             },
             focus = {
                 classcolor = false,
@@ -667,11 +668,12 @@ local defaults = {
                 showManaTextAlways = false,
                 show_buff_debuff = true,
                 show_name_background = true,
-                scale = 0.9,
                 -- Also fades Target of Focus and the focus cast bar (see target_style.lua)
                 show_on_hover = false,
                 show_in_combat = false,
                 visibility_logic = "and",
+                no_portrait = false, -- No portrait mode (hides portrait, no class icon)
+                scale = 0.9
             },
             pet = {
                 breakUpLargeNumbers = true,

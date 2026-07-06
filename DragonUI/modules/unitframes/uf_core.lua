@@ -28,6 +28,16 @@ UF.TEXTURES = {
         BOSS           = "Interface\\AddOns\\DragonUI\\Textures\\uiunitframeboss2x",
         THREAT         = "Interface\\AddOns\\DragonUI\\Textures\\Unitframe2x\\ui-hud-unitframe-target-portraiton-incombat-2x",
         THREAT_NUMERIC = "Interface\\AddOns\\DragonUI\\Textures\\uiunitframe",
+        BASE_NO_PORTRAIT = "Interface\\Addons\\DragonUI\\Textures\\UNITFRAM-NO-PORTRAIT",
+        HEALTH_BAR    = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health",
+        HEALTH_STATUS = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health-Status",
+        POWER_BARS = {
+            MANA        = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana",
+            RAGE        = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Rage",
+            FOCUS       = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Focus",
+            ENERGY      = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Energy",
+            RUNIC_POWER = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-RunicPower",
+        },
     },
 
     -- Small-style frames (ToT, FoT, Pet)

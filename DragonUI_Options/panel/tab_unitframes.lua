@@ -427,6 +427,13 @@ local function BuildTargetSection(scroll)
         dbPrefix = "unitframe.target",
         hoverDesc = LO["Fade the target frame group until you hover over it."],
         combatDesc = LO["Fade the target frame group until you enter combat."],
+
+    })
+    
+    C:AddToggle(s, {
+        label = LO["No Portrait Mode"],
+        desc = LO["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."],
+        dbPath = "unitframe.target.no_portrait",
         callback = refreshTarget,
     })
 end
@@ -445,6 +452,13 @@ local function BuildFocusSection(scroll)
         label = LO["Show Name Background"],
         desc = LO["Show the colored name background behind the focus name."],
         dbPath = "unitframe.focus.show_name_background",
+        callback = refreshFocus,
+    })
+
+    C:AddToggle(s, {
+        label = LO["No Portrait Mode"],
+        desc = LO["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."],
+        dbPath = "unitframe.focus.no_portrait",
         callback = refreshFocus,
     })
 
