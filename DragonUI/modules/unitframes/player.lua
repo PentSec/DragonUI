@@ -2260,6 +2260,13 @@ local function ChangePlayerframe()
     -- Configure mana bar (fat mode uses anchor frame, vehicle/normal use inline position)
     ApplyFatManaBar()
 
+    -- Reposition alternate mana bar slightly right in no-portrait mode
+    local altManaBar = _G.PlayerFrameAlternateManaBar
+    if altManaBar then
+        altManaBar:ClearAllPoints()
+        altManaBar:SetPoint('BOTTOM', PlayerFrameManaBar, 'CENTER', 0, -18)
+    end
+
     -- Set power bar texture based on type (respects user texture override)
     local powerType, powerTypeString = UnitPowerType('player')
     local powerTexture = GetPowerBarTexture(powerTypeString)
