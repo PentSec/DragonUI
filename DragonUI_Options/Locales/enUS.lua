@@ -1023,6 +1023,8 @@ L["Always display mana/energy/rage text (otherwise only on mouseover)"] = true
 
 -- Player frame specific
 L["Player Frame"] = true
+L["No Portrait Mode"] = true
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = true
 L["Dragon Decoration"] = true
 L["Add decorative dragon to your player frame for a premium look"] = true
 L["None"] = true

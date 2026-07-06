@@ -911,6 +911,8 @@ L["Always display mana/energy/rage text (otherwise only on mouseover)"] = "Вс�
 
 -- Player frame specific
 L["Player Frame"] = "Фрейм игрока"
+L["No Portrait Mode"] = "Режим без портрета"
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = "Скрывает портрет и значок класса. Использует компактную текстуру рамки без выреза для портрета."
 L["Dragon Decoration"] = "Декоративный дракон"
 L["Add decorative dragon to your player frame for a premium look"] = "Добавить декоративного дракона к фрейму игрока для премиального вида"
 L["None"] = "Нет"

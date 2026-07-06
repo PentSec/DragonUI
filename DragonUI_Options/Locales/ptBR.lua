@@ -275,6 +275,10 @@ L["Pulsing glow effect when entering combat. Works with all frame modes."] = "Ef
 L["Combat Flash Opacity"] = "Opacidade do Flash de Combate"
 L["Maximum opacity of the combat flash pulse effect."] = "Opacidade m\195\161xima do efeito de pulso do flash de combate."
 
+-- Player frame specific (no portrait mode)
+L["No Portrait Mode"] = "Modo Sem Retrato"
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = "Oculta o retrato e o ícone de classe. Usa uma textura de moldura compacta sem o recorte do retrato."
+
 -- Castbar detach/reattach
 L["Castbar detached - positioned freely via Editor Mode"] = "Barra de lancamento desacoplada - posicionada livremente no Modo Editor"
 L["Castbar attached - follows Target frame"] = "Barra de lancamento acoplada - segue o quadro do Alvo"

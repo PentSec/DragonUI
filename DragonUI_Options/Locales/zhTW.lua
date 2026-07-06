@@ -891,6 +891,8 @@ L["Always display mana/energy/rage text (otherwise only on mouseover)"] = "始�
 
 -- 玩家框架特定選項
 L["Player Frame"] = "玩家框架"
+L["No Portrait Mode"] = "無肖像模式"
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = "隱藏肖像和職業圖示。使用沒有肖像剪影的緊湊框架紋理。"
 L["Dragon Decoration"] = "龍形裝飾"
 L["Add decorative dragon to your player frame for a premium look"] = "為你的玩家框架新增裝飾性的龍，以獲得高階外觀"
 L["None"] = "無"

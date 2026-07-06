@@ -919,6 +919,8 @@ L["Always display mana/energy/rage text (otherwise only on mouseover)"] = "마�
 
 -- Player frame specific
 L["Player Frame"] = "플레이어 프레임"
+L["No Portrait Mode"] = "초상화 없음 모드"
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = "초상화와 직업 아이콘을 숨깁니다. 초상화 컷아웃이 없는 컴팩트한 프레임 텍스처를 사용합니다."
 L["Dragon Decoration"] = "용 장식"
 L["Add decorative dragon to your player frame for a premium look"] = "고급스러운 외관을 위해 플레이어 프레임에 장식용 드래곤을 추가합니다"
 L["None"] = "없음"

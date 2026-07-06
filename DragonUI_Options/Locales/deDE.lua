@@ -915,6 +915,8 @@ L["Always display mana/energy/rage text (otherwise only on mouseover)"] = "Mana-
 
 -- Player frame specific
 L["Player Frame"] = "Spielerfenster"
+L["No Portrait Mode"] = "Kein Porträtmodus"
+L["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."] = "Versteckt das Porträt und das Klassensymbol. Verwendet eine kompakte Rahmenstruktur ohne Porträtausschnitt."
 L["Dragon Decoration"] = "Drachendekoration"
 L["Add decorative dragon to your player frame for a premium look"] = "Dekorativen Drachen am Spielerfenster hinzufügen (Premium-Look)"
 L["None"] = "Keine"
