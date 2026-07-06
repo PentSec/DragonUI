@@ -491,6 +491,70 @@ function UF.TargetStyle.Create(opts)
             end
         end
 
+        -- ---- Raid target icon, leader icon, and PVP icon: save/restore for no-portrait ----
+        local raidTargetIcon = _G[namePrefix .. "FrameTextureFrameRaidTargetIcon"]
+        local leaderIcon = _G[namePrefix .. "FrameTextureFrameLeaderIcon"]
+        local pvpIcon = _G[namePrefix .. "FrameTextureFramePVPIcon"]
+
+        if noPortrait then
+            if raidTargetIcon then
+                if not BlizzFrame._npRaidTargetPos then
+                    local pt, _, rpt, xOfs, yOfs = raidTargetIcon:GetPoint(1)
+                    if pt then
+                        BlizzFrame._npRaidTargetPos = { pt, rpt, xOfs, yOfs }
+                    end
+                end
+                raidTargetIcon:ClearAllPoints()
+                raidTargetIcon:SetSize(14, 14)
+                raidTargetIcon:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 86, 55)
+            end
+            if leaderIcon then
+                if not BlizzFrame._npLeaderIconPos then
+                    local pt, _, rpt, xOfs, yOfs = leaderIcon:GetPoint(1)
+                    if pt then
+                        BlizzFrame._npLeaderIconPos = { pt, rpt, xOfs, yOfs }
+                    end
+                end
+                leaderIcon:ClearAllPoints()
+                leaderIcon:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 112, 46)
+            end
+            if pvpIcon then
+                if not BlizzFrame._npPVPIconPos then
+                    local pt, _, rpt, xOfs, yOfs = pvpIcon:GetPoint(1)
+                    if pt then
+                        BlizzFrame._npPVPIconPos = { pt, rpt, xOfs, yOfs }
+                    end
+                end
+                pvpIcon:ClearAllPoints()
+                pvpIcon:SetPoint("TOPRIGHT", BlizzFrame, "LEFT", 126, 73)
+            end
+        else
+            if raidTargetIcon and BlizzFrame._npRaidTargetPos then
+                raidTargetIcon:ClearAllPoints()
+                raidTargetIcon:SetPoint(
+                    BlizzFrame._npRaidTargetPos[1], BlizzFrame,
+                    BlizzFrame._npRaidTargetPos[2],
+                    BlizzFrame._npRaidTargetPos[3], BlizzFrame._npRaidTargetPos[4])
+                BlizzFrame._npRaidTargetPos = nil
+            end
+            if leaderIcon and BlizzFrame._npLeaderIconPos then
+                leaderIcon:ClearAllPoints()
+                leaderIcon:SetPoint(
+                    BlizzFrame._npLeaderIconPos[1], BlizzFrame,
+                    BlizzFrame._npLeaderIconPos[2],
+                    BlizzFrame._npLeaderIconPos[3], BlizzFrame._npLeaderIconPos[4])
+                BlizzFrame._npLeaderIconPos = nil
+            end
+            if pvpIcon and BlizzFrame._npPVPIconPos then
+                pvpIcon:ClearAllPoints()
+                pvpIcon:SetPoint(
+                    BlizzFrame._npPVPIconPos[1], BlizzFrame,
+                    BlizzFrame._npPVPIconPos[2],
+                    BlizzFrame._npPVPIconPos[3], BlizzFrame._npPVPIconPos[4])
+                BlizzFrame._npPVPIconPos = nil
+            end
+        end
+
         if UnitExists(unitToken) then
             ForceUpdatePowerBar()
             UpdateHealthBarColor(true)
@@ -697,10 +761,29 @@ function UF.TargetStyle.Create(opts)
         if raidTargetIcon and raidTargetIcon.SetDrawLayer then
             raidTargetIcon:SetDrawLayer("OVERLAY", 7)
         end
+        if raidTargetIcon and IsNoPortraitActive() then
+            raidTargetIcon:ClearAllPoints()
+            raidTargetIcon:SetSize(24, 24)
+            raidTargetIcon:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 50, 55)
+        end
+
+        local leaderIcon = _G[namePrefix .. "FrameTextureFrameLeaderIcon"]
+        if leaderIcon and leaderIcon.SetDrawLayer then
+            leaderIcon:SetDrawLayer("OVERLAY", 7)
+        end
+        if leaderIcon and IsNoPortraitActive() then
+            leaderIcon:ClearAllPoints()
+            leaderIcon:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 112, 46)
+        end
 
         local pvpIcon = _G[namePrefix .. "FrameTextureFramePVPIcon"]
         if pvpIcon and pvpIcon.SetDrawLayer then
             pvpIcon:SetDrawLayer("OVERLAY", 7)
+        end
+        if pvpIcon and IsNoPortraitActive() then
+            pvpIcon:ClearAllPoints()
+            pvpIcon:SetSize(24, 24)
+            pvpIcon:SetPoint("TOPRIGHT", BlizzFrame, "LEFT", 35, 47)
         end
 
         if not UnitExists(unitToken) or not frameElements.elite then
