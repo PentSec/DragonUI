@@ -1682,27 +1682,62 @@ local function UpdatePlayerDragonDecoration()
                 -- No-portrait: keep base texture (GetBaseTexture returns BASE_NO_PORTRAIT),
                 -- just resize/position glow to cover the no-portrait area
                 if dragonFrame.DragonUICombatTexture then
+                    if not dragonFrame._noPortraitSaved then
+                        dragonFrame._npCombatTexCoord = { dragonFrame.DragonUICombatTexture:GetTexCoord() }
+                    end
                     dragonFrame.DragonUICombatTexture:SetTexCoord(0, 1, 0, 1)
                 end
                 if dragonFrame.DragonUIStatusTexture then
+                    if not dragonFrame._noPortraitSaved then
+                        dragonFrame._npStatusTexCoord = { dragonFrame.DragonUIStatusTexture:GetTexCoord() }
+                    end
                     dragonFrame.DragonUIStatusTexture:SetTexCoord(0, 1, 0, 1)
                 end
                 if dragonFrame.DragonUICombatGlow then
+                    if not dragonFrame._noPortraitSaved then
+                        dragonFrame._npCombatSize = { dragonFrame.DragonUICombatGlow:GetSize() }
+                        dragonFrame._npCombatPoint = { dragonFrame.DragonUICombatGlow:GetPoint(1) }
+                    end
                     dragonFrame.DragonUICombatGlow:SetSize(131, 131)
                     dragonFrame.DragonUICombatGlow:ClearAllPoints()
                     dragonFrame.DragonUICombatGlow:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
                 end
                 if dragonFrame.DragonUIStatusGlow then
+                    if not dragonFrame._noPortraitSaved then
+                        dragonFrame._npStatusSize = { dragonFrame.DragonUIStatusGlow:GetSize() }
+                        dragonFrame._npStatusPoint = { dragonFrame.DragonUIStatusGlow:GetPoint(1) }
+                    end
                     dragonFrame.DragonUIStatusGlow:SetSize(131, 131)
                     dragonFrame.DragonUIStatusGlow:ClearAllPoints()
                     dragonFrame.DragonUIStatusGlow:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
                 end
+                dragonFrame._noPortraitSaved = true
             else
                 if dragonFrame.DragonUICombatTexture then
                     dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
+                    if dragonFrame._npCombatTexCoord then
+                        dragonFrame.DragonUICombatTexture:SetTexCoord(unpack(dragonFrame._npCombatTexCoord))
+                    end
                 end
                 if dragonFrame.DragonUIStatusTexture then
                     dragonFrame.DragonUIStatusTexture:SetTexture(baseTexture)
+                    if dragonFrame._npStatusTexCoord then
+                        dragonFrame.DragonUIStatusTexture:SetTexCoord(unpack(dragonFrame._npStatusTexCoord))
+                    end
+                end
+                if dragonFrame.DragonUICombatGlow and dragonFrame._npCombatSize then
+                    dragonFrame.DragonUICombatGlow:SetSize(unpack(dragonFrame._npCombatSize))
+                    dragonFrame.DragonUICombatGlow:ClearAllPoints()
+                    if dragonFrame._npCombatPoint then
+                        dragonFrame.DragonUICombatGlow:SetPoint(unpack(dragonFrame._npCombatPoint))
+                    end
+                end
+                if dragonFrame.DragonUIStatusGlow and dragonFrame._npStatusSize then
+                    dragonFrame.DragonUIStatusGlow:SetSize(unpack(dragonFrame._npStatusSize))
+                    dragonFrame.DragonUIStatusGlow:ClearAllPoints()
+                    if dragonFrame._npStatusPoint then
+                        dragonFrame.DragonUIStatusGlow:SetPoint(unpack(dragonFrame._npStatusPoint))
+                    end
                 end
             end
 
