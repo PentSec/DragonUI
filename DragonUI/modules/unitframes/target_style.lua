@@ -376,10 +376,16 @@ function UF.TargetStyle.Create(opts)
             frameElements.background:SetTexCoord(0, 1, 0, 1)
             frameElements.background:ClearAllPoints()
             if noPortrait then
+                if not frameElements._bgOrigSize then
+                    frameElements._bgOrigSize = { frameElements.background:GetSize() }
+                end
                 frameElements.background:SetSize(131, 130)
                 frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 1, 74)
             else
                 frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "TOPLEFT", 0, -8)
+                if frameElements._bgOrigSize then
+                    frameElements.background:SetSize(unpack(frameElements._bgOrigSize))
+                end
             end
         end
 
