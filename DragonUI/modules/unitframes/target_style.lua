@@ -127,6 +127,10 @@ function UF.TargetStyle.Create(opts)
         border        = nil,
         elite         = nil,
         threatNumeric = nil,
+        combatGlow    = nil,
+        combatGlowTex = nil,
+        statusGlow    = nil,
+        statusGlowTex = nil,
     }
 
     local updateCache = {
@@ -418,6 +422,73 @@ function UF.TargetStyle.Create(opts)
         if manaRightText then
             manaRightText:ClearAllPoints()
             manaRightText:SetPoint("RIGHT", ManaBar, "RIGHT", noPortrait and -3 or -13, 0)
+        end
+
+        -- ---- Suppress Blizzard flash (wrong circular shape in no-portrait) ----
+        local blizzFlash = _G[namePrefix .. "FrameFlash"]
+        if blizzFlash then
+            if noPortrait then
+                blizzFlash:Hide()
+                blizzFlash:SetAlpha(0)
+            else
+                blizzFlash:SetAlpha(0.7)
+            end
+        end
+
+        -- ---- Combat/rest glows for no-portrait: save/restore ----
+        if noPortrait then
+            if frameElements.combatGlow then
+                if not BlizzFrame._npGlowSaved then
+                    BlizzFrame._npCombatSize = { frameElements.combatGlow:GetSize() }
+                    local pt, _, rpt, xOfs, yOfs = frameElements.combatGlow:GetPoint(1)
+                    if pt then
+                        BlizzFrame._npCombatPoint = { pt, rpt, xOfs, yOfs }
+                    end
+                end
+                frameElements.combatGlow:SetSize(131, 130)
+                frameElements.combatGlow:ClearAllPoints()
+                frameElements.combatGlow:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 1, 74)
+            end
+            if frameElements.statusGlow then
+                if not BlizzFrame._npGlowSaved then
+                    BlizzFrame._npStatusSize = { frameElements.statusGlow:GetSize() }
+                    local pt, _, rpt, xOfs, yOfs = frameElements.statusGlow:GetPoint(1)
+                    if pt then
+                        BlizzFrame._npStatusPoint = { pt, rpt, xOfs, yOfs }
+                    end
+                end
+                frameElements.statusGlow:SetSize(131, 130)
+                frameElements.statusGlow:ClearAllPoints()
+                frameElements.statusGlow:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 1, 74)
+            end
+            BlizzFrame._npGlowSaved = true
+        else
+            if frameElements.combatGlow then
+                frameElements.combatGlow:Hide()
+                if BlizzFrame._npCombatSize then
+                    frameElements.combatGlow:SetSize(unpack(BlizzFrame._npCombatSize))
+                    frameElements.combatGlow:ClearAllPoints()
+                    if BlizzFrame._npCombatPoint then
+                        frameElements.combatGlow:SetPoint(
+                            BlizzFrame._npCombatPoint[1], BlizzFrame,
+                            BlizzFrame._npCombatPoint[2],
+                            BlizzFrame._npCombatPoint[3], BlizzFrame._npCombatPoint[4])
+                    end
+                end
+            end
+            if frameElements.statusGlow then
+                frameElements.statusGlow:Hide()
+                if BlizzFrame._npStatusSize then
+                    frameElements.statusGlow:SetSize(unpack(BlizzFrame._npStatusSize))
+                    frameElements.statusGlow:ClearAllPoints()
+                    if BlizzFrame._npStatusPoint then
+                        frameElements.statusGlow:SetPoint(
+                            BlizzFrame._npStatusPoint[1], BlizzFrame,
+                            BlizzFrame._npStatusPoint[2],
+                            BlizzFrame._npStatusPoint[3], BlizzFrame._npStatusPoint[4])
+                    end
+                end
+            end
         end
 
         if UnitExists(unitToken) then
@@ -859,6 +930,37 @@ function UF.TargetStyle.Create(opts)
             frameElements.elite:Hide()
         end
 
+        -- ---- Create combat/rest glows (for no-portrait mode) ----
+        if not frameElements.combatGlow then
+            local glow = CreateFrame("Frame", nil, BlizzFrame)
+            glow:SetFrameStrata("LOW")
+            glow:SetFrameLevel(BlizzFrame:GetFrameLevel() + 5)
+            glow:Hide()
+            local tex = glow:CreateTexture(nil, "OVERLAY")
+            tex:SetTexture(BASE_NO_PORTRAIT)
+            tex:SetTexCoord(0, 1, 0, 1)
+            tex:SetAllPoints(glow)
+            tex:SetBlendMode("ADD")
+            tex:SetVertexColor(1.0, 0.0, 0.0, 1.0)
+            frameElements.combatGlow = glow
+            frameElements.combatGlowTex = tex
+        end
+
+        if not frameElements.statusGlow then
+            local glow = CreateFrame("Frame", nil, BlizzFrame)
+            glow:SetFrameStrata("LOW")
+            glow:SetFrameLevel(BlizzFrame:GetFrameLevel() + 5)
+            glow:Hide()
+            local tex = glow:CreateTexture(nil, "OVERLAY")
+            tex:SetTexture(BASE_NO_PORTRAIT)
+            tex:SetTexCoord(0, 1, 0, 1)
+            tex:SetAllPoints(glow)
+            tex:SetBlendMode("ADD")
+            tex:SetVertexColor(1.0, 0.82, 0.0, 0.6)
+            frameElements.statusGlow = glow
+            frameElements.statusGlowTex = tex
+        end
+
         local raidTargetIcon = _G[namePrefix .. "FrameTextureFrameRaidTargetIcon"]
         if raidTargetIcon and raidTargetIcon.SetDrawLayer then
             raidTargetIcon:SetDrawLayer("OVERLAY", 7)
@@ -1195,6 +1297,40 @@ function UF.TargetStyle.Create(opts)
     -- EVENT HANDLING
     -- ================================================================
 
+    -- ================================================================
+    -- GLOW VISIBILITY (no-portrait combat/rest glows)
+    -- ================================================================
+
+    local function UpdateGlowVisibility()
+        local blizzFlash = _G[namePrefix .. "FrameFlash"]
+
+        if not IsNoPortraitActive() then
+            if frameElements.combatGlow then frameElements.combatGlow:Hide() end
+            if frameElements.statusGlow then frameElements.statusGlow:Hide() end
+            return
+        end
+
+        -- Suppress Blizzard's native flash (shows wrong circular shape in no-portrait)
+        if blizzFlash then
+            blizzFlash:Hide()
+            blizzFlash:SetAlpha(0)
+        end
+
+        local inCombat = UnitAffectingCombat("player")
+        local isResting = IsResting()
+
+        if inCombat then
+            if frameElements.combatGlow then frameElements.combatGlow:Show() end
+            if frameElements.statusGlow then frameElements.statusGlow:Hide() end
+        elseif isResting then
+            if frameElements.combatGlow then frameElements.combatGlow:Hide() end
+            if frameElements.statusGlow then frameElements.statusGlow:Show() end
+        else
+            if frameElements.combatGlow then frameElements.combatGlow:Hide() end
+            if frameElements.statusGlow then frameElements.statusGlow:Hide() end
+        end
+    end
+
     local function OnEvent(self, event, ...)
         if event == "ADDON_LOADED" then
             local name = ...
@@ -1270,6 +1406,11 @@ function UF.TargetStyle.Create(opts)
             local unit = ...
             if unit == unitToken then UpdateNameBackground() end
 
+        elseif event == "PLAYER_REGEN_DISABLED"
+            or event == "PLAYER_REGEN_ENABLED"
+            or event == "PLAYER_UPDATE_RESTING" then
+            UpdateGlowVisibility()
+
         elseif event == "UNIT_DISPLAYPOWER" then
             local unit = ...
             if unit == unitToken and UnitExists(unitToken) then
@@ -1321,6 +1462,10 @@ function UF.TargetStyle.Create(opts)
         ef:RegisterEvent("UNIT_POWER_UPDATE")
         ef:RegisterEvent("UNIT_MAXPOWER")
         ef:RegisterEvent("UNIT_DISPLAYPOWER")
+
+        ef:RegisterEvent("PLAYER_REGEN_DISABLED")
+        ef:RegisterEvent("PLAYER_REGEN_ENABLED")
+        ef:RegisterEvent("PLAYER_UPDATE_RESTING")
 
         -- Register additional per-module events
         if opts.extraEvents then
@@ -1405,7 +1550,7 @@ function UF.TargetStyle.Create(opts)
             if Module.textSystem then Module.textSystem.update() end
         end
 
-        SyncVisibilityFade()
+        UpdateGlowVisibility()
     end
 
     local function ResetFrame()
