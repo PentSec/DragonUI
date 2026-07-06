@@ -385,14 +385,20 @@ function UF.TargetStyle.Create(opts)
 
         if noPortrait then
             Portrait:Hide()
+            if NameBackground then
+                NameBackground:Hide()
+            end
             if frameElements.border then
                 frameElements.border:Hide()
             end
             ManaBar:ClearAllPoints()
-            ManaBar:SetSize(125, 20)
-            ManaBar:SetPoint("TOPLEFT", HealthBar, "BOTTOMLEFT", 0, -2)
+            ManaBar:SetSize(125, 9.5)
+            ManaBar:SetPoint("TOPLEFT", HealthBar, "BOTTOMLEFT", 0, -1)
         else
             Portrait:Show()
+            if NameBackground then
+                NameBackground:Show()
+            end
             if frameElements.border then
                 frameElements.border:Show()
             end
@@ -400,6 +406,12 @@ function UF.TargetStyle.Create(opts)
             ManaBar:ClearAllPoints()
             ManaBar:SetSize(132, 9.5)
             ManaBar:SetPoint("RIGHT", Portrait, "LEFT", 6.5, -16.5)
+        end
+
+        local manaRightText = BlizzFrame[namePrefix .. "FrameManaTextRight"]
+        if manaRightText then
+            manaRightText:ClearAllPoints()
+            manaRightText:SetPoint("RIGHT", ManaBar, "RIGHT", noPortrait and -3 or -13, 0)
         end
 
         if UnitExists(unitToken) then
@@ -708,8 +720,14 @@ function UF.TargetStyle.Create(opts)
             return
         end
 
-        -- Check if name background is disabled in config
+        -- Hide while no_portrait is active
         local config = GetConfig()
+        if config and config.no_portrait then
+            NameBackground:Hide()
+            return
+        end
+
+        -- Check if name background is disabled in config
         if config and config.show_name_background == false then
             NameBackground:Hide()
             return
