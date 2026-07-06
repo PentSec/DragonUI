@@ -171,6 +171,7 @@ local function ShowHelp()
     print("  " .. L["/dragonui debug on|off|status - Toggle diagnostic logging"])
     print("  " .. L["/dragonui kb - Toggle keybind mode"])
     print("  " .. L["/dragonui version - Show version info"])
+    print("  " .. L["/dragonui nppos - Debug: position no-portrait texture interactively"])
     print("  " .. L["/dragonui help - Show this help"])
     print("  " .. L["/rl - Reload UI"])
 end
@@ -260,6 +261,109 @@ local function SlashCommandHandler(input)
             print(L["=== FocusFrame children (depth 3) ==="])
             InspectFrame(FocusFrame, "  ", 0)
         end
+    elseif cmd == "nppos" then
+        local EXISTING = _G["DragonUI_NPposFrame"]
+        if EXISTING then
+            EXISTING:Hide()
+            EXISTING = nil
+            addon:Print("NPpos closed.")
+            return
+        end
+
+        local texW, texH = 129, 129
+        local offX, offY = -27, 30
+        local PLAYER_TEXTURE = addon.UF.TEXTURES.player.BASE_NO_PORTRAIT
+
+        local f = CreateFrame("Frame", "DragonUI_NPposFrame", PlayerFrame)
+        f:SetFrameStrata("TOOLTIP")
+        f:SetSize(texW, texH)
+        f:SetPoint("LEFT", PlayerFrameHealthBar, "LEFT", offX, offY)
+        f:EnableMouse(true)
+        f:SetMovable(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetClampedToScreen(true)
+
+        local tex = f:CreateTexture(nil, "ARTWORK")
+        tex:SetAllPoints()
+        tex:SetTexture(PLAYER_TEXTURE)
+        tex:SetTexCoord(0, 1, 0, 1)
+        tex:SetAlpha(0.85)
+
+        local info = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightOutline")
+        info:SetPoint("BOTTOM", f, "TOP", 0, 2)
+        info:SetJustifyH("CENTER")
+        info:SetText(string.format("X: %d  Y: %d  %dx%d", offX, offY, texW, texH))
+
+        f:SetScript("OnDragStart", function(self)
+            self:StartMoving()
+        end)
+        f:SetScript("OnDragStop", function(self)
+            self:StopMovingOrSizing()
+            local _, _, _, x, y = self:GetPoint(1)
+            if x and y then
+                offX, offY = math.floor(x + 0.5), math.floor(y + 0.5)
+                info:SetText(string.format("X: %d  Y: %d  %dx%d", offX, offY, texW, texH))
+            end
+        end)
+
+        f:SetScript("OnMouseDown", function(self, button)
+            if button == "RightButton" then
+                self:Hide()
+                _G["DragonUI_NPposFrame"] = nil
+                return
+            end
+        end)
+
+        f:SetScript("OnKeyDown", function(self, key)
+            local step = IsShiftKeyDown() and 5 or 1
+            if key == "UP" then offY = offY + step
+            elseif key == "DOWN" then offY = offY - step
+            elseif key == "LEFT" then offX = offX - step
+            elseif key == "RIGHT" then offX = offX + step
+            elseif key == "W" then texW = texW + step
+            elseif key == "S" then texH = texH + step
+            elseif key == "A" then texW = math.max(1, texW - step)
+            elseif key == "D" then texH = math.max(1, texH - step)
+            elseif key == "C" then
+                addon:Print(string.format(
+                    "NPpos: SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', %d, %d)  size: %dx%d",
+                    offX, offY, texW, texH))
+                return
+            else return end
+            f:ClearAllPoints()
+            f:SetPoint("LEFT", PlayerFrameHealthBar, "LEFT", offX, offY)
+            f:SetSize(texW, texH)
+            tex:SetAllPoints()
+            info:SetText(string.format("X: %d  Y: %d  %dx%d", offX, offY, texW, texH))
+        end)
+
+        f:SetScript("OnMouseWheel", function(self, delta)
+            local step = IsShiftKeyDown() and 5 or 1
+            if delta > 0 then
+                texW = texW + step
+                texH = texH + step
+            else
+                texW = math.max(1, texW - step)
+                texH = math.max(1, texH - step)
+            end
+            f:SetSize(texW, texH)
+            tex:SetAllPoints()
+            info:SetText(string.format("X: %d  Y: %d  %dx%d", offX, offY, texW, texH))
+        end)
+
+        f:SetScript("OnEnter", function(self)
+            self:SetAlpha(1)
+        end)
+        f:SetScript("OnLeave", function(self)
+            self:SetAlpha(0.85)
+        end)
+
+        f:EnableKeyboard(true)
+        tinsert(UISpecialFrames, "DragonUI_NPposFrame")
+
+        addon:Print("|cFF00FF00NPpos opened. " ..
+            "Drag to move | Wheel to resize | Arrow keys to nudge | Shift=5px | C to print coords | Right-click to close|r")
+
     elseif cmd == "help" or cmd == "?" then
         ShowHelp()
     elseif cmd == "shadowcolor" then

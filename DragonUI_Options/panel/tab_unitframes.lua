@@ -263,6 +263,19 @@ local function BuildPlayerSection(scroll)
         callback = refreshPlayer,
     })
 
+    -- No Portrait Mode
+    C:AddHeading(s, LO["No Portrait Mode"])
+
+    C:AddToggle(s, {
+        label = LO["Enable"],
+        desc = LO["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."],
+        dbPath = "unitframe.player.no_portrait",
+        callback = function(val)
+            refreshPlayer()
+            Panel:SelectTab("unitframes")
+        end,
+    })
+
     -- Fat Health Bar
     C:AddHeading(s, LO["Fat Health Bar"])
 

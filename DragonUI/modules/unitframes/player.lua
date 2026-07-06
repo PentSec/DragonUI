@@ -193,8 +193,15 @@ local function IsFatHealthbarActive()
     return true
 end
 
+local function IsNoPortraitActive()
+    if IsInVehicle() then return false end
+    local config = GetPlayerConfig()
+    return config and config.no_portrait or false
+end
+
 -- Get the correct BASE texture path (fat or normal, not vehicle — vehicle uses atlas)
 local function GetBaseTexture()
+    if IsNoPortraitActive() then return TEXTURES.BASE_NO_PORTRAIT end
     return IsFatHealthbarActive() and TEXTURES.BASE_FAT or TEXTURES.BASE
 end
 
@@ -1434,7 +1441,11 @@ local function UpdatePlayerDragonDecoration()
             dragonFrame.PlayerFrameBackground:ClearAllPoints()
             dragonFrame.PlayerFrameBackground:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', bgX, bgY)
         end
-        if dragonFrame.PlayerFrameBorder then
+        if IsNoPortraitActive() then
+            if dragonFrame.PlayerFrameBorder then
+                dragonFrame.PlayerFrameBorder:Hide()
+            end
+        elseif dragonFrame.PlayerFrameBorder then
             dragonFrame.PlayerFrameBorder:Show()
             dragonFrame.PlayerFrameBorder:SetTexture(decorBorder)
             dragonFrame.PlayerFrameBorder:SetTexCoord(1, 0, 0, 1) -- Flip horizontal for player
@@ -1637,13 +1648,23 @@ local function UpdatePlayerDragonDecoration()
             if dragonFrame.PlayerFrameBackground then
                 dragonFrame.PlayerFrameBackground:Show()
                 dragonFrame.PlayerFrameBackground:SetTexture(baseTexture)
-                dragonFrame.PlayerFrameBackground:SetTexCoord(0.7890625, 0.982421875, 0.001953125, 0.140625)
-                dragonFrame.PlayerFrameBackground:SetSize(198, 71)
-
-                dragonFrame.PlayerFrameBackground:ClearAllPoints()
-                dragonFrame.PlayerFrameBackground:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, 0 + HP_OFFSET)
+                if IsNoPortraitActive() then
+                    dragonFrame.PlayerFrameBackground:SetTexCoord(0, 1, 0, 1)
+                    dragonFrame.PlayerFrameBackground:SetSize(131, 130)
+                    dragonFrame.PlayerFrameBackground:ClearAllPoints()
+                    dragonFrame.PlayerFrameBackground:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
+                else
+                    dragonFrame.PlayerFrameBackground:SetTexCoord(0.7890625, 0.982421875, 0.001953125, 0.140625)
+                    dragonFrame.PlayerFrameBackground:SetSize(198, 71)
+                    dragonFrame.PlayerFrameBackground:ClearAllPoints()
+                    dragonFrame.PlayerFrameBackground:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, 0 + HP_OFFSET)
+                end
             end
-            if dragonFrame.PlayerFrameBorder then
+            if IsNoPortraitActive() then
+                if dragonFrame.PlayerFrameBorder then
+                    dragonFrame.PlayerFrameBorder:Hide()
+                end
+            elseif dragonFrame.PlayerFrameBorder then
                 dragonFrame.PlayerFrameBorder:Show()
                 dragonFrame.PlayerFrameBorder:SetTexture(borderTexture)
                 dragonFrame.PlayerFrameBorder:SetTexCoord(0, 1, 0, 1)
@@ -1654,11 +1675,16 @@ local function UpdatePlayerDragonDecoration()
             end
 
             -- Update combat and status glow textures to match fat/normal mode
-            if dragonFrame.DragonUICombatTexture then
-                dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
-            end
-            if dragonFrame.DragonUIStatusTexture then
-                dragonFrame.DragonUIStatusTexture:SetTexture(baseTexture)
+            if IsNoPortraitActive() then
+                if dragonFrame.DragonUICombatGlow then dragonFrame.DragonUICombatGlow:Hide() end
+                if dragonFrame.DragonUIStatusGlow then dragonFrame.DragonUIStatusGlow:Hide() end
+            else
+                if dragonFrame.DragonUICombatTexture then
+                    dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
+                end
+                if dragonFrame.DragonUIStatusTexture then
+                    dragonFrame.DragonUIStatusTexture:SetTexture(baseTexture)
+                end
             end
 
             -- Show deco dot when no dragon decoration
@@ -1997,6 +2023,7 @@ end
 
 -- Apply class portrait if enabled in config
 local function UpdatePlayerClassPortrait()
+    if IsNoPortraitActive() then return end
     local config = GetPlayerConfig()
     if not config then return end
 
@@ -2022,6 +2049,7 @@ local function UpdatePlayerClassPortrait()
 end
 
 local function RefreshPlayerPortraitState(unit)
+    if IsNoPortraitActive() then return end
     local portraitUnit = unit == "vehicle" and "vehicle" or "player"
 
     UpdatePlayerClassPortrait()
@@ -2068,8 +2096,13 @@ local function ChangePlayerframe()
         PlayerPortrait:SetSize(56, 56)
     end
     
-    -- Apply class portrait if enabled
-    UpdatePlayerClassPortrait()
+    -- Handle no-portrait mode
+    if IsNoPortraitActive() then
+        PlayerPortrait:Hide()
+    else
+        PlayerPortrait:Show()
+        UpdatePlayerClassPortrait()
+    end
 
     -- Position name and level (shifted right in vehicle due to larger portrait)
     -- Ensure name/level are on OVERLAY draw layer so they render above vehicle textures

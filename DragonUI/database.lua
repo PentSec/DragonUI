@@ -620,6 +620,7 @@ local defaults = {
                 show_rest_glow = true, -- Show golden glow when resting (inn/city)
                 combat_flash_enabled = true, -- Enable combat flash pulse animation
                 combat_flash_opacity = 1.0, -- Opacity multiplier for combat flash (0.0 - 1.0)
+                no_portrait = false, -- No portrait mode (hides portrait, no class icon)
                 fat_healthbar = false, -- Full-width health bar
                 fat_manabar_width = 200,
                 fat_manabar_height = 8,
