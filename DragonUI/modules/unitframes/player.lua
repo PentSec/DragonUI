@@ -1664,6 +1664,9 @@ local function UpdatePlayerDragonDecoration()
                 if dragonFrame.PlayerFrameBorder then
                     dragonFrame.PlayerFrameBorder:Hide()
                 end
+                if dragonFrame.PlayerFrameDeco then
+                    dragonFrame.PlayerFrameDeco:Hide()
+                end
             elseif dragonFrame.PlayerFrameBorder then
                 dragonFrame.PlayerFrameBorder:Show()
                 dragonFrame.PlayerFrameBorder:SetTexture(borderTexture)
@@ -1674,10 +1677,26 @@ local function UpdatePlayerDragonDecoration()
                 dragonFrame.PlayerFrameBorder:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', -67, -28.5 + HP_OFFSET)
             end
 
-            -- Update combat and status glow textures to match fat/normal mode
+            -- Update combat and status glow textures and position to match current mode
             if IsNoPortraitActive() then
-                if dragonFrame.DragonUICombatGlow then dragonFrame.DragonUICombatGlow:Hide() end
-                if dragonFrame.DragonUIStatusGlow then dragonFrame.DragonUIStatusGlow:Hide() end
+                -- No-portrait: keep base texture (GetBaseTexture returns BASE_NO_PORTRAIT),
+                -- just resize/position glow to cover the no-portrait area
+                if dragonFrame.DragonUICombatTexture then
+                    dragonFrame.DragonUICombatTexture:SetTexCoord(0, 1, 0, 1)
+                end
+                if dragonFrame.DragonUIStatusTexture then
+                    dragonFrame.DragonUIStatusTexture:SetTexCoord(0, 1, 0, 1)
+                end
+                if dragonFrame.DragonUICombatGlow then
+                    dragonFrame.DragonUICombatGlow:SetSize(131, 131)
+                    dragonFrame.DragonUICombatGlow:ClearAllPoints()
+                    dragonFrame.DragonUICombatGlow:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
+                end
+                if dragonFrame.DragonUIStatusGlow then
+                    dragonFrame.DragonUIStatusGlow:SetSize(131, 131)
+                    dragonFrame.DragonUIStatusGlow:ClearAllPoints()
+                    dragonFrame.DragonUIStatusGlow:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
+                end
             else
                 if dragonFrame.DragonUICombatTexture then
                     dragonFrame.DragonUICombatTexture:SetTexture(baseTexture)
@@ -1687,8 +1706,8 @@ local function UpdatePlayerDragonDecoration()
                 end
             end
 
-            -- Show deco dot when no dragon decoration
-            if dragonFrame.PlayerFrameDeco then
+            -- Show deco dot when no dragon decoration and not in no-portrait
+            if dragonFrame.PlayerFrameDeco and not IsNoPortraitActive() then
                 dragonFrame.PlayerFrameDeco:Show()
             end
 
@@ -2271,7 +2290,7 @@ local function SetCombatFlashVisible(visible)
 
     -- Update deco icon (swords in combat, dot in normal) — skip if deco doesn't exist
     -- or we're in vehicle (deco is hidden during vehicle anyway)
-    if dragonFrame and dragonFrame.PlayerFrameDeco and not IsInVehicle() then
+    if dragonFrame and dragonFrame.PlayerFrameDeco and not IsInVehicle() and not IsNoPortraitActive() then
         if visible then
             combatPulseTimer = 0 -- Reset pulse timer
 
