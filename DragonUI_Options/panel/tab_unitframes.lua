@@ -722,6 +722,13 @@ local function BuildPartySection(scroll)
     })
 
     C:AddToggle(s, {
+        label = LO["No Portrait Mode"],
+        desc = LO["Hide portrait and class icon. Uses a compact frame texture without the portrait cutout."],
+        dbPath = "unitframe.party.no_portrait",
+        callback = refreshParty,
+    })
+
+    C:AddToggle(s, {
         label = LO["Class Color Health"],
         dbPath = "unitframe.party.classcolor",
         callback = refreshParty,

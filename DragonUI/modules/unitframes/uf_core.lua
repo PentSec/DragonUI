@@ -82,6 +82,16 @@ UF.TEXTURES = {
         rageBar         = "Interface\\Addons\\DragonUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Rage",
         energyBar       = "Interface\\Addons\\DragonUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-Energy",
         runicPowerBar   = "Interface\\Addons\\DragonUI\\Textures\\Partyframe\\UI-HUD-UnitFrame-Party-PortraitOn-Bar-RunicPower",
+        BASE_NO_PORTRAIT = "Interface\\Addons\\DragonUI\\Textures\\UNITFRAM-NO-PORTRAIT",
+        HEALTH_BAR    = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health",
+        HEALTH_STATUS = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health-Status",
+        POWER_BARS = {
+            MANA        = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana",
+            RAGE        = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Rage",
+            FOCUS       = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Focus",
+            ENERGY      = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Energy",
+            RUNIC_POWER = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-RunicPower",
+        },
     },
 
     -- Pet frame (constructs paths from prefix)
@@ -432,17 +442,24 @@ function UF.GetPartyPowerBarTexture(unit)
         return UF.TEXTURES.party.manaBar
     end
     local powerType = UnitPowerType(unit)
+    local key
     if powerType == 1 then
-        return UF.TEXTURES.party.rageBar
+        key = 'rageBar'
     elseif powerType == 2 then
-        return UF.TEXTURES.party.focusBar
+        key = 'focusBar'
     elseif powerType == 3 then
-        return UF.TEXTURES.party.energyBar
+        key = 'energyBar'
     elseif powerType == 6 then
-        return UF.TEXTURES.party.runicPowerBar
+        key = 'runicPowerBar'
     else
-        return UF.TEXTURES.party.manaBar
+        key = 'manaBar'
     end
+    local noPortrait = addon and addon.db and addon.db.profile.unitframe.party.no_portrait
+    if noPortrait then
+        local map = { rageBar = 'RAGE', focusBar = 'FOCUS', energyBar = 'ENERGY', runicPowerBar = 'RUNIC_POWER', manaBar = 'MANA' }
+        return UF.TEXTURES.party.POWER_BARS[map[key]]
+    end
+    return UF.TEXTURES.party[key]
 end
 
 -- Returns the full pet power bar texture path for a power type string.
