@@ -1484,9 +1484,23 @@ local function UpdatePlayerDragonDecoration()
             dragonFrame.PlayerFrameBackground:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', bgX, bgY)
         end
         if IsNoPortraitActive() then
+            -- Override background with no-portrait texture (rectangular, no cutout)
+            if dragonFrame.PlayerFrameBackground then
+                dragonFrame.PlayerFrameBackground:SetTexture(TEXTURES.BASE_NO_PORTRAIT)
+                dragonFrame.PlayerFrameBackground:SetTexCoord(0, 1, 0, 1)
+                dragonFrame.PlayerFrameBackground:SetSize(131, 130)
+                dragonFrame.PlayerFrameBackground:ClearAllPoints()
+                local HP_OFFSET = fatMode and 6 or 0
+                dragonFrame.PlayerFrameBackground:SetPoint('TOPLEFT', PlayerFrameHealthBar, 'LEFT', -2, 67 + HP_OFFSET)
+            end
+            -- Hide decoration border
             if dragonFrame.PlayerFrameBorder then
                 dragonFrame.PlayerFrameBorder:Hide()
             end
+            -- Hide fat-mode overlays if they exist
+            if dragonFrame.BorderOverlay then dragonFrame.BorderOverlay:Hide() end
+            if dragonFrame.PortraitOverlay then dragonFrame.PortraitOverlay:Hide() end
+            if dragonFrame.ClassPortraitOverlay then dragonFrame.ClassPortraitOverlay:Hide() end
         elseif dragonFrame.PlayerFrameBorder then
             dragonFrame.PlayerFrameBorder:Show()
             dragonFrame.PlayerFrameBorder:SetTexture(decorBorder)
@@ -1529,7 +1543,9 @@ local function UpdatePlayerDragonDecoration()
             dragonFrame.PortraitOverlay:SetPoint("CENTER", PlayerPortrait, "CENTER", 0, 0)
             dragonFrame.PortraitOverlay:SetSize(56, 56)
             SetPortraitTexture(dragonFrame.PortraitOverlayTexture, "player")
-            dragonFrame.PortraitOverlay:Show()
+            if not IsNoPortraitActive() then
+                dragonFrame.PortraitOverlay:Show()
+            end
 
             -- Border overlay frame (level +3, above portrait)
             if not dragonFrame.BorderOverlay then
@@ -1537,17 +1553,19 @@ local function UpdatePlayerDragonDecoration()
                 dragonFrame.BorderOverlay:SetAllPoints(PlayerFrame)
                 dragonFrame.BorderOverlayTexture = dragonFrame.BorderOverlay:CreateTexture(nil, 'OVERLAY', nil, 5)
             end
-            dragonFrame.BorderOverlay:SetFrameLevel(PlayerFrame:GetFrameLevel() + 3)
-            dragonFrame.BorderOverlay:Show()
+            if not IsNoPortraitActive() then
+                dragonFrame.BorderOverlay:SetFrameLevel(PlayerFrame:GetFrameLevel() + 3)
+                dragonFrame.BorderOverlay:Show()
 
-            -- Show border on overlay (above portrait), hide original border (on HealthBar level)
-            dragonFrame.PlayerFrameBorder:Hide()
-            dragonFrame.BorderOverlayTexture:SetTexture(decorBorder)
-            dragonFrame.BorderOverlayTexture:SetTexCoord(1, 0, 0, 1)
-            dragonFrame.BorderOverlayTexture:SetSize(PLAYER_BORDER_WIDTH, PLAYER_BORDER_HEIGHT)
-            dragonFrame.BorderOverlayTexture:ClearAllPoints()
-            dragonFrame.BorderOverlayTexture:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', borderX, borderY)
-            dragonFrame.BorderOverlayTexture:Show()
+                -- Show border on overlay (above portrait), hide original border (on HealthBar level)
+                dragonFrame.PlayerFrameBorder:Hide()
+                dragonFrame.BorderOverlayTexture:SetTexture(decorBorder)
+                dragonFrame.BorderOverlayTexture:SetTexCoord(1, 0, 0, 1)
+                dragonFrame.BorderOverlayTexture:SetSize(PLAYER_BORDER_WIDTH, PLAYER_BORDER_HEIGHT)
+                dragonFrame.BorderOverlayTexture:ClearAllPoints()
+                dragonFrame.BorderOverlayTexture:SetPoint('LEFT', PlayerFrameHealthBar, 'LEFT', borderX, borderY)
+                dragonFrame.BorderOverlayTexture:Show()
+            end
 
             -- Keep class portraits on the same render plane as the active portrait texture.
             local pConfig = GetPlayerConfig()
@@ -1794,8 +1812,8 @@ local function UpdatePlayerDragonDecoration()
 
     end
 
-    -- Don't create dragon if decoration is disabled or currently in vehicle
-    if decorationType == "none" or inVehicle then
+    -- Don't create dragon if decoration is disabled, currently in vehicle, or no_portrait active
+    if decorationType == "none" or inVehicle or IsNoPortraitActive() then
         return
     end
 
@@ -2145,7 +2163,10 @@ local function UpdatePlayerClassPortrait()
 end
 
 local function RefreshPlayerPortraitState(unit)
-    if IsNoPortraitActive() then return end
+    if IsNoPortraitActive() then
+        PlayerPortrait:Hide()
+        return
+    end
     local portraitUnit = unit == "vehicle" and "vehicle" or "player"
 
     UpdatePlayerClassPortrait()
@@ -2193,8 +2214,13 @@ local function ChangePlayerframe()
     end
 
     -- Handle no-portrait mode
+    local dragonFrame = _G["DragonUIUnitframeFrame"]
     if IsNoPortraitActive() then
         PlayerPortrait:Hide()
+        if dragonFrame then
+            if dragonFrame.PortraitOverlay then dragonFrame.PortraitOverlay:Hide() end
+            if dragonFrame.ClassPortraitOverlay then dragonFrame.ClassPortraitOverlay:Hide() end
+        end
     else
         PlayerPortrait:Show()
         UpdatePlayerClassPortrait()

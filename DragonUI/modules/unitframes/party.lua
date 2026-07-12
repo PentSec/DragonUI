@@ -68,11 +68,11 @@ end
 -- Update anchor size based on orientation
 local function UpdatePartyAnchorSize()
     if not PartyFrames.anchor then return end
-    
+
     local settings = addon.db and addon.db.profile and addon.db.profile.unitframe and addon.db.profile.unitframe.party
     local orientation = settings and settings.orientation or 'vertical'
     local numMembers = MAX_PARTY_MEMBERS -- 4
-    
+
     if orientation == 'horizontal' then
         local padding = (settings and tonumber(settings.padding_horizontal)) or 50
         local frameWidth = 120
@@ -229,8 +229,7 @@ function PartyFrames:LoadDefaultSettings()
             anchor = 'TOPLEFT',
             anchorParent = 'TOPLEFT',
             x = GetDefaultPartyPosX(),
-            y = -200,
-            no_portrait = false,
+            y = -200
         }
     end
 end
@@ -356,18 +355,12 @@ local function GetSettings()
             anchor = 'TOPLEFT',
             anchorParent = 'TOPLEFT',
             x = GetDefaultPartyPosX(),
-            y = -200,
-            no_portrait = false,
+            y = -200
         }
         settings = addon.db.profile.unitframe.party
     end
-    
-    return settings
-end
 
-local function IsNoPortraitActive()
-    local settings = GetSettings()
-    return settings and settings.no_portrait or false
+    return settings
 end
 
 -- Format numbers helper — delegates to shared TextSystem
@@ -385,7 +378,7 @@ end
 local function GetPartyStep()
     local settings = GetSettings()
     local orientation = settings and settings.orientation or 'vertical'
-    
+
     if orientation == 'horizontal' then
         local pad = (settings and tonumber(settings.padding_horizontal)) or 50
         local base = 120  -- width of party frame
@@ -484,7 +477,7 @@ local function UpdatePartyHealthBarColor(partyIndex)
 
     if settings.classcolor and UnitIsPlayer(unit) then
         -- Use constant instead of hardcoded string
-        local statusTexturePath = IsNoPortraitActive() and TEXTURES.HEALTH_STATUS or TEXTURES.healthBarStatus
+        local statusTexturePath = TEXTURES.healthBarStatus
         if texture:GetTexture() ~= statusTexturePath then
             texture:SetTexture(statusTexturePath)
         end
@@ -494,7 +487,7 @@ local function UpdatePartyHealthBarColor(partyIndex)
         healthbar:SetStatusBarColor(r, g, b, 1)
     else
         -- Use constant instead of hardcoded string
-        local normalTexturePath = IsNoPortraitActive() and TEXTURES.HEALTH_BAR or TEXTURES.healthBar
+        local normalTexturePath = TEXTURES.healthBar
         if texture:GetTexture() ~= normalTexturePath then
             texture:SetTexture(normalTexturePath)
         end
@@ -658,10 +651,10 @@ end
 -- Hide Blizzard texts permanently with alpha 0 (no taint)
 local function HideBlizzardTexts(frame)
     if not frame then return end
-    
+
     local healthText = _G[frame:GetName() .. 'HealthBarText']
     local manaText = _G[frame:GetName() .. 'ManaBarText']
-    
+
     -- Set alpha to 0 instead of hiding to avoid taint
     -- Use hooksecurefunc to re-force alpha=0 after any Blizzard SetAlpha call
     -- A recursion guard flag prevents infinite loop since our SetAlpha(0) also triggers the hook
@@ -678,7 +671,7 @@ local function HideBlizzardTexts(frame)
             healthText.DragonUI_AlphaHooked = true
         end
     end
-    
+
     if manaText then
         manaText:SetAlpha(0)
         if not manaText.DragonUI_AlphaHooked then
@@ -752,14 +745,14 @@ end
 -- Health text update function (taint-free)
 UpdateHealthText = function(statusBar, forceShow)
     if not statusBar then return end
-    
+
     local frame = statusBar:GetParent()
     local frameIndex = frame:GetName():match("PartyMemberFrame(%d+)")
     if not frameIndex then return end
-    
+
     local partyUnit = "party" .. frameIndex
     if not UnitExists(partyUnit) then return end
-    
+
     -- Don't show health numbers when player is disconnected
     if not UnitIsConnected(partyUnit) then
         if frame.DragonUI_HealthText then frame.DragonUI_HealthText:Hide() end
@@ -767,13 +760,13 @@ UpdateHealthText = function(statusBar, forceShow)
         if frame.DragonUI_HealthTextRight then frame.DragonUI_HealthTextRight:Hide() end
         return
     end
-    
+
     -- Ensure our custom text exists
     CreateCustomTexts(frame)
-    
+
     local healthText = frame.DragonUI_HealthText
     if not healthText then return end
-    
+
     local settings = GetSettings()
 
     -- If unitframe_layers missing-health mode is enabled, party health text
@@ -785,24 +778,24 @@ UpdateHealthText = function(statusBar, forceShow)
         if frame.DragonUI_HealthTextRight then frame.DragonUI_HealthTextRight:Hide() end
         return
     end
-    
+
     -- Check visibility logic with hover state (new structure)
     local frameIndexNum = tonumber(frameIndex)
     local hoverState = hoverStates[frameIndexNum]
     local isHovering = false
-    
+
     if hoverState then
         isHovering = hoverState.portrait or hoverState.health
     end
-    
+
     local shouldShow = false
-    
+
     if forceShow or isHovering then
         shouldShow = true -- Force show during hover or explicit force
     elseif settings and settings.showHealthTextAlways then
         shouldShow = true -- Always show if enabled
     end
-    
+
     if not shouldShow then
         -- Hide ALL text elements (including both format)
         if healthText then healthText:Hide() end
@@ -810,15 +803,15 @@ UpdateHealthText = function(statusBar, forceShow)
         if frame.DragonUI_HealthTextRight then frame.DragonUI_HealthTextRight:Hide() end
         return
     end
-    
+
     local current = UnitHealth(partyUnit)
     local max = UnitHealthMax(partyUnit)
-    
+
     if current and max and max > 0 then
         local textFormat = settings and settings.textFormat or "formatted"
         local breakUp = settings and settings.breakUpLargeNumbers
         local finalText = GetFormattedText(current, max, textFormat, breakUp)
-        
+
         -- Dual system: table for "both", string for other formats
         if textFormat == "both" and type(finalText) == "table" then
             -- Dual format: use left and right, hide center
@@ -851,14 +844,14 @@ end
 -- Mana text update function (taint-free)
 UpdateManaText = function(statusBar, forceShow)
     if not statusBar then return end
-    
+
     local frameName = statusBar:GetParent():GetName()
     local frameIndex = frameName:match("PartyMemberFrame(%d+)")
     if not frameIndex then return end
-    
+
     local partyUnit = "party" .. frameIndex
     if not UnitExists(partyUnit) then return end
-    
+
     -- Don't show mana numbers when player is disconnected
     local frame = statusBar:GetParent()
     if not UnitIsConnected(partyUnit) then
@@ -867,32 +860,32 @@ UpdateManaText = function(statusBar, forceShow)
         if frame.DragonUI_ManaTextRight then frame.DragonUI_ManaTextRight:Hide() end
         return
     end
-    
+
     -- Create custom text if it doesn't exist - look in the frame, not statusbar!
     CreateCustomTexts(frame)
     local customText = frame.DragonUI_ManaText
-    
+
     if not customText then return end
-    
+
     local settings = GetSettings()
-    
+
     -- Check visibility logic with hover state (new structure)
     local frameIndexNum = tonumber(frameIndex)
     local hoverState = hoverStates[frameIndexNum]
     local isHovering = false
-    
+
     if hoverState then
         isHovering = hoverState.portrait or hoverState.mana
     end
-    
+
     local shouldShow = false
-    
+
     if forceShow or isHovering then
         shouldShow = true -- Force show during hover or explicit force
     elseif settings and settings.showManaTextAlways then
         shouldShow = true -- Always show if enabled
     end
-    
+
     if not shouldShow then
         -- Hide ALL text elements (including both format)
         if customText then customText:Hide() end
@@ -900,15 +893,15 @@ UpdateManaText = function(statusBar, forceShow)
         if frame.DragonUI_ManaTextRight then frame.DragonUI_ManaTextRight:Hide() end
         return
     end
-    
+
     local current = UnitPower(partyUnit)
     local max = UnitPowerMax(partyUnit)
-    
+
     if current and max and max > 0 then
         local textFormat = settings and settings.textFormat or "formatted"
         local breakUp = settings and settings.breakUpLargeNumbers
         local finalText = GetFormattedText(current, max, textFormat, breakUp)
-        
+
         -- Dual system: table for "both", string for other formats
         if textFormat == "both" and type(finalText) == "table" then
             -- Dual format: use left and right, hide center
@@ -941,19 +934,20 @@ end
 -- Create invisible hover frames for independent health/mana text display
 local function CreateHoverFrames(frame, frameIndex)
     if not frame or frame.DragonUI_HoverFrames then return end
-    
+
     local healthBar = _G[frame:GetName() .. 'HealthBar']
     local manaBar = _G[frame:GetName() .. 'ManaBar']
     local unitToken = "party" .. frameIndex
-    
+
     -- Create hover frame for health bar
     if healthBar and not frame.DragonUI_HealthHover then
         frame.DragonUI_HealthHover = CreateFrame("Button", nil, frame.DragonUI_TextFrame, "SecureUnitButtonTemplate")
         frame.DragonUI_HealthHover:SetFrameLevel(frame.DragonUI_TextFrame:GetFrameLevel() + 1)
         frame.DragonUI_HealthHover:SetAllPoints(healthBar)
-        frame.DragonUI_HealthHover:RegisterForClicks("LeftButtonUp")
+        frame.DragonUI_HealthHover:RegisterForClicks("AnyUp")
         frame.DragonUI_HealthHover:SetAttribute("unit", unitToken)
         frame.DragonUI_HealthHover:SetAttribute("*type1", "target")
+        frame.DragonUI_HealthHover:SetAttribute("*type2", "togglemenu")
         frame.DragonUI_HealthHover:EnableMouse(true)
         frame.DragonUI_HealthHover:SetScript("OnEnter", function()
             hoverStates[frameIndex].health = true
@@ -975,15 +969,16 @@ local function CreateHoverFrames(frame, frameIndex)
             if manaBar then UpdateManaText(manaBar, false) end
         end)
     end
-    
+
     -- Create hover frame for mana bar
     if manaBar and not frame.DragonUI_ManaHover then
         frame.DragonUI_ManaHover = CreateFrame("Button", nil, frame.DragonUI_TextFrame, "SecureUnitButtonTemplate")
         frame.DragonUI_ManaHover:SetFrameLevel(frame.DragonUI_TextFrame:GetFrameLevel() + 1)
         frame.DragonUI_ManaHover:SetAllPoints(manaBar)
-        frame.DragonUI_ManaHover:RegisterForClicks("LeftButtonUp")
+        frame.DragonUI_ManaHover:RegisterForClicks("AnyUp")
         frame.DragonUI_ManaHover:SetAttribute("unit", unitToken)
         frame.DragonUI_ManaHover:SetAttribute("*type1", "target")
+        frame.DragonUI_ManaHover:SetAttribute("*type2", "togglemenu")
         frame.DragonUI_ManaHover:EnableMouse(true)
         frame.DragonUI_ManaHover:SetScript("OnEnter", function()
             hoverStates[frameIndex].mana = true
@@ -1005,10 +1000,6 @@ local function CreateHoverFrames(frame, frameIndex)
             UpdateManaText(manaBar, false)
         end)
     end
-    
-    -- Right-click overlay lives on the frame itself (below hover frames) to cover
-    -- the full visual area (bars sit at Y=-30.5, above the PartyMemberFrame's native rect).
-    -- Created once in StylePartyFrames, see there.
 
     frame.DragonUI_HoverFrames = true
 end
@@ -1030,10 +1021,10 @@ CreateCustomTexts = function(frame)
     if InCombatLockdown() then
         return
     end
-    
+
     local frameIndex = frame:GetID()
     if not frameIndex or frameIndex < 1 or frameIndex > 4 then return end
-    
+
     -- Initialize hover states (separate for health and mana)
     if not hoverStates[frameIndex] then
         hoverStates[frameIndex] = {
@@ -1042,7 +1033,7 @@ CreateCustomTexts = function(frame)
             mana = false
         }
     end
-    
+
     -- Create text frame with proper layering (above border)
     if not frame.DragonUI_TextFrame then
         frame.DragonUI_TextFrame = CreateFrame("Frame", nil, frame)
@@ -1113,10 +1104,10 @@ CreateCustomTexts = function(frame)
         ApplyPartyTextVisualStyle(frame.DragonUI_ManaTextRight)
         EnsurePartyTextFont(frame.DragonUI_ManaTextRight)
     end
-    
+
     -- Create invisible dummy frames for independent hover (taint-free)
     CreateHoverFrames(frame, frameIndex)
-    
+
     frame.DragonUI_CustomTexts = true
 end
 
@@ -1195,55 +1186,6 @@ local function StylePartyFrames()
                     local yOffset = (i - 1) * -step
                     frame:SetPoint("TOPLEFT", PartyFrames.anchor, "TOPLEFT", 0, yOffset)
                 end
-                -- Expand frame size to cover visual area for right-click hit detection
-                if IsNoPortraitActive() then
-                    frame:SetSize(128, 100)
-                else
-                    frame:SetSize(128, 55)
-                end
-            end
-
-            -- Right-click overlay: direct child at level 0 (below hover frames).
-            -- Covers full visual area including Y=-35..105 (bars sit at Y=-30.5).
-            -- Uses *type2="menu" with UnitPopup_ShowMenu — same pattern as
-            -- CompactUnitFrame, no extra dropdown.
-            if not frame.DragonUI_RightClickOverlay then
-                local overlay = CreateFrame("Button", nil, frame, "SecureUnitButtonTemplate")
-                overlay:SetFrameLevel(0)
-                overlay:RegisterForClicks("RightButtonUp")
-                overlay:SetAttribute("*type2", "menu")
-                overlay.menu = function(self, unit)
-                    if not unit or not UnitExists(unit) then return end
-                    CloseDropDownMenus()
-                    local menu, name, id
-                    if UnitIsUnit(unit, "player") then
-                        menu = "SELF"
-                    elseif UnitIsUnit(unit, "vehicle") then
-                        menu = "VEHICLE"
-                    elseif UnitIsUnit(unit, "pet") then
-                        menu = "PET"
-                    elseif UnitIsPlayer(unit) then
-                        id = UnitInRaid(unit)
-                        menu = id and "RAID_PLAYER" or (UnitInParty(unit) and "PARTY" or "PLAYER")
-                    else
-                        menu = "TARGET"
-                    end
-                    if menu then
-                        local activeMenu = UnitPopupMenus[menu]
-                        local removeFocus = activeMenu and activeMenu[1] == "SET_FOCUS"
-                        if removeFocus then table.remove(activeMenu, 1) end
-                        UnitPopup_ShowMenu(self, menu, unit, name, id)
-                        if removeFocus then tinsert(activeMenu, 1, "SET_FOCUS") end
-                    end
-                end
-                frame.DragonUI_RightClickOverlay = overlay
-            end
-            if not InCombatLockdown() then
-                local overlay = frame.DragonUI_RightClickOverlay
-                overlay:ClearAllPoints()
-                overlay:SetPoint("TOPLEFT", frame, "TOPLEFT", -5, -35)
-                overlay:SetSize(138, 140)
-                overlay:SetAttribute("unit", "party" .. i)
             end
 
             -- Hide background (and permanently prevent Blizzard's "Party/Arena Background" CVar from showing it)
@@ -1292,30 +1234,14 @@ local function StylePartyFrames()
                 portrait.DragonUI_SetPointHooked = true
             end
 
-            -- Handle no-portrait mode: hide portrait, expand bars to the left
-            local noPortrait = IsNoPortraitActive()
-            if portrait then
-                if noPortrait then
-                    portrait:Hide()
-                else
-                    portrait:Show()
-                end
-            end
-
             -- Health bar
             local healthbar = _G[frame:GetName() .. 'HealthBar']
             if healthbar and not InCombatLockdown() then
-                healthbar:SetStatusBarTexture(noPortrait and TEXTURES.HEALTH_BAR or TEXTURES.healthBar)
-                if noPortrait then
-                    healthbar:SetSize(112, 10)
-                    healthbar:ClearAllPoints()
-                    healthbar:SetPoint('TOPLEFT', 4, -19)
-                else
-                    healthbar:SetSize(71, 10)
-                    healthbar:ClearAllPoints()
-                    healthbar:SetPoint('TOPLEFT', 44, -19)
-                end
-                healthbar:SetFrameLevel(1)
+                healthbar:SetStatusBarTexture(TEXTURES.healthBar)
+                healthbar:SetSize(71, 10)
+                healthbar:ClearAllPoints()
+                healthbar:SetPoint('TOPLEFT', 44, -19)
+                healthbar:SetFrameLevel(1)  -- Lower level so border texture can appear above
                 healthbar:SetStatusBarColor(1, 1, 1, 1)
 
                 -- Configure dynamic clipping with class color
@@ -1329,16 +1255,10 @@ local function StylePartyFrames()
             local manabar = _G[frame:GetName() .. 'ManaBar']
             if manabar and not InCombatLockdown() then
                 manabar:SetStatusBarTexture(TEXTURES.manaBar)
-                if noPortrait then
-                    manabar:SetSize(112, 6.5)
-                    manabar:ClearAllPoints()
-                    manabar:SetPoint('TOPLEFT', 4, -30.5)
-                else
-                    manabar:SetSize(74, 6.5)
-                    manabar:ClearAllPoints()
-                    manabar:SetPoint('TOPLEFT', 41, -30.5)
-                end
-                manabar:SetFrameLevel(1)
+                manabar:SetSize(74, 6.5)
+                manabar:ClearAllPoints()
+                manabar:SetPoint('TOPLEFT', 41, -30.5)
+                manabar:SetFrameLevel(1)  -- Lower level so border texture can appear above
                 manabar:SetStatusBarColor(1, 1, 1, 1)
 
                 -- Configure dynamic clipping
@@ -1357,52 +1277,37 @@ local function StylePartyFrames()
 
                 if not InCombatLockdown() then
                     name:ClearAllPoints()
-                    if noPortrait then
-                        name:SetPoint('TOPLEFT', 4, -5)
-                        name:SetSize(104, 12)
-                    else
-                        name:SetPoint('TOPLEFT', 46, -5)
-                        name:SetSize(57, 12)
-                    end
+                    name:SetPoint('TOPLEFT', 46, -5)
+                    name:SetSize(57, 12)
                 end
             end
 
             -- LEADER ICON STYLING
             local leaderIcon = _G[frame:GetName() .. 'LeaderIcon']
-            if leaderIcon then
+            if leaderIcon then -- Removed and not InCombatLockdown()
                 leaderIcon:ClearAllPoints()
-                if noPortrait then
-                    leaderIcon:SetPoint('TOPLEFT', frame, 'TOPLEFT', 2, 9)
-                else
-                    leaderIcon:SetPoint('TOPLEFT', 42, 9)
-                end
-                leaderIcon:SetSize(16, 16)
+                leaderIcon:SetPoint('TOPLEFT', 42, 9) -- Custom position
+                leaderIcon:SetSize(16, 16) -- Custom size (optional)
             end
 
             -- Master looter icon styling
             local masterLooterIcon = _G[frame:GetName() .. 'MasterIcon']
-            if masterLooterIcon then
+            if masterLooterIcon then -- No combat restriction
                 masterLooterIcon:ClearAllPoints()
-                if noPortrait then
-                    masterLooterIcon:SetPoint('TOPLEFT', frame, 'TOPLEFT', 18, 11)
-                else
-                    masterLooterIcon:SetPoint('TOPLEFT', 58, 11)
-                end
-                masterLooterIcon:SetSize(16, 16)
+                masterLooterIcon:SetPoint('TOPLEFT', 58, 11) -- Position next to leader icon
+                masterLooterIcon:SetSize(16, 16) -- Custom size
+
             end
 
-            -- Suppress Blizzard combat flash (glow innecesario)
+            -- Flash setup
             local flash = _G[frame:GetName() .. 'Flash']
             if flash then
-                flash:SetTexture()
-                flash:Hide()
-                if not flash.DragonUI_ShowHooked then
-                    hooksecurefunc(flash, "Show", function(self)
-                        self:Hide()
-                        if self.SetTexture then self:SetTexture() end
-                    end)
-                    flash.DragonUI_ShowHooked = true
-                end
+                flash:SetSize(114, 47)
+                flash:SetTexture(TEXTURES.frame)
+                flash:SetTexCoord(GetPartyCoords("flash"))
+                flash:SetPoint('TOPLEFT', 2, -2)
+                flash:SetVertexColor(1, 0, 0, 1)
+                flash:SetDrawLayer('OVERLAY', 1)
             end
 
             -- Create background and mark as styled
@@ -1413,14 +1318,13 @@ local function StylePartyFrames()
                 background:SetTexCoord(GetPartyCoords("background"))
                 background:SetSize(120, 49)
                 background:SetPoint('TOPLEFT', 1, -2)
-                frame.DragonUI_PartyBackground = background
 
                 -- Create border as a separate FRAME (not texture) to appear above bars
                 if not frame.DragonUI_BorderFrame then
                     frame.DragonUI_BorderFrame = CreateFrame("Frame", nil, frame)
                     frame.DragonUI_BorderFrame:SetFrameLevel(frame:GetFrameLevel() + 3) -- Above health/mana bars (level 2)
                     frame.DragonUI_BorderFrame:SetAllPoints(frame)
-                    
+
                     -- Now create border texture inside the border frame
                     local border = frame.DragonUI_BorderFrame:CreateTexture(nil, 'ARTWORK', nil, 1)
                     border:SetTexture(TEXTURES.border)
@@ -1439,21 +1343,6 @@ local function StylePartyFrames()
                     frame.DragonUI_FlashContainer = flashContainer
                 end
 
-                -- Create custom threat glow (adapts to no_portrait texture)
-                if not frame.DragonUI_ThreatGlow then
-                    local glow = CreateFrame("Frame", nil, frame)
-                    glow:SetFrameStrata("BACKGROUND")
-                    glow:SetFrameLevel(5) -- Above border (+3), below icons (+10)
-                    glow:Hide()
-                    local tex = glow:CreateTexture(nil, "OVERLAY")
-                    tex:SetTexture(TEXTURES.BASE_NO_PORTRAIT)
-                    tex:SetTexCoord(0, 1, 0, 1)
-                    tex:SetAllPoints(glow)
-                    tex:SetBlendMode("ADD")
-                    frame.DragonUI_ThreatGlow = glow
-                    frame.DragonUI_ThreatGlowTex = tex
-                end
-
                 -- Create icon container well above border frame
                 if not frame.DragonUI_IconContainer then
                     local iconContainer = CreateFrame("Frame", nil, frame)
@@ -1463,7 +1352,6 @@ local function StylePartyFrames()
                     frame.DragonUI_IconContainer = iconContainer
                 end
 
-                local flash = _G[frame:GetName() .. 'Flash']
                 if flash and frame.DragonUI_FlashContainer and flash:GetParent() ~= frame.DragonUI_FlashContainer then
                     flash:SetParent(frame.DragonUI_FlashContainer)
                     flash:ClearAllPoints()
@@ -1480,7 +1368,7 @@ local function StylePartyFrames()
                 local statusIcon = _G[frame:GetName() .. 'StatusIcon']
                 local blizzardRoleIcon = _G[frame:GetName() .. 'RoleIcon']
                 local guideIcon = _G[frame:GetName() .. 'GuideIcon']
-                
+
                 -- Text elements stay in normal layer
                 if name then
                     name:SetDrawLayer('OVERLAY', 1)
@@ -1491,7 +1379,7 @@ local function StylePartyFrames()
                 if manaText then
                     manaText:SetDrawLayer('OVERLAY', 1)
                 end
-                
+
                 -- Move PvP and status icons to icon container (above border)
                 if leaderIcon then
                     leaderIcon:SetParent(frame.DragonUI_IconContainer)
@@ -1505,7 +1393,7 @@ local function StylePartyFrames()
                     pvpIcon:SetParent(frame.DragonUI_IconContainer)
                     pvpIcon:SetDrawLayer('OVERLAY', 1)
                 end
-                if statusIcon then 
+                if statusIcon then
                     statusIcon:SetParent(frame.DragonUI_IconContainer)
                     statusIcon:SetDrawLayer('OVERLAY', 1)
                 end
@@ -1520,60 +1408,10 @@ local function StylePartyFrames()
 
                 frame.DragonUIStyled = true
             end
-            -- Hide Blizzard background textures so they don't show portrait-style borders
-            local blizzTex = _G[frame:GetName() .. "Texture"]
-            if blizzTex then
-                blizzTex:SetTexture()
-                blizzTex:Hide()
-            end
-            local blizzBg = _G[frame:GetName() .. "Background"]
-            if blizzBg then
-                blizzBg:Hide()
-            end
-            -- In no_portrait mode: hide Blizzard ThreatIndicator (portrait-style borders)
-            if noPortrait then
-                local blizzTi = _G[frame:GetName() .. "ThreatIndicator"]
-                if blizzTi then
-                    blizzTi:Hide()
-                end
-            end
-
-            -- Update background texture for no_portrait mode (runs every StylePartyFrames call)
-            local bg = frame.DragonUI_PartyBackground
-            if bg then
-                if noPortrait then
-                    bg:SetTexture(TEXTURES.BASE_NO_PORTRAIT)
-                    bg:SetTexCoord(0, 1, 0, 1)
-                    bg:SetSize(116, 80)
-                    bg:SetPoint('TOPLEFT', 3, 17)
-                else
-                    bg:SetTexture(TEXTURES.frame)
-                    bg:SetTexCoord(GetPartyCoords("background"))
-                    bg:SetSize(120, 49)
-                    bg:SetPoint('TOPLEFT', 1, -2)
-                end
-            end
-            -- Hide border in no_portrait mode (matches player/target pattern)
-            if frame.DragonUI_BorderFrame then
-                if noPortrait then
-                    frame.DragonUI_BorderFrame:Hide()
-                else
-                    frame.DragonUI_BorderFrame:Show()
-                end
-            end
-            -- Threat glow: adapts to no_portrait texture shape
-            if frame.DragonUI_ThreatGlow then
-                if noPortrait then
-                    frame.DragonUI_ThreatGlow:SetSize(130, 95)
-                    frame.DragonUI_ThreatGlow:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 18)
-                else
-                    frame.DragonUI_ThreatGlow:Hide()
-                end
-            end
             -- Hide Blizzard texts and create our custom ones
             HideBlizzardTexts(frame)
             CreateCustomTexts(frame)
-            
+
             -- Update our custom texts initially
             if healthbar then
                 UpdateHealthText(healthbar, false)
@@ -1581,6 +1419,8 @@ local function StylePartyFrames()
             if manabar then
                 UpdateManaText(manabar, false)
             end
+
+            frame.DragonUIStyled = true
         end
     end
 end
@@ -1828,11 +1668,11 @@ local function SetupPartyHooks()
             UpdateManaBarTexture(frame)
             -- Disconnected state
             UpdateDisconnectedState(frame)
-            
+
             -- Always hide Blizzard texts and ensure our custom texts exist
             HideBlizzardTexts(frame)
             CreateCustomTexts(frame)
-            
+
             -- Force reparent icons to icon container (for dynamic PvP icons)
             if frame.DragonUI_IconContainer then
                 local pvpIcon = _G[frame:GetName() .. 'PVPIcon']
@@ -1841,7 +1681,7 @@ local function SetupPartyHooks()
                 local statusIcon = _G[frame:GetName() .. 'StatusIcon']
                 local guideIcon = _G[frame:GetName() .. 'GuideIcon']
                 local roleIcon = _G[frame:GetName() .. 'RoleIcon']
-                
+
                 if pvpIcon then
                     pvpIcon:SetParent(frame.DragonUI_IconContainer)
                     pvpIcon:SetDrawLayer('OVERLAY', 1)
@@ -1859,7 +1699,7 @@ local function SetupPartyHooks()
                     roleIcon:SetDrawLayer('OVERLAY', 1)
                 end
             end
-            
+
             -- Update custom health/mana text
             local healthbar = _G[frame:GetName() .. 'HealthBar']
             local manabar = _G[frame:GetName() .. 'ManaBar']
@@ -1900,7 +1740,7 @@ local function SetupPartyHooks()
                     texture:SetTexCoord(0, percentage, 0, 1)
                 end
             end
-            
+
             -- Update health text with DragonUI formatting
             UpdateHealthText(statusbar, false)
         end
@@ -1930,12 +1770,12 @@ local function SetupPartyHooks()
                     end
                 end
             end
-            
+
             -- Update mana text with DragonUI formatting
             UpdateManaText(statusbar, false)
         end
     end)
-    
+
     -- Handle hover text display with persistent state (portrait hover - shows both texts)
     hooksecurefunc("UnitFrame_OnEnter", function(self)
         if self and self:GetName() and self:GetName():match("^PartyMemberFrame%d+$") then
@@ -1943,10 +1783,10 @@ local function SetupPartyHooks()
             if frameIndex and hoverStates[frameIndex] then
                 hoverStates[frameIndex].portrait = true  -- Mark portrait as hovering
             end
-            
+
             -- Immediately hide Blizzard texts after hover
             HideBlizzardTexts(self)
-            
+
             -- Show both custom texts during portrait hover (even if always show is off)
             local healthbar = _G[self:GetName() .. 'HealthBar']
             local manabar = _G[self:GetName() .. 'ManaBar']
@@ -1954,17 +1794,17 @@ local function SetupPartyHooks()
             if manabar then UpdateManaText(manabar, true) end -- forceShow = true
         end
     end)
-    
+
     hooksecurefunc("UnitFrame_OnLeave", function(self)
         if self and self:GetName() and self:GetName():match("^PartyMemberFrame%d+$") then
             local frameIndex = tonumber(self:GetID())
             if frameIndex and hoverStates[frameIndex] then
                 hoverStates[frameIndex].portrait = false  -- Clear portrait hover state
             end
-            
+
             -- Ensure Blizzard texts stay hidden after hover ends
             HideBlizzardTexts(self)
-            
+
             -- Return to normal text visibility (respect always show setting)
             local healthbar = _G[self:GetName() .. 'HealthBar']
             local manabar = _G[self:GetName() .. 'ManaBar']
@@ -1972,7 +1812,7 @@ local function SetupPartyHooks()
             if manabar then UpdateManaText(manabar, false) end -- forceShow = false
         end
     end)
-    
+
     -- ===============================================================
     -- DISCONNECT VISUAL FIX (mod-playerbots compatibility)
     -- ===============================================================
@@ -1984,11 +1824,11 @@ local function SetupPartyHooks()
     hooksecurefunc("PartyMemberFrame_UpdateOnlineStatus", function(frame)
         if not frame or not frame:GetName() then return end
         if not frame:GetName():match("^PartyMemberFrame%d+$") then return end
-        
+
         local frameIndex = frame:GetID()
         local unit = "party" .. frameIndex
         if not UnitExists(unit) then return end
-        
+
         -- Re-apply disconnect state — this runs after Blizzard AND after our
         -- SetValue/UnitFrameHealthBar_Update hooks have already executed,
         -- ensuring the gray visuals stick.
@@ -2003,39 +1843,6 @@ local function SetupPartyHooks()
         if manabar then
             ApplyManaBarClipping(manabar, manabar:GetValue())
         end
-    end)
-
-    -- ============================================================
-    -- THREAT GLOW (no_portrait mode)
-    -- ============================================================
-    -- Hook Blizzard's threat indicator to use our custom glow with
-    -- the no_portrait texture shape instead of portrait-style borders.
-    hooksecurefunc("PartyMemberFrame_SetThreatIndicator", function(frame, status)
-        if not frame or not frame:GetName() then return end
-        if not frame:GetName():match("^PartyMemberFrame%d+$") then return end
-        if not IsNoPortraitActive() then return end
-
-        -- Hide Blizzard's native threat indicator (portrait-style borders)
-        local blizzInd = _G[frame:GetName() .. "ThreatIndicator"]
-        if blizzInd then blizzInd:Hide() end
-
-        local glow = frame.DragonUI_ThreatGlow
-        local tex = frame.DragonUI_ThreatGlowTex
-        if not glow or not tex then return end
-
-        if not status or status == 0 then
-            glow:Hide()
-            return
-        end
-
-        if status == 3 then
-            tex:SetVertexColor(1.0, 0.0, 0.0, 0.9)
-        elseif status == 2 then
-            tex:SetVertexColor(1.0, 0.5, 0.0, 0.9)
-        else
-            tex:SetVertexColor(1.0, 1.0, 0.0, 0.9)
-        end
-        glow:Show()
     end)
 end
 
@@ -2060,32 +1867,32 @@ function PartyFrames:UpdateSettings()
 
     -- Apply widget position first
     ApplyWidgetPosition()
-    
+
     -- Only apply base styles - ACE3 handles class color
     StylePartyFrames()
-    
+
     -- Reposition buffs
     RepositionBlizzardBuffs()
-    
+
     -- Update anchor size for new orientation
     UpdatePartyAnchorSize()
-    
+
     -- Refresh all texts and power bar textures with new settings
     for i = 1, MAX_PARTY_MEMBERS do
         local frame = _G['PartyMemberFrame' .. i]
         if frame then
             HideBlizzardTexts(frame)
             CreateCustomTexts(frame)
-            
+
             -- Refresh power bar texture (energy, rage, etc.)
             UpdateManaBarTexture(frame)
-            
+
             local healthbar = _G[frame:GetName() .. 'HealthBar']
             local manabar = _G[frame:GetName() .. 'ManaBar']
-            
+
             if healthbar then UpdateHealthText(healthbar, false) end
             if manabar then UpdateManaText(manabar, false) end
-            
+
             -- Re-apply disconnected state AFTER styling (gray name, hidden texts, etc.)
             -- StylePartyFrames resets name color to yellow, so this must come last
             UpdateDisconnectedState(frame)
@@ -2219,34 +2026,8 @@ recoveryFrame:RegisterEvent("PLAYER_ENTERING_WORLD")   -- Recovery after reload/
 recoveryFrame:RegisterEvent("PLAYER_ALIVE")             -- Player resurrects (accept rez or spirit healer)
 recoveryFrame:RegisterEvent("PLAYER_UNGHOST")           -- Player returns from ghost form
 recoveryFrame:RegisterEvent("UNIT_HEALTH")              -- Any unit health change (catches party member rez too)
-recoveryFrame:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
 recoveryFrame:RegisterEvent("CVAR_UPDATE")              -- React to Blizzard party visibility options changes
 recoveryFrame:SetScript("OnEvent", function(self, event, unit)
-    if event == "UNIT_THREAT_SITUATION_UPDATE" then
-        if not unit or not unit:match("^party%d$") then return end
-        if not IsNoPortraitActive() then return end
-        local frameIndex = tonumber(unit:match("party(%d)"))
-        local frame = frameIndex and _G["PartyMemberFrame" .. frameIndex]
-        if not frame then return end
-        local status = UnitThreatSituation(unit)
-        local glow = frame.DragonUI_ThreatGlow
-        local tex = frame.DragonUI_ThreatGlowTex
-        if not glow or not tex then return end
-        if not status or status == 0 then
-            glow:Hide()
-            return
-        end
-        if status == 3 then
-            tex:SetVertexColor(1.0, 0.0, 0.0, 0.9)
-        elseif status == 2 then
-            tex:SetVertexColor(1.0, 0.5, 0.0, 0.9)
-        else
-            tex:SetVertexColor(1.0, 1.0, 0.0, 0.9)
-        end
-        glow:Show()
-        return
-    end
-
     if event == "PLAYER_ENTERING_WORLD" then
         local delayFrame = CreateFrame("Frame")
         local elapsed = 0
@@ -2277,7 +2058,7 @@ recoveryFrame:SetScript("OnEvent", function(self, event, unit)
         local function RefreshPartyFrames()
             RefreshAllPartyFrameVisibility()
         end
-        
+
         if InCombatLockdown() then
             -- Queue for after combat ends
             if addon.CombatQueue then
@@ -2352,7 +2133,7 @@ recoveryFrame:SetScript("OnEvent", function(self, event, unit)
         end
         return
     end
-    
+
     -- For party-wide events, refresh ALL party frames
     for i = 1, MAX_PARTY_MEMBERS do
         local frame = _G['PartyMemberFrame' .. i]
@@ -2578,4 +2359,3 @@ end)
 -- ===============================================================
 -- MODULE LOADED CONFIRMATION
 -- ===============================================================
-
