@@ -52,6 +52,25 @@ function UF.TargetStyle.Create(opts)
     local BOSS_COORDS = UF.BOSS_COORDS.targetStyle
     local POWER_MAP   = UF.POWER_MAP
 
+    -- Nameplate-style elite/rare icon coordinates for no-portrait mode.
+    -- Mirrors the player frame decoration (see player.lua).
+    local NP_ELITE_ICON_TEXTURE = "Interface\\AddOns\\DragonUI\\Textures\\nameplates"
+    local NP_ELITE_COORDS = {
+        elite     = {0, 0.15, 0.35, 0.63},  -- Elite gold dragon
+        rareelite = {0, 0.15, 0.35, 0.63},  -- Rare elite (same gold dragon)
+        worldboss = {0, 0.15, 0.62, 0.94},  -- Boss gold dragon
+    }
+    local NP_ELITE_ICON_SIZE = 20  -- Size in pixels
+
+    -- Native pixel dimensions of the portrait-on BACKGROUND texture
+    -- (UI-HUD-UnitFrame-Target-PortraitOn-BACKGROUND.blp, 256x128).
+    -- InitializeFrame creates the background with only a SetPoint and no
+    -- explicit SetSize, so it renders at this native size. ApplyNoPortraitLayout
+    -- restores the size explicitly because once SetSize is called (in the
+    -- no-portrait branch) it cannot be "unset" back to native-file behavior.
+    local TARGET_BG_WIDTH = 256
+    local TARGET_BG_HEIGHT = 128
+
     -- Name background color variants sourced from UIUnitFrame2x_PTR.blp.
     -- Coords extracted from the local PTR atlas (1024x512) and mapped by color.
     local NAME_BG_PTR_TEXTURE = "Interface\\AddOns\\DragonUI\\Textures\\UIUnitFrame2x_PTR"
@@ -372,6 +391,37 @@ function UF.TargetStyle.Create(opts)
         return IsNoPortraitActive() and BASE_NO_PORTRAIT or TEXTURES.BACKGROUND
     end
 
+    -- ----------------------------------------------------------------
+    -- No-portrait elite/rare icon (nameplates.blp atlas)
+    -- Shown only when no_portrait is active AND the unit is
+    -- elite/rareelite/worldboss. Mirrors the player frame decoration.
+    -- Called from ApplyNoPortraitLayout (layout/config changes) and
+    -- UpdateClassification (target switch / classification events) so
+    -- the icon refreshes on both no_portrait toggle and retarget.
+    -- ----------------------------------------------------------------
+    local function UpdateNoPortraitEliteIcon()
+        local icon = frameElements.noPortraitElite
+        if not icon then return end
+
+        if not IsNoPortraitActive() or not UnitExists(unitToken) then
+            icon:Hide()
+            return
+        end
+
+        local classification = UnitClassification(unitToken)
+        local coords = NP_ELITE_COORDS[classification]
+        if coords then
+            icon:SetTexture(NP_ELITE_ICON_TEXTURE)
+            icon:SetTexCoord(unpack(coords))
+            icon:ClearAllPoints()
+            -- Position at top-left of health bar (matches player frame offset)
+            icon:SetPoint("LEFT", HealthBar, "LEFT", 4, 42)
+            icon:Show()
+        else
+            icon:Hide()
+        end
+    end
+
     local function ApplyNoPortraitLayout()
         local noPortrait = IsNoPortraitActive()
 
@@ -380,16 +430,17 @@ function UF.TargetStyle.Create(opts)
             frameElements.background:SetTexCoord(0, 1, 0, 1)
             frameElements.background:ClearAllPoints()
             if noPortrait then
-                if not frameElements._bgOrigSize then
-                    frameElements._bgOrigSize = { frameElements.background:GetSize() }
-                end
                 frameElements.background:SetSize(131, 130)
                 frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "LEFT", 1, 74)
             else
+                -- Restore the portrait-on background exactly as InitializeFrame
+                -- sets it up: BACKGROUND texture (selected by GetBaseTexture
+                -- above), default TexCoord (0,1,0,1), anchored TOPLEFT 0,-8,
+                -- and rendered at the texture's native pixel size (256x128).
+                -- We set size explicitly because SetSize cannot be "unset" once
+                -- applied in the no-portrait branch.
                 frameElements.background:SetPoint("TOPLEFT", BlizzFrame, "TOPLEFT", 0, -8)
-                if frameElements._bgOrigSize then
-                    frameElements.background:SetSize(unpack(frameElements._bgOrigSize))
-                end
+                frameElements.background:SetSize(TARGET_BG_WIDTH, TARGET_BG_HEIGHT)
             end
         end
 
@@ -400,6 +451,12 @@ function UF.TargetStyle.Create(opts)
             end
             if frameElements.border then
                 frameElements.border:Hide()
+            end
+            -- Default elite icon is anchored to the (hidden) Portrait; hide
+            -- it so it doesn't render in the wrong spot. The no-portrait
+            -- nameplates-blp icon takes over via UpdateNoPortraitEliteIcon().
+            if frameElements.elite then
+                frameElements.elite:Hide()
             end
             ManaBar:ClearAllPoints()
             ManaBar:SetSize(125, 9.5)
@@ -554,6 +611,10 @@ function UF.TargetStyle.Create(opts)
                 BlizzFrame._npPVPIconPos = nil
             end
         end
+
+        -- Refresh the no-portrait elite/rare icon so it follows no_portrait
+        -- toggles even when UpdateClassification isn't about to run.
+        UpdateNoPortraitEliteIcon()
 
         if UnitExists(unitToken) then
             ForceUpdatePowerBar()
@@ -788,6 +849,7 @@ function UF.TargetStyle.Create(opts)
 
         if not UnitExists(unitToken) or not frameElements.elite then
             if frameElements.elite then frameElements.elite:Hide() end
+            if frameElements.noPortraitElite then frameElements.noPortraitElite:Hide() end
             return
         end
 
@@ -818,17 +880,28 @@ function UF.TargetStyle.Create(opts)
             end
         end
 
-        if coords then
-            frameElements.elite:SetDrawLayer("ARTWORK", 1)
-            frameElements.elite:SetTexCoord(
-                coords[1], coords[2], coords[3], coords[4])
-            frameElements.elite:SetSize(coords[5], coords[6])
-            frameElements.elite:ClearAllPoints()
-            frameElements.elite:SetPoint(
-                "CENTER", Portrait, "CENTER", coords[7], coords[8])
-            frameElements.elite:Show()
+        if IsNoPortraitActive() then
+            -- No-portrait: the portrait-anchored elite icon would render in
+            -- the wrong spot (Portrait is hidden), so hide it and delegate to
+            -- the nameplates.blp icon positioned on the health bar.
+            if frameElements.elite then frameElements.elite:Hide() end
+            UpdateNoPortraitEliteIcon()
         else
-            frameElements.elite:Hide()
+            -- Portrait active: ensure the no-portrait icon is hidden and
+            -- show the default portrait-anchored elite icon when classified.
+            if frameElements.noPortraitElite then frameElements.noPortraitElite:Hide() end
+            if coords then
+                frameElements.elite:SetDrawLayer("ARTWORK", 1)
+                frameElements.elite:SetTexCoord(
+                    coords[1], coords[2], coords[3], coords[4])
+                frameElements.elite:SetSize(coords[5], coords[6])
+                frameElements.elite:ClearAllPoints()
+                frameElements.elite:SetPoint(
+                    "CENTER", Portrait, "CENTER", coords[7], coords[8])
+                frameElements.elite:Show()
+            else
+                frameElements.elite:Hide()
+            end
         end
     end
 
@@ -1011,6 +1084,16 @@ function UF.TargetStyle.Create(opts)
                 "DragonUI_" .. namePrefix .. "Elite", "ARTWORK", nil, 1)
             frameElements.elite:SetTexture(TEXTURES.BOSS)
             frameElements.elite:Hide()
+        end
+
+        -- No-portrait elite/rare icon (nameplates.blp atlas); shown only
+        -- when no_portrait is active and the unit is elite/rareelite/worldboss.
+        if not frameElements.noPortraitElite then
+            local icon = frameElements.eliteFrame:CreateTexture(
+                nil, "OVERLAY", nil, 2)
+            icon:SetSize(NP_ELITE_ICON_SIZE, NP_ELITE_ICON_SIZE)
+            icon:Hide()
+            frameElements.noPortraitElite = icon
         end
 
         -- ---- Create combat/rest glows (for no-portrait mode) ----

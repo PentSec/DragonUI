@@ -95,6 +95,15 @@ local DRAGON_COORDINATES = {
     }
 }
 
+-- Nameplate-style elite/rare icon coordinates for no-portrait mode
+local NP_ELITE_ICON_TEXTURE = "Interface\\AddOns\\DragonUI\\Textures\\nameplates"
+local NP_ELITE_COORDS = {
+    elite    = {0, 0.15, 0.35, 0.63},  -- Elite gold dragon
+    rareelite = {0, 0.15, 0.35, 0.63}, -- Rare elite (same gold dragon)
+    worldboss = {0, 0.15, 0.62, 0.94}, -- Boss gold dragon
+}
+local NP_ELITE_ICON_SIZE = 20  -- Size in pixels
+
 -- Combat Flash animation settings *NO Elite activated
 local COMBAT_PULSE_SETTINGS = {
     speed = 9, -- Pulse speed
@@ -1812,8 +1821,29 @@ local function UpdatePlayerDragonDecoration()
 
     end
 
-    -- Don't create dragon if decoration is disabled, currently in vehicle, or no_portrait active
-    if decorationType == "none" or inVehicle or IsNoPortraitActive() then
+    -- Handle no_portrait elite/rare icon (replaces dragon decoration)
+    local icon = dragonFrame and dragonFrame.NoPortraitEliteIcon
+    if IsNoPortraitActive() then
+        if icon then
+            local coords = NP_ELITE_COORDS[decorationType]
+            if coords then
+                icon:SetTexture(NP_ELITE_ICON_TEXTURE)
+                icon:SetTexCoord(unpack(coords))
+                icon:ClearAllPoints()
+                -- Position near top-left of health bar (similar to leader icon position)
+                icon:SetPoint("LEFT", PlayerFrameHealthBar, "LEFT", 4, 42)
+                icon:Show()
+            else
+                icon:Hide()
+            end
+        end
+        return
+    end
+    -- Hide the no_portrait icon when not in no_portrait mode
+    if icon then icon:Hide() end
+
+    -- Don't create dragon if decoration is disabled or currently in vehicle
+    if decorationType == "none" or inVehicle then
         return
     end
 
@@ -1867,6 +1897,14 @@ local function CreatePlayerFrameTextures()
         iconContainer:SetSize(200, 200)
         iconContainer:SetPoint("CENTER", PlayerFrame, "CENTER", 0, 0)
         dragonFrame.EliteIconContainer = iconContainer
+    end
+
+    -- No-portrait elite/rare icon (shown only when no_portrait + dragon decoration active)
+    if not dragonFrame.NoPortraitEliteIcon then
+        local icon = dragonFrame.EliteIconContainer:CreateTexture(nil, "OVERLAY", nil, 7)
+        icon:SetSize(NP_ELITE_ICON_SIZE, NP_ELITE_ICON_SIZE)
+        icon:Hide()
+        dragonFrame.NoPortraitEliteIcon = icon
     end
 
     if not dragonFrame.DragonUICombatGlow then
@@ -2224,6 +2262,10 @@ local function ChangePlayerframe()
     else
         PlayerPortrait:Show()
         UpdatePlayerClassPortrait()
+        -- Hide no_portrait elite icon when portrait mode is active
+        if dragonFrame and dragonFrame.NoPortraitEliteIcon then
+            dragonFrame.NoPortraitEliteIcon:Hide()
+        end
     end
 
     -- Position name and level (shifted right in vehicle due to larger portrait)

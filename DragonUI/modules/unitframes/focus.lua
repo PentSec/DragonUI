@@ -174,10 +174,12 @@ local api = UF.TargetStyle.Create({
                 local config = ctx.GetConfig()
                 local correctScale = config.scale or 1
                 FocusFrame:SetScale(correctScale)
-                -- Force re-initialization to restore our customizations
+                -- Re-apply scale only; bars anchored to Portrait follow Blizzard's resize automatically.
+                -- Do NOT call InitializeFrame() — it runs ApplyWidgetPosition() which calls
+                -- ClearAllPoints() on FocusFrame, destroying Blizzard's size anchors and
+                -- causing health/power bars to drift outside the border.
                 if ctx.Module.configured then
-                    ctx.Module.configured = false
-                    ctx.InitializeFrame()
+                    FocusFrame:SetScale(correctScale)
                 end
             end)
             ctx.Module.scaleHooked = true
