@@ -71,8 +71,13 @@
     <!-- Bag Skin module (retail-style textures for bags) — must load before combuctor -->
     <Script file="bags_skin.lua"/>
 
-    <!-- Combuctor bag replacement module -->
+    <!-- Combuctor bag replacement module (split into 6 files in PR #2) -->
     <Script file="combuctor\combuctor.lua"/>
+    <Script file="combuctor\combuctor_data.lua"/>
+    <Script file="combuctor\combuctor_sets.lua"/>
+    <Script file="combuctor\combuctor_classes.lua"/>
+    <Script file="combuctor\combuctor_frame.lua"/>
+    <Script file="combuctor\combuctor_system.lua"/>
 
     <!-- Bag Sort module (sort buttons for bags and bank) -->
     <Script file="bagsort.lua"/>
