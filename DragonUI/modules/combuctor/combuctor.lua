@@ -940,6 +940,30 @@ function mod:Toggle(bag)
 end
 
 -- ============================================================================
+-- SHARED LOCALS → mod.X PROMOTIONS
+-- Promotes file-local upvalues to mod fields so downstream split files can
+-- access them via mod.X after extraction (PR #2). The locals remain valid
+-- as upvalues within this file; behaviors are unchanged.
+-- ============================================================================
+
+mod.CT = CT
+mod.L = L
+mod.DB = DB
+mod.defaults = defaults
+mod.playerName = playerName
+mod.ItemSearch = ItemSearch
+mod.GetModuleConfig = GetModuleConfig
+mod.IsModuleEnabled = IsModuleEnabled
+mod.SetupDatabase = SetupDatabase
+mod.CombuctorModule = CombuctorModule
+mod.CombuctorAddNineSlice = CombuctorAddNineSlice
+mod.CombuctorRetailItemSlot = CombuctorRetailItemSlot
+mod.CombuctorRetailBagSlot = CombuctorRetailBagSlot
+mod.CombuctorRetailBackpackButton = CombuctorRetailBackpackButton
+mod.TEXTURE_ITEM_QUEST_BORDER = TEXTURE_ITEM_QUEST_BORDER
+mod.TEXTURE_ITEM_QUEST_BANG = TEXTURE_ITEM_QUEST_BANG
+
+-- ============================================================================
 -- ENVOY (EVENT BUS)
 -- ============================================================================
 
@@ -1215,7 +1239,7 @@ do
     -- Event handlers
     local eventFrame = CreateFrame("Frame")
     eventFrame:SetScript("OnEvent", function(self, event, ...)
-        if not CombuctorModule.applied then return end
+        if not mod.CombuctorModule.applied then return end
         if event == "PLAYER_LOGIN" then
             forEachBag(updateBag)
         elseif event == "BAG_UPDATE" then
@@ -1277,7 +1301,7 @@ do
     end)
 
     bankWatcher:SetScript("OnEvent", function(self, event)
-        if not CombuctorModule.applied then return end
+        if not mod.CombuctorModule.applied then return end
         if event == "BANKFRAME_OPENED" then
             self:Show()
         else
@@ -1296,7 +1320,7 @@ do
     local BankCache = mod:NewModule("BankCache")
 
     local function getCharKey()
-        return (GetRealmName() or "") .. "|" .. playerName
+        return (GetRealmName() or "") .. "|" .. mod.playerName
     end
 
     local function getCharCache()
@@ -1429,7 +1453,7 @@ do
     end
 
     function PlayerInfo:GetMoney(player)
-        if player == playerName then
+        if player == mod.playerName then
             return GetMoney()
         end
         return 0
@@ -1463,7 +1487,7 @@ do
     end
 
     function BagSlotInfo:IsCached(player, bag)
-        if player ~= playerName then
+        if player ~= mod.playerName then
             return true
         end
         if self:IsBank(bag) or self:IsBankBag(bag) then
@@ -1477,7 +1501,7 @@ do
     end
 
     function BagSlotInfo:IsEquipped(player, bag)
-        if player ~= playerName then return false end
+        if player ~= mod.playerName then return false end
         -- Non-slot containers are always "equipped" by definition.
         if self:IsBackpack(bag) or self:IsBank(bag) or self:IsKeyRing(bag) then
             return true
@@ -1495,7 +1519,7 @@ do
     end
 
     function BagSlotInfo:GetSize(player, bag)
-        if player == playerName then
+        if player == mod.playerName then
             -- If the bag is not equipped, return 0 regardless of what
             -- GetContainerNumSlots may cache (some 3.3.5a servers return
             -- stale values after unequip).
@@ -1522,7 +1546,7 @@ do
         if self:IsBank(bag) or self:IsBackpack(bag) then
             return 0
         end
-        if player == playerName then
+        if player == mod.playerName then
             local itemLink = self:GetItemInfo(player, bag)
             if itemLink then
                 return GetItemFamily(itemLink)
@@ -1558,7 +1582,7 @@ do
 
     function BagSlotInfo:GetItemInfo(player, bag)
         if self:IsBackpack(bag) or self:IsBank(bag) then return nil end
-        if player == playerName then
+        if player == mod.playerName then
             local invSlot = self:ToInventorySlot(bag)
             if invSlot then
                 local link = GetInventoryItemLink("player", invSlot)
@@ -1582,7 +1606,7 @@ do
     local ItemSlotInfo = mod:NewModule("ItemSlotInfo")
 
     function ItemSlotInfo:GetItemInfo(player, bag, slot)
-        if player ~= playerName then
+        if player ~= mod.playerName then
             return nil
         end
 
@@ -1679,10 +1703,10 @@ do
     local BAGTYPE_PROFESSION = 0x0008 + 0x0010 + 0x0020 + 0x0040 + 0x0080 + 0x0200 + 0x0400 + 0x8000
 
     -- Additional localization for sets
-    L.Equipment = SET_EQUIPMENT
-    L.Usable = SET_USABLE
-    L.Normal = SET_NORMAL
-    L.Trade = SET_TRADE
+    mod.L.Equipment = SET_EQUIPMENT
+    mod.L.Usable = SET_USABLE
+    mod.L.Normal = SET_NORMAL
+    mod.L.Trade = SET_TRADE
 
     -- Register default item sets (matching KPack Combuctor structure)
 
@@ -1690,112 +1714,112 @@ do
     CombuctorSet:Register(SET_ALL, [[Interface\Icons\INV_Misc_EngGizmos_17]], function() return true end)
     -- ALL subtabs: All, Normal, Trade
     CombuctorSet:Register(SET_ALL, nil, nil, SET_ALL)
-    CombuctorSet:Register(L.Normal, nil, function(player, bagType) return bagType and bagType == 0 end, SET_ALL)
-    CombuctorSet:Register(L.Trade, nil, function(player, bagType) return bagType and bit.band(bagType, BAGTYPE_PROFESSION) > 0 end, SET_ALL)
+    CombuctorSet:Register(mod.L.Normal, nil, function(player, bagType) return bagType and bagType == 0 end, SET_ALL)
+    CombuctorSet:Register(mod.L.Trade, nil, function(player, bagType) return bagType and bit.band(bagType, BAGTYPE_PROFESSION) > 0 end, SET_ALL)
 
     -- EQUIPMENT: parent set (armor + weapons)
     do
         local function isEquipment(_, _, _, _, _, _, _, itype)
-            return (itype == L.Armor or itype == L.Weapon)
+            return (itype == mod.L.Armor or itype == mod.L.Weapon)
         end
-        CombuctorSet:Register(L.Equipment, [[Interface\Icons\INV_Chest_Chain_04]], isEquipment)
+        CombuctorSet:Register(mod.L.Equipment, [[Interface\Icons\INV_Chest_Chain_04]], isEquipment)
         -- Equipment subtabs: All, Armor, Weapon, Trinket
-        CombuctorSet:Register(SET_ALL, nil, nil, L.Equipment)
+        CombuctorSet:Register(SET_ALL, nil, nil, mod.L.Equipment)
     end
     do
         local function isArmor(_, _, _, _, _, _, _, itype, _, _, equipLoc)
-            return itype == L.Armor and equipLoc ~= "INVTYPE_TRINKET"
+            return itype == mod.L.Armor and equipLoc ~= "INVTYPE_TRINKET"
         end
-        CombuctorSet:Register(L.Armor, nil, isArmor, L.Equipment)
+        CombuctorSet:Register(mod.L.Armor, nil, isArmor, mod.L.Equipment)
     end
     do
         local function isWeapon(_, _, _, _, _, _, _, itype)
-            return itype == L.Weapon
+            return itype == mod.L.Weapon
         end
-        CombuctorSet:Register(L.Weapon, nil, isWeapon, L.Equipment)
+        CombuctorSet:Register(mod.L.Weapon, nil, isWeapon, mod.L.Equipment)
     end
     do
         local function isTrinket(_, _, _, _, _, _, _, _, _, _, equipLoc)
             return equipLoc == "INVTYPE_TRINKET"
         end
-        CombuctorSet:Register(INVTYPE_TRINKET, nil, isTrinket, L.Equipment)
+        CombuctorSet:Register(INVTYPE_TRINKET, nil, isTrinket, mod.L.Equipment)
     end
 
     -- USABLE: parent set (consumables + devices/explosives)
     do
         local function isUsable(_, _, _, _, _, _, _, itype, subType)
-            if itype == L.Consumable then
+            if itype == mod.L.Consumable then
                 return true
-            elseif itype == L.TradeGood then
-                if subType == L.Devices or subType == L.Explosives then
+            elseif itype == mod.L.TradeGood then
+                if subType == mod.L.Devices or subType == mod.L.Explosives then
                     return true
                 end
             end
         end
-        CombuctorSet:Register(L.Usable, [[Interface\Icons\INV_Potion_93]], isUsable)
+        CombuctorSet:Register(mod.L.Usable, [[Interface\Icons\INV_Potion_93]], isUsable)
         -- Usable subtabs: All, Consumable, Devices
-        CombuctorSet:Register(SET_ALL, nil, nil, L.Usable)
+        CombuctorSet:Register(SET_ALL, nil, nil, mod.L.Usable)
     end
     do
         local function isConsumable(_, _, _, _, _, _, _, itype)
-            return itype == L.Consumable
+            return itype == mod.L.Consumable
         end
-        CombuctorSet:Register(L.Consumable, nil, isConsumable, L.Usable)
+        CombuctorSet:Register(mod.L.Consumable, nil, isConsumable, mod.L.Usable)
     end
     do
         local function isDevice(_, _, _, _, _, _, _, itype)
-            return itype == L.TradeGood
+            return itype == mod.L.TradeGood
         end
-        CombuctorSet:Register(L.Devices, nil, isDevice, L.Usable)
+        CombuctorSet:Register(mod.L.Devices, nil, isDevice, mod.L.Usable)
     end
 
     -- QUEST: parent set (no subtabs)
     do
         local function isQuestItem(_, _, _, _, _, _, _, itype)
-            return itype == L.Quest
+            return itype == mod.L.Quest
         end
-        CombuctorSet:Register(L.Quest, [[Interface\QuestFrame\UI-QuestLog-BookIcon]], isQuestItem)
-        CombuctorSet:Register(SET_ALL, nil, nil, L.Quest)
+        CombuctorSet:Register(mod.L.Quest, [[Interface\QuestFrame\UI-QuestLog-BookIcon]], isQuestItem)
+        CombuctorSet:Register(SET_ALL, nil, nil, mod.L.Quest)
     end
 
     -- TRADE GOODS: parent set (trade goods + gems + recipes, excluding devices/explosives)
     do
         local function isTradeGood(_, _, _, _, _, _, _, itype, subType)
-            if itype == L.TradeGood then
-                return not (subType == L.Devices or subType == L.Explosives)
+            if itype == mod.L.TradeGood then
+                return not (subType == mod.L.Devices or subType == mod.L.Explosives)
             end
-            return itype == L.Recipe or itype == L.Gem
+            return itype == mod.L.Recipe or itype == mod.L.Gem
         end
-        CombuctorSet:Register(L.TradeGood, [[Interface\Icons\INV_Fabric_Silk_02]], isTradeGood)
+        CombuctorSet:Register(mod.L.TradeGood, [[Interface\Icons\INV_Fabric_Silk_02]], isTradeGood)
         -- Trade Goods subtabs: All, Trade Goods, Gem, Recipe
-        CombuctorSet:Register(SET_ALL, nil, nil, L.TradeGood)
+        CombuctorSet:Register(SET_ALL, nil, nil, mod.L.TradeGood)
     end
     do
         local function isTradeGoodOnly(_, _, _, _, _, _, _, itype)
-            return itype == L.TradeGood
+            return itype == mod.L.TradeGood
         end
-        CombuctorSet:Register(L.TradeGood, nil, isTradeGoodOnly, L.TradeGood)
+        CombuctorSet:Register(mod.L.TradeGood, nil, isTradeGoodOnly, mod.L.TradeGood)
     end
     do
         local function isGem(_, _, _, _, _, _, _, itype)
-            return itype == L.Gem
+            return itype == mod.L.Gem
         end
-        CombuctorSet:Register(L.Gem, nil, isGem, L.TradeGood)
+        CombuctorSet:Register(mod.L.Gem, nil, isGem, mod.L.TradeGood)
     end
     do
         local function isRecipe(_, _, _, _, _, _, _, itype)
-            return itype == L.Recipe
+            return itype == mod.L.Recipe
         end
-        CombuctorSet:Register(L.Recipe, nil, isRecipe, L.TradeGood)
+        CombuctorSet:Register(mod.L.Recipe, nil, isRecipe, mod.L.TradeGood)
     end
 
     -- MISCELLANEOUS: parent set (no subtabs)
     do
         local function isMiscItem(_, _, _, link, _, _, _, itype)
-            return itype == L.Misc and (link:match("%d+") ~= "6265")
+            return itype == mod.L.Misc and (link:match("%d+") ~= "6265")
         end
-        CombuctorSet:Register(L.Misc, [[Interface\Icons\INV_Misc_Rune_01]], isMiscItem)
-        CombuctorSet:Register(SET_ALL, nil, nil, L.Misc)
+        CombuctorSet:Register(mod.L.Misc, [[Interface\Icons\INV_Misc_Rune_01]], isMiscItem)
+        CombuctorSet:Register(SET_ALL, nil, nil, mod.L.Misc)
     end
 end
 
@@ -1892,7 +1916,7 @@ do
         local questBorder = item:CreateTexture(nil, "OVERLAY")
         questBorder:SetSize(item:GetWidth(), item:GetHeight())
         questBorder:SetPoint("CENTER")
-        questBorder:SetTexture(TEXTURE_ITEM_QUEST_BORDER)
+        questBorder:SetTexture(mod.TEXTURE_ITEM_QUEST_BORDER)
         questBorder:SetDrawLayer("OVERLAY", 4)
         questBorder:Hide()
         item.questBorder = questBorder
@@ -1918,9 +1942,9 @@ do
         -- Apply retail skin from bags_skin module (if available).
         -- The _BagSkin_Applied guard prevents duplicate work.
         -- This is necessary because ItemSlots are created dynamically
-        -- and CombuctorSkinItems() may run before the slot exists.
+        -- and mod.CombuctorSkinItems() may run before the slot exists.
         if not self._BagSkin_Applied then
-            CombuctorRetailItemSlot(self)
+            mod.CombuctorRetailItemSlot(self)
         end
     end
 
@@ -2088,14 +2112,14 @@ do
         -- Quest item check
         local isQuestItem, isQuestStarter = self:IsQuestItem()
         if isQuestItem then
-            qBorder:SetTexture(TEXTURE_ITEM_QUEST_BORDER)
+            qBorder:SetTexture(mod.TEXTURE_ITEM_QUEST_BORDER)
             qBorder:SetAlpha(0.5)
             qBorder:Show()
             border:Hide()
             return
         end
         if isQuestStarter then
-            qBorder:SetTexture(TEXTURE_ITEM_QUEST_BANG)
+            qBorder:SetTexture(mod.TEXTURE_ITEM_QUEST_BANG)
             qBorder:SetAlpha(0.5)
             qBorder:Show()
             border:Hide()
@@ -2146,7 +2170,7 @@ do
             local p = self:GetParent():GetParent()
             player = p and p.GetPlayer and p:GetPlayer()
         end
-        return player or playerName
+        return player or mod.playerName
     end
 
     function ItemSlot:GetBag()
@@ -2183,7 +2207,7 @@ do
         local itemLink = self:GetItem()
         if not itemLink then return false, false end
         if self:IsCached() then
-            return ItemSearch:Find(itemLink, QUEST_ITEM_SEARCH), false
+            return mod.ItemSearch:Find(itemLink, QUEST_ITEM_SEARCH), false
         else
             local isQuestItem, questID, isActive = GetContainerItemQuestInfo(self:GetBag(), self:GetID())
             return isQuestItem, (questID and not isActive)
@@ -2275,7 +2299,7 @@ do
     function FrameEvents:BAG_UPDATE_TYPE(msg, ...) self:UpdateSlotColor(...) end
     function FrameEvents:BAG_EMPTIED(msg, bag, prevSize)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then
+            if f:GetPlayer() == mod.playerName then
                 -- Remove stale items first (Regenerate won't clean them
                 -- because GetBagSize(bag) returns 0 for unequipped bags,
                 -- so the bag's items would remain in self.items).
@@ -2290,13 +2314,13 @@ do
 
     function FrameEvents:UpdateSlotColor(...)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then f:UpdateSlotColor(...) end
+            if f:GetPlayer() == mod.playerName then f:UpdateSlotColor(...) end
         end
     end
 
     function FrameEvents:UpdateSlot(...)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then
+            if f:GetPlayer() == mod.playerName then
                 if f:UpdateSlot(...) then f:RequestLayout() end
             end
         end
@@ -2304,7 +2328,7 @@ do
 
     function FrameEvents:RemoveItem(...)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then
+            if f:GetPlayer() == mod.playerName then
                 if f:RemoveItem(...) then f:RequestLayout() end
             end
         end
@@ -2312,13 +2336,13 @@ do
 
     function FrameEvents:UpdateSlotLock(...)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then f:UpdateSlotLock(...) end
+            if f:GetPlayer() == mod.playerName then f:UpdateSlotLock(...) end
         end
     end
 
     function FrameEvents:UpdateSlotCooldown(...)
         for f in self:GetFrames() do
-            if f:GetPlayer() == playerName then f:UpdateSlotCooldown(...) end
+            if f:GetPlayer() == mod.playerName then f:UpdateSlotCooldown(...) end
         end
     end
 
@@ -2429,7 +2453,7 @@ do
     end
 
     function ItemFrame:GetPlayer()
-        return self.player or playerName
+        return self.player or mod.playerName
     end
 
     function ItemFrame:HasItem(bag, slot, link)
@@ -2457,7 +2481,7 @@ do
             elseif f.subRule and not f.subRule(player, bagType, name, link, quality, level, ilvl, itemType, subType, stackCount, equipLoc) then
                 return false
             elseif f.name then
-                return ItemSearch:Find(link, f.name)
+                return mod.ItemSearch:Find(link, f.name)
             end
         end
         return true
@@ -2745,7 +2769,7 @@ do
     end
 
     function Bag:IsPurchasable()
-        return BagSlotInfo:IsPurchasable(playerName, self:GetID())
+        return BagSlotInfo:IsPurchasable(mod.playerName, self:GetID())
     end
 
     function Bag:Update()
@@ -2755,12 +2779,12 @@ do
 
         -- Actualizar bloqueo
         if self:IsBagSlot() then
-            SetItemButtonDesaturated(self, BagSlotInfo:IsLocked(playerName, id))
+            SetItemButtonDesaturated(self, BagSlotInfo:IsLocked(mod.playerName, id))
         end
 
         -- Update slot info (texture)
         if self:IsBagSlot() then
-            local link, count, texture = BagSlotInfo:GetItemInfo(playerName, id)
+            local link, count, texture = BagSlotInfo:GetItemInfo(mod.playerName, id)
             if link then
                 SetItemButtonTexture(self, texture or GetItemIcon(link))
                 SetItemButtonTextureVertexColor(self, 1, 1, 1)
@@ -2944,7 +2968,7 @@ do
 
         -- Copper (ancla a la derecha)
         f.iconCopper = f:CreateTexture(nil, "OVERLAY")
-        f.iconCopper:SetTexture(CT.coinCopper)
+        f.iconCopper:SetTexture(mod.CT.coinCopper)
         f.iconCopper:SetTexCoord(unpack(COIN_TEXCOORD))
         f.iconCopper:SetSize(13, 13)
         f.iconCopper:SetPoint("RIGHT", f, "RIGHT", 0, 0)
@@ -2953,7 +2977,7 @@ do
 
         -- Silver
         f.iconSilver = f:CreateTexture(nil, "OVERLAY")
-        f.iconSilver:SetTexture(CT.coinSilver)
+        f.iconSilver:SetTexture(mod.CT.coinSilver)
         f.iconSilver:SetTexCoord(unpack(COIN_TEXCOORD))
         f.iconSilver:SetSize(13, 13)
         f.iconSilver:SetPoint("RIGHT", f.amtCopper, "LEFT", -4, 0)
@@ -2962,7 +2986,7 @@ do
 
         -- Gold
         f.iconGold = f:CreateTexture(nil, "OVERLAY")
-        f.iconGold:SetTexture(CT.coinGold)
+        f.iconGold:SetTexture(mod.CT.coinGold)
         f.iconGold:SetTexCoord(unpack(COIN_TEXCOORD))
         f.iconGold:SetSize(13, 13)
         f.iconGold:SetPoint("RIGHT", f.amtSilver, "LEFT", -4, 0)
@@ -3049,19 +3073,19 @@ do
         local left = bar:CreateTexture(nil, "BACKGROUND")
         left:SetSize(8, TOKENBAR_HEIGHT)
         left:SetPoint("LEFT", bar, "LEFT")
-        left:SetTexture(CT.currencybox)
+        left:SetTexture(mod.CT.currencybox)
         left:SetTexCoord(0.03125, 0.53125, 0.289062, 0.554688)
 
         local right = bar:CreateTexture(nil, "BACKGROUND")
         right:SetSize(8, TOKENBAR_HEIGHT)
         right:SetPoint("RIGHT", bar, "RIGHT")
-        right:SetTexture(CT.currencybox)
+        right:SetTexture(mod.CT.currencybox)
         right:SetTexCoord(0.03125, 0.53125, 0.570312, 0.835938)
 
         local middle = bar:CreateTexture(nil, "BACKGROUND")
         middle:SetPoint("TOPLEFT", left, "TOPRIGHT")
         middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
-        middle:SetTexture(CT.currencybox)
+        middle:SetTexture(mod.CT.currencybox)
         middle:SetTexCoord(0, 0.5, 0.0078125, 0.273438)
     end
 
@@ -3652,19 +3676,19 @@ do
         local coinLeft = f.coinFrame:CreateTexture(nil, "BACKGROUND")
         coinLeft:SetSize(8, 19)
         coinLeft:SetPoint("LEFT", f.coinFrame, "LEFT")
-        coinLeft:SetTexture(CT.coinbox)
+        coinLeft:SetTexture(mod.CT.coinbox)
         coinLeft:SetTexCoord(0.03125, 0.53125, 0.289062, 0.554688)
 
         local coinRight = f.coinFrame:CreateTexture(nil, "BACKGROUND")
         coinRight:SetSize(8, 19)
         coinRight:SetPoint("RIGHT", f.coinFrame, "RIGHT")
-        coinRight:SetTexture(CT.coinbox)
+        coinRight:SetTexture(mod.CT.coinbox)
         coinRight:SetTexCoord(0.03125, 0.53125, 0.570312, 0.835938)
 
         local coinMiddle = f.coinFrame:CreateTexture(nil, "BACKGROUND")
         coinMiddle:SetPoint("TOPLEFT", coinLeft, "TOPRIGHT")
         coinMiddle:SetPoint("BOTTOMRIGHT", coinRight, "BOTTOMLEFT")
-        coinMiddle:SetTexture(CT.coinbox)
+        coinMiddle:SetTexture(mod.CT.coinbox)
         coinMiddle:SetTexCoord(0, 0.5, 0.0078125, 0.273438)
 
         f.moneyFrame = mod.MoneyFrame:New(f)
@@ -3692,8 +3716,8 @@ do
         if text then
             GameTooltip:SetText(text, 1, 1, 1)
         end
-        GameTooltip:AddLine(L.MoveTip)
-        GameTooltip:AddLine(L.ResetPositionTip)
+        GameTooltip:AddLine(mod.L.MoveTip)
+        GameTooltip:AddLine(mod.L.ResetPositionTip)
         GameTooltip:Show()
     end
 
@@ -3712,12 +3736,12 @@ do
 
     function InventoryFrame:OnBagToggleEnter(toggle)
         GameTooltip:SetOwner(toggle, "ANCHOR_LEFT")
-        GameTooltip:SetText(L.Bags, 1, 1, 1)
-        GameTooltip:AddLine(L.BagToggle)
+        GameTooltip:SetText(mod.L.Bags, 1, 1, 1)
+        GameTooltip:AddLine(mod.L.BagToggle)
         if self.isBank then
-            GameTooltip:AddLine(L.InventoryToggle)
+            GameTooltip:AddLine(mod.L.InventoryToggle)
         else
-            GameTooltip:AddLine(L.BankToggle)
+            GameTooltip:AddLine(mod.L.BankToggle)
         end
         GameTooltip:Show()
     end
@@ -3786,7 +3810,7 @@ do
     end
 
     function InventoryFrame:GetPlayer()
-        return self.player or playerName
+        return self.player or mod.playerName
     end
 
     function InventoryFrame:UpdateSets(category)
@@ -3982,7 +4006,7 @@ do
         if self:IsBank() and self:AtBank() then
             CloseBankFrame()
         end
-        self:SetPlayer(playerName)
+        self:SetPlayer(mod.playerName)
     end
 
     function InventoryFrame:ToggleFrame(auto)
@@ -4027,7 +4051,7 @@ local function CombuctorSkinFrame(frame)
     if not frame or frame._BagSkin_Combuctor then return end
     frame._BagSkin_Combuctor = true
 
-    CombuctorAddNineSlice(frame)
+    mod.CombuctorAddNineSlice(frame)
 
     -- Adjust NineSlice so it doesn't cover the header
     if frame._BagSkin_NineSlice then
@@ -4070,7 +4094,7 @@ local function CombuctorSkinFrame(frame)
         borderFrame:SetFrameLevel(iconLevel + 10)
 
         local pp = borderFrame:CreateTexture(nil, 'OVERLAY')
-        pp:SetTexture(CT.bag_border)
+        pp:SetTexture(mod.CT.bag_border)
         pp:SetAllPoints(borderFrame)
         pp:SetDrawLayer('OVERLAY', 7)
 
@@ -4115,7 +4139,7 @@ local function CombuctorSkinItems(frame)
             for _, subchild in ipairs({ child:GetChildren() }) do
                 if subchild:GetObjectType() == 'Button' and subchild:GetName() then
                     if subchild:GetName():find('DragonUI_CombuctorItem') then
-                        CombuctorRetailItemSlot(subchild)
+                        mod.CombuctorRetailItemSlot(subchild)
                     end
                 end
             end
@@ -4130,7 +4154,7 @@ local function CombuctorSkinBagSlots(frame)
                 if subchild:GetObjectType() == 'Button' and subchild:GetName() then
                     local name = subchild:GetName()
                     if name:find('DragonUI_CombuctorBag') then
-                        CombuctorRetailBagSlot(subchild)
+                        mod.CombuctorRetailBagSlot(subchild)
                     end
                 end
             end
@@ -4143,23 +4167,28 @@ local function CombuctorApplySkin()
     for i = 1, 2 do
         local frame = _G['DragonUI_CombuctorFrame' .. i]
         if frame then
-            CombuctorSkinFrame(frame)
-            CombuctorSkinItems(frame)
-            CombuctorSkinBagSlots(frame)
+            mod.CombuctorSkinFrame(frame)
+            mod.CombuctorSkinItems(frame)
+            mod.CombuctorSkinBagSlots(frame)
         end
     end
 
     -- Backpack button on main bar
-    CombuctorRetailBackpackButton()
+    mod.CombuctorRetailBackpackButton()
 
     -- Character bag slots on action bar
     for i = 0, 3 do
         local slot = _G['CharacterBag' .. i .. 'Slot']
         if slot then
-            CombuctorRetailBagSlot(slot)
+            mod.CombuctorRetailBagSlot(slot)
         end
     end
 end
+
+mod.CombuctorSkinFrame = CombuctorSkinFrame
+mod.CombuctorSkinItems = CombuctorSkinItems
+mod.CombuctorSkinBagSlots = CombuctorSkinBagSlots
+mod.CombuctorApplySkin = CombuctorApplySkin
 
 -- ============================================================================
 -- APPLY / RESTORE SYSTEM
@@ -4168,10 +4197,10 @@ end
 local AutoShowInventory, AutoHideInventory
 
 local function ApplyCombuctorSystem()
-    if CombuctorModule.applied then return end
+    if mod.CombuctorModule.applied then return end
 
-    SetupDatabase()
-    if not DB then return end
+    mod.SetupDatabase()
+    if not mod.DB then return end
 
     -- Sets are empty by default (no category tabs shown)
     -- Users can enable individual tabs via the options panel
@@ -4179,14 +4208,14 @@ local function ApplyCombuctorSystem()
     -- Create frames only once; toggling module should reuse existing frames.
     mod.frames = mod.frames or {}
     if not mod.frames[1] then
-        mod.frames[1] = mod.Frame:New(L.InventoryTitle, DB.inventory, false, "inventory")
+        mod.frames[1] = mod.Frame:New(mod.L.InventoryTitle, mod.DB.inventory, false, "inventory")
     end
     if not mod.frames[2] then
-        mod.frames[2] = mod.Frame:New(L.BankTitle, DB.bank, true, "bank")
+        mod.frames[2] = mod.Frame:New(mod.L.BankTitle, mod.DB.bank, true, "bank")
     end
 
     -- Apply retail skin to frames (independent of bags_skin module)
-    CombuctorApplySkin()
+    mod.CombuctorApplySkin()
 
     AutoShowInventory = function()
         mod:Show(BACKPACK_CONTAINER, true)
@@ -4195,18 +4224,18 @@ local function ApplyCombuctorSystem()
         mod:Hide(BACKPACK_CONTAINER, true)
     end
 
-    CombuctorModule.originalStates.OpenBackpack = _G.OpenBackpack
-    CombuctorModule.originalStates.ToggleBank = _G.ToggleBank
-    CombuctorModule.originalStates.ToggleBackpack = _G.ToggleBackpack
-    CombuctorModule.originalStates.OpenAllBags = _G.OpenAllBags
-    CombuctorModule.originalStates.ToggleAllBags = _G.ToggleAllBags
-    CombuctorModule.originalStates.ToggleBag = _G.ToggleBag
+    mod.CombuctorModule.originalStates.OpenBackpack = _G.OpenBackpack
+    mod.CombuctorModule.originalStates.ToggleBank = _G.ToggleBank
+    mod.CombuctorModule.originalStates.ToggleBackpack = _G.ToggleBackpack
+    mod.CombuctorModule.originalStates.OpenAllBags = _G.OpenAllBags
+    mod.CombuctorModule.originalStates.ToggleAllBags = _G.ToggleAllBags
+    mod.CombuctorModule.originalStates.ToggleBag = _G.ToggleBag
 
     -- Hook bag functions
     _G.OpenBackpack = AutoShowInventory
-    if not CombuctorModule.hooks.closeBackpack then
+    if not mod.CombuctorModule.hooks.closeBackpack then
         hooksecurefunc("CloseBackpack", AutoHideInventory)
-        CombuctorModule.hooks.closeBackpack = true
+        mod.CombuctorModule.hooks.closeBackpack = true
     end
 
     _G.ToggleBank = function(bag) mod:Toggle(bag) end
@@ -4224,14 +4253,14 @@ local function ApplyCombuctorSystem()
         _G.ToggleAllBags = function() mod:Toggle(BACKPACK_CONTAINER) end
     end
 
-    if not CombuctorModule.hooks.closeAllBags then
+    if not mod.CombuctorModule.hooks.closeAllBags then
         hooksecurefunc("CloseAllBags", function() mod:Hide(BACKPACK_CONTAINER) end)
-        CombuctorModule.hooks.closeAllBags = true
+        mod.CombuctorModule.hooks.closeAllBags = true
     end
     BankFrame:UnregisterAllEvents()
     BankFrame:Hide()
 
-    if not CombuctorModule.hooks.inventoryEvents then
+    if not mod.CombuctorModule.hooks.inventoryEvents then
         mod("InventoryEvents"):Register(mod, "BANK_OPENED", function()
             mod:Show(BANK_CONTAINER, true)
             mod:Show(BACKPACK_CONTAINER, true)
@@ -4240,11 +4269,11 @@ local function ApplyCombuctorSystem()
             mod:Hide(BANK_CONTAINER, true)
             mod:Hide(BACKPACK_CONTAINER, true)
         end)
-        CombuctorModule.hooks.inventoryEvents = true
+        mod.CombuctorModule.hooks.inventoryEvents = true
     end
 
     -- Auto show/hide on trade/auction/mail
-    local autoEventFrame = CombuctorModule.frames.autoEventFrame or CreateFrame("Frame")
+    local autoEventFrame = mod.CombuctorModule.frames.autoEventFrame or CreateFrame("Frame")
     autoEventFrame:UnregisterAllEvents()
     autoEventFrame:SetScript("OnEvent", function(self, event)
         if event == "MAIL_CLOSED" or event == "TRADE_CLOSED" or
@@ -4262,7 +4291,7 @@ local function ApplyCombuctorSystem()
     autoEventFrame:RegisterEvent("TRADE_SHOW")
     autoEventFrame:RegisterEvent("TRADE_SKILL_SHOW")
     autoEventFrame:RegisterEvent("AUCTION_HOUSE_SHOW")
-    CombuctorModule.frames.autoEventFrame = autoEventFrame
+    mod.CombuctorModule.frames.autoEventFrame = autoEventFrame
 
     -- Slash commands
     SlashCmdList["DRAGONUI_COMBUCTOR"] = function(msg)
@@ -4278,15 +4307,15 @@ local function ApplyCombuctorSystem()
     SLASH_DRAGONUI_COMBUCTOR1 = "/cbt"
     SLASH_DRAGONUI_COMBUCTOR2 = "/combuctor"
 
-    CombuctorModule.applied = true
+    mod.CombuctorModule.applied = true
 end
 
 local function RestoreCombuctorSystem()
-    if not CombuctorModule.applied then return end
+    if not mod.CombuctorModule.applied then return end
 
-    if CombuctorModule.frames.autoEventFrame then
-        CombuctorModule.frames.autoEventFrame:UnregisterAllEvents()
-        CombuctorModule.frames.autoEventFrame:SetScript("OnEvent", nil)
+    if mod.CombuctorModule.frames.autoEventFrame then
+        mod.CombuctorModule.frames.autoEventFrame:UnregisterAllEvents()
+        mod.CombuctorModule.frames.autoEventFrame:SetScript("OnEvent", nil)
     end
 
     -- Hide all frames
@@ -4297,27 +4326,27 @@ local function RestoreCombuctorSystem()
     end
 
     -- Restore original bag functions
-    if CombuctorModule.originalStates.OpenBackpack then
-        _G.OpenBackpack = CombuctorModule.originalStates.OpenBackpack
+    if mod.CombuctorModule.originalStates.OpenBackpack then
+        _G.OpenBackpack = mod.CombuctorModule.originalStates.OpenBackpack
     end
-    if CombuctorModule.originalStates.ToggleBank then
-        _G.ToggleBank = CombuctorModule.originalStates.ToggleBank
+    if mod.CombuctorModule.originalStates.ToggleBank then
+        _G.ToggleBank = mod.CombuctorModule.originalStates.ToggleBank
     end
-    if CombuctorModule.originalStates.ToggleBackpack then
-        _G.ToggleBackpack = CombuctorModule.originalStates.ToggleBackpack
+    if mod.CombuctorModule.originalStates.ToggleBackpack then
+        _G.ToggleBackpack = mod.CombuctorModule.originalStates.ToggleBackpack
     end
-    if CombuctorModule.originalStates.OpenAllBags then
-        _G.OpenAllBags = CombuctorModule.originalStates.OpenAllBags
+    if mod.CombuctorModule.originalStates.OpenAllBags then
+        _G.OpenAllBags = mod.CombuctorModule.originalStates.OpenAllBags
     end
-    if CombuctorModule.originalStates.ToggleAllBags then
-        _G.ToggleAllBags = CombuctorModule.originalStates.ToggleAllBags
+    if mod.CombuctorModule.originalStates.ToggleAllBags then
+        _G.ToggleAllBags = mod.CombuctorModule.originalStates.ToggleAllBags
     end
-    if CombuctorModule.originalStates.ToggleBag then
-        _G.ToggleBag = CombuctorModule.originalStates.ToggleBag
+    if mod.CombuctorModule.originalStates.ToggleBag then
+        _G.ToggleBag = mod.CombuctorModule.originalStates.ToggleBag
     end
 
-    CombuctorModule.originalStates = {}
-    CombuctorModule.applied = false
+    mod.CombuctorModule.originalStates = {}
+    mod.CombuctorModule.applied = false
 end
 
 local function RefreshCombuctorFrames()
@@ -4339,8 +4368,8 @@ local function RefreshCombuctorFrames()
             local name = frame:GetName()
             local gframe = _G[name]
             if gframe then
-                CombuctorSkinItems(gframe)
-                CombuctorSkinBagSlots(gframe)
+                mod.CombuctorSkinItems(gframe)
+                mod.CombuctorSkinBagSlots(gframe)
             end
         end
 
@@ -4355,21 +4384,21 @@ end
 -- ============================================================================
 
 local function OnProfileChanged()
-    if IsModuleEnabled() then
-        if not CombuctorModule.applied then
+    if mod.IsModuleEnabled() then
+        if not mod.CombuctorModule.applied then
             ApplyCombuctorSystem()
         else
-            -- Profile changed while module is active: refresh DB and existing frames
-            SetupDatabase()
-            if not DB then return end
+            -- Profile changed while module is active: refresh mod.DB and existing frames
+            mod.SetupDatabase()
+            if not mod.DB then return end
 
             -- Sets remain as stored in profile (empty = no category tabs)
 
-            -- Update existing frames to point to new DB tables
+            -- Update existing frames to point to new mod.DB tables
             if mod.frames then
                 for _, frame in pairs(mod.frames) do
-                    if frame.key and DB[frame.key] then
-                        frame.sets = DB[frame.key]
+                    if frame.key and mod.DB[frame.key] then
+                        frame.sets = mod.DB[frame.key]
                         frame:SetWidth(frame.sets.w or 384)
                         frame:SetHeight(frame.sets.h or 440)
                         if frame.UpdateSets then
@@ -4380,7 +4409,7 @@ local function OnProfileChanged()
             end
         end
     else
-        if addon:ShouldDeferModuleDisable("combuctor", CombuctorModule) then
+        if addon:ShouldDeferModuleDisable("combuctor", mod.CombuctorModule) then
             return
         end
         RestoreCombuctorSystem()
@@ -4397,7 +4426,7 @@ initFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 initFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "DragonUI" then
-        if not IsModuleEnabled() then return end
+        if not mod.IsModuleEnabled() then return end
 
         addon:After(0.5, function()
             if addon.db and addon.db.RegisterCallback then
@@ -4408,7 +4437,7 @@ initFrame:SetScript("OnEvent", function(self, event, arg1)
         end)
 
     elseif event == "PLAYER_ENTERING_WORLD" then
-        if not IsModuleEnabled() then return end
+        if not mod.IsModuleEnabled() then return end
         ApplyCombuctorSystem()
     end
 end)
