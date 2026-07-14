@@ -2915,32 +2915,6 @@ do
 
     local moneyId = 1
 
-    function MoneyFrame:New(parent)
-        local f = self:Bind(CreateFrame("Frame", format("DragonUI_CombuctorMoney%d", moneyId), parent, "MoneyFrameTemplate"))
-        f:SetHeight(19)
-        f:SetScript("OnShow", self.OnShow)
-        f:SetFrameLevel(f:GetFrameLevel() + 4)
-
-        local name = f:GetName()
-        f.iconGold    = _G[name .. "GoldButton"]
-        f.iconSilver  = _G[name .. "SilverButton"]
-        f.iconCopper  = _G[name .. "CopperButton"]
-        f.amtGold     = _G[name .. "GoldButtonText"]
-        f.amtSilver   = _G[name .. "SilverButtonText"]
-        f.amtCopper   = _G[name .. "CopperButtonText"]
-
-        local txt = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        txt:SetAllPoints(f)
-        txt:SetJustifyH("RIGHT")
-        txt:SetJustifyV("MIDDLE")
-        txt:Hide()
-        f.textFull = txt
-
-        moneyId = moneyId + 1
-        f:Update()
-        return f
-    end
-
     function MoneyFrame:OnShow()
         self:Update()
     end
