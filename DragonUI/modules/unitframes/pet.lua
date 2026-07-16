@@ -56,20 +56,20 @@ local function AnimatePetCombatPulse(elapsed)
     if not COMBAT_PULSE_SETTINGS.enabled then
         return
     end
-    
+
     local texture = _G.PetAttackModeTexture
     if not texture or not texture:IsVisible() then
         return
     end
-    
+
     -- Increment timer
     combatPulseTimer = combatPulseTimer + (elapsed * COMBAT_PULSE_SETTINGS.speed)
-    
+
     -- Calculate red intensity using sine function
-    local intensity = COMBAT_PULSE_SETTINGS.minIntensity + 
-                     (COMBAT_PULSE_SETTINGS.maxIntensity - COMBAT_PULSE_SETTINGS.minIntensity) * 
+    local intensity = COMBAT_PULSE_SETTINGS.minIntensity +
+                     (COMBAT_PULSE_SETTINGS.maxIntensity - COMBAT_PULSE_SETTINGS.minIntensity) *
                      (math.sin(combatPulseTimer) * 0.5 + 0.5)
-    
+
     -- Pulse vertex color between min/max red intensity
     texture:SetVertexColor(intensity, 0.0, 0.0, 1.0)
 end
@@ -136,10 +136,10 @@ end
 -- ===============================================================
 local function UpdatePowerBarTexture()
     if not UnitExists("pet") or not PetFrameManaBar then return end
-    
+
     local _, powerType = UnitPowerType('pet')
     local texture = POWER_TEXTURES[powerType]
-    
+
     if texture then
         local statusBar = PetFrameManaBar:GetStatusBarTexture()
         statusBar:SetTexture(texture)
@@ -153,7 +153,7 @@ end
 local function ConfigureCombatMode()
     local texture = _G.PetAttackModeTexture
     if not texture then return end
-    
+
     texture:SetTexture(ATLAS_TEXTURE)
     texture:SetTexCoord(unpack(COMBAT_TEX_COORDS))
     texture:SetVertexColor(1.0, 0.0, 0.0, 1.0)  -- Initial color
@@ -163,7 +163,7 @@ local function ConfigureCombatMode()
     texture:ClearAllPoints()
     texture:SetPoint('CENTER', PetFrame, 'CENTER', -7, -1)
     texture:SetSize(114, 47)
-    
+
     --  RESET TIMER
     combatPulseTimer = 0
 end
@@ -184,27 +184,27 @@ local function PetFrame_OnUpdate(self, elapsed)
 end
 
 -- ===============================================================
--- THREAT GLOW SYSTEM 
+-- THREAT GLOW SYSTEM
 -- ===============================================================
 local function ConfigurePetThreatGlow()
     --  The pet frame uses PetFrameFlash for the threat glow
     local threatFlash = _G.PetFrameFlash
     if not threatFlash then return end
-    
+
     -- Apply custom texture and coordinates
-    threatFlash:SetTexture(ATLAS_TEXTURE)  
+    threatFlash:SetTexture(ATLAS_TEXTURE)
     threatFlash:SetTexCoord(unpack(COMBAT_TEX_COORDS))
-   
-    
+
+
     --  Visual configuration
     threatFlash:SetBlendMode("ADD")
     threatFlash:SetAlpha(0.7)
     threatFlash:SetDrawLayer("OVERLAY", 10)
-    
+
     -- Position relative to pet frame
     threatFlash:ClearAllPoints()
-    threatFlash:SetPoint("CENTER", PetFrame, "CENTER", -7, -1)  
-    threatFlash:SetSize(114, 47)  
+    threatFlash:SetPoint("CENTER", PetFrame, "CENTER", -7, -1)
+    threatFlash:SetSize(114, 47)
 end
 -- ===============================================================
 -- FRAME SETUP
@@ -247,20 +247,81 @@ UpdatePetTextSystemUnit = function()
     if not moduleState.textSystem then
         return
     end
-    
+
     local hasVehicleUI = UnitHasVehicleUI("player")
     -- CORRECT LOGIC: When in a vehicle, PetFrame should show the PLAYER as "pet"
     local targetUnit = hasVehicleUI and "player" or "pet"
-    
+
     -- Update both the public unit field and internal reference
     moduleState.textSystem.unit = targetUnit
     if moduleState.textSystem._unitRef then
         moduleState.textSystem._unitRef.unit = targetUnit
     end
-    
+
     -- Force immediate update
     if moduleState.textSystem.update then
         moduleState.textSystem.update()
+    end
+end
+
+-- ===============================================================
+-- NO-PORTRAIT SYSTEM
+-- ===============================================================
+local BASE_NO_PORTRAIT = "Interface\\Addons\\DragonUI\\Textures\\UNITFRAM-NO-PORTRAIT"
+
+local function IsNoPortraitActive()
+    local config = addon.db and addon.db.profile and addon.db.profile.unitframe
+                     and addon.db.profile.unitframe.pet
+    return config and config.no_portrait or false
+end
+
+local function UpdateNoPortraitHitRect()
+    if InCombatLockdown() then return end
+
+    if IsNoPortraitActive() then
+        local petFrame = _G.PetFrame
+        local scale = petFrame:GetEffectiveScale() or 1.0
+        local healthBar = _G.PetFrameHealthBar
+
+        -- LEFT INSET: exclude hidden portrait area (portrait on left ~40px)
+        local leftInset = 0
+        local frameLeft = petFrame:GetLeft()
+        local barLeft = healthBar:GetLeft()
+
+        if frameLeft and barLeft and frameLeft > 0 and barLeft > frameLeft then
+            leftInset = (barLeft - frameLeft) / scale
+            if leftInset < 10 or leftInset > 100 then
+                leftInset = 0
+            end
+        end
+
+        -- BOTTOM INSET: trim below mana bar
+        local bottomInset = 0
+        local manaBar = _G.PetFrameManaBar
+        local frameBottom = petFrame:GetBottom()
+        local manaBottom = manaBar:GetBottom()
+
+        if manaBottom and frameBottom and frameBottom > manaBottom then
+            bottomInset = (frameBottom - manaBottom) / scale + 2
+            if bottomInset < 0 or bottomInset > 100 then
+                bottomInset = 0
+            end
+        end
+
+        -- Safety fallback
+        if bottomInset <= 0 then
+            local frameHeight = petFrame:GetHeight() or 44
+            if frameHeight > 30 then
+                bottomInset = 16
+            end
+        end
+
+        petFrame:SetHitRectInsets(leftInset, 0, 0, bottomInset)
+    else
+        local petFrame = _G.PetFrame
+        if petFrame then
+            petFrame:SetHitRectInsets(0, 0, 0, 0)
+        end
     end
 end
 
@@ -271,13 +332,15 @@ local function ReplaceBlizzardPetFrame()
     local petFrame = PetFrame
     if not petFrame then return end
 
+    local noPortrait = IsNoPortraitActive()
+
     if not moduleState.hooks.onUpdate then
         -- Phase 2: HookScript instead of SetScript to avoid taint on Blizzard PetFrame
         petFrame:HookScript("OnUpdate", PetFrame_OnUpdate)
         moduleState.hooks.onUpdate = true
-        
+
     end
-    
+
     -- Phase 2: Combat protection for secure frame positioning
     if InCombatLockdown() then
         if addon and addon.CombatQueue then
@@ -286,34 +349,39 @@ local function ReplaceBlizzardPetFrame()
     else
         ApplyFramePositioning()
     end
-    
+
     -- Hide original Blizzard texture
     PetFrameTexture:SetTexture('')
     PetFrameTexture:Hide()
-    
+
     -- Hide original text elements to avoid conflicts
     HideBlizzardPetTexts()
-    
+
     -- Setup portrait
     local portrait = PetPortrait
     if portrait then
         portrait:ClearAllPoints()
-        portrait:SetPoint("LEFT", 6, 0)
-        portrait:SetSize(34, 34)
-        portrait:SetDrawLayer('BACKGROUND')
+        if noPortrait then
+            portrait:Hide()
+        else
+            portrait:SetPoint("LEFT", 6, 0)
+            portrait:SetSize(34, 34)
+            portrait:SetDrawLayer('BACKGROUND')
+            portrait:Show()
+        end
     end
-    
+
     -- Create DragonUI elements if needed
     if not moduleState.frame.background then
         moduleState.frame.background = SetupFrameElement(
             petFrame,
             'DragonUIPetFrameBackground',
             {'BACKGROUND', 1},
-            TEXTURE_PATH .. TOT_BASE .. 'BACKGROUND',
+            noPortrait and BASE_NO_PORTRAIT or (TEXTURE_PATH .. TOT_BASE .. 'BACKGROUND'),
             {'LEFT', portrait, 'CENTER', -24, -9}
         )
     end
-    
+
     if not moduleState.frame.border then
         moduleState.frame.border = SetupFrameElement(
             PetFrameHealthBar,
@@ -323,12 +391,46 @@ local function ReplaceBlizzardPetFrame()
             {'LEFT', portrait, 'CENTER', -24, -9}
         )
     end
-    
+
+    -- No-portrait background: reposition and resize to fill full width.
+    -- Save/restore the original anchor and size so the toggle is reversible.
+    if moduleState.frame.background then
+        if noPortrait then
+            if not moduleState.frame.background._npOriginalPoint then
+                local pt, rel, rpt, x, y = moduleState.frame.background:GetPoint(1)
+                moduleState.frame.background._npOriginalPoint = {pt, rel, rpt, x, y}
+                moduleState.frame.background._npOriginalSize = {moduleState.frame.background:GetSize()}
+            end
+            moduleState.frame.background:ClearAllPoints()
+            moduleState.frame.background:SetTexture(BASE_NO_PORTRAIT)
+            moduleState.frame.background:SetTexCoord(0, 1, 0, 1)
+            moduleState.frame.background:SetSize(85, 65)
+            moduleState.frame.background:SetPoint("TOPLEFT", PetFrame, "TOPLEFT", 2, 4)
+        elseif moduleState.frame.background._npOriginalPoint then
+            -- Restore original layout
+            moduleState.frame.background:SetTexture(TEXTURE_PATH .. TOT_BASE .. 'BACKGROUND')
+            moduleState.frame.background:SetTexCoord(0, 1, 0, 1)
+            moduleState.frame.background:ClearAllPoints()
+            local pt, rel, rpt, x, y = unpack(moduleState.frame.background._npOriginalPoint)
+            moduleState.frame.background:SetPoint(pt, rel, rpt, x, y)
+            moduleState.frame.background:SetSize(unpack(moduleState.frame.background._npOriginalSize))
+            moduleState.frame.background._npOriginalPoint = nil
+            moduleState.frame.background._npOriginalSize = nil
+        end
+    end
+
+    -- Hide border in no_portrait (wrong shape)
+    if noPortrait and moduleState.frame.border then
+        moduleState.frame.border:Hide()
+    elseif not noPortrait and moduleState.frame.border then
+        moduleState.frame.border:Show()
+    end
+
     -- Setup health bar
     SetupStatusBar(
         PetFrameHealthBar,
-        {'LEFT', portrait, 'RIGHT', 2, 1},
-        {70.5, 10},
+        noPortrait and {'LEFT', petFrame, 'LEFT', 6, 1} or {'LEFT', portrait, 'RIGHT', 2, 1},
+        noPortrait and {104, 10} or {70.5, 10},
         UNITFRAME_PATH .. TOT_BASE .. 'Bar-Health'
     )
 
@@ -345,12 +447,12 @@ local function ReplaceBlizzardPetFrame()
         end)
         PetFrameHealthBar.DragonUI_TexCoordHooked = true
     end
-    
+
     -- Setup mana bar
     SetupStatusBar(
         PetFrameManaBar,
-        {'LEFT', portrait, 'RIGHT', -1, -9},
-        {74, 7.5}
+        noPortrait and {'LEFT', petFrame, 'LEFT', 4, -9} or {'LEFT', portrait, 'RIGHT', -1, -9},
+        noPortrait and {107, 7.5} or {74, 7.5}
     )
     UpdatePowerBarTexture()
 
@@ -369,14 +471,14 @@ local function ReplaceBlizzardPetFrame()
         end)
         PetFrameManaBar.DragonUI_TexCoordHooked = true
     end
-    
+
     -- Configure combat mode
     ConfigureCombatMode()
     if not moduleState.hooks.combatMode then
         hooksecurefunc(_G.PetAttackModeTexture, "Show", function(self)
             ConfigureCombatMode()
         end)
-        
+
         --  MODIFY THE SetVertexColor HOOK TO NOT INTERFERE
         hooksecurefunc(_G.PetAttackModeTexture, "SetVertexColor", function(self, r, g, b, a)
             -- Only intervene if not in our pulse color range
@@ -387,20 +489,20 @@ local function ReplaceBlizzardPetFrame()
             end
             -- If the pulse is active, let the animation control the color
         end)
-        
+
         moduleState.hooks.combatMode = true
     end
 
     -- Configure custom threat glow
     if not moduleState.hooks.threatGlow then
         ConfigurePetThreatGlow()
-        
+
         --  HOOK to maintain configuration
         hooksecurefunc(_G.PetFrameFlash, "Show", ConfigurePetThreatGlow)
-        
+
         moduleState.hooks.threatGlow = true
     end
-    
+
     -- Setup pet name positioning (single-line, no word wrap)
     if PetName then
         PetName:ClearAllPoints()
@@ -411,7 +513,7 @@ local function ReplaceBlizzardPetFrame()
         PetName:SetNonSpaceWrap(false)
         PetName:SetDrawLayer("OVERLAY")
     end
-    
+
     -- Position happiness icon
     local happiness = _G[petFrame:GetName() .. 'Happiness']
     if happiness then
@@ -419,16 +521,50 @@ local function ReplaceBlizzardPetFrame()
         happiness:SetPoint("LEFT", petFrame, "RIGHT", -10, -5)
     end
 
+    -- ---- No-portrait hit rect + hover frame click-through ----
+    UpdateNoPortraitHitRect()
+
+    -- Make text-system hover frames click-through when no_portrait is active
+    -- (same pattern as target frame — regular Frames with EnableMouse(true)
+    -- swallow clicks before they reach PetFrame).
+    local healthHover = petFrame.DragonUIHealthHover
+    local manaHover = petFrame.DragonUIManaHover
+    if noPortrait then
+        if healthHover and not healthHover._npClickThrough then
+            healthHover._npOldMouse = healthHover:IsMouseEnabled()
+            healthHover:EnableMouse(false)
+            healthHover._npClickThrough = true
+        end
+        if manaHover and not manaHover._npClickThrough then
+            manaHover._npOldMouse = manaHover:IsMouseEnabled()
+            manaHover:EnableMouse(false)
+            manaHover._npClickThrough = true
+        end
+    else
+        if healthHover and healthHover._npClickThrough then
+            if healthHover._npOldMouse ~= nil then
+                healthHover:EnableMouse(healthHover._npOldMouse)
+            end
+            healthHover._npClickThrough = nil
+        end
+        if manaHover and manaHover._npClickThrough then
+            if manaHover._npOldMouse ~= nil then
+                manaHover:EnableMouse(manaHover._npOldMouse)
+            end
+            manaHover._npClickThrough = nil
+        end
+    end
+
     -- ===============================================================
     -- INTEGRATE TEXT SYSTEM
     -- ===============================================================
     if addon.TextSystem then
-        
-        
+
+
         -- Setup the advanced text system for pet frame with dynamic unit
         local hasVehicleUI = UnitHasVehicleUI("player")
         local initialUnit = hasVehicleUI and "player" or "pet"
-        
+
         moduleState.textSystem = addon.TextSystem.SetupFrameTextSystem(
             "pet",                 -- frameType
             initialUnit,           -- unit (dynamic based on vehicle state)
@@ -437,12 +573,12 @@ local function ReplaceBlizzardPetFrame()
             PetFrameManaBar,       -- manaBar
             "PetFrame"             -- prefix
         )
-        
+
         -- Ensure we have the correct unit after setup
         UpdatePetTextSystemUnit()
-        
+
     else
-        
+
     end
 end
 
@@ -451,21 +587,79 @@ end
 -- UPDATE HANDLER
 -- ===============================================================
 local function OnPetFrameUpdate()
-    -- Refresh textures
+    local noPortrait = IsNoPortraitActive()
+
+    -- Refresh textures (save/restore original layout for background)
     if moduleState.frame.background then
-        moduleState.frame.background:SetTexture(TEXTURE_PATH .. TOT_BASE .. 'BACKGROUND')
+        if noPortrait then
+            if not moduleState.frame.background._npOriginalPoint then
+                local pt, rel, rpt, x, y = moduleState.frame.background:GetPoint(1)
+                moduleState.frame.background._npOriginalPoint = {pt, rel, rpt, x, y}
+                moduleState.frame.background._npOriginalSize = {moduleState.frame.background:GetSize()}
+            end
+            moduleState.frame.background:SetTexture(BASE_NO_PORTRAIT)
+            moduleState.frame.background:SetTexCoord(0, 1, 0, 1)
+            moduleState.frame.background:ClearAllPoints()
+            moduleState.frame.background:SetSize(85, 65)
+            moduleState.frame.background:SetPoint("TOPLEFT", PetFrame, "TOPLEFT", 2, 4)
+        elseif moduleState.frame.background._npOriginalPoint then
+            moduleState.frame.background:SetTexture(TEXTURE_PATH .. TOT_BASE .. 'BACKGROUND')
+            moduleState.frame.background:SetTexCoord(0, 1, 0, 1)
+            moduleState.frame.background:ClearAllPoints()
+            local pt, rel, rpt, x, y = unpack(moduleState.frame.background._npOriginalPoint)
+            moduleState.frame.background:SetPoint(pt, rel, rpt, x, y)
+            moduleState.frame.background:SetSize(unpack(moduleState.frame.background._npOriginalSize))
+            moduleState.frame.background._npOriginalPoint = nil
+            moduleState.frame.background._npOriginalSize = nil
+        end
     end
     if moduleState.frame.border then
         moduleState.frame.border:SetTexture(TEXTURE_PATH .. TOT_BASE .. 'BORDER')
+        if noPortrait then
+            moduleState.frame.border:Hide()
+        else
+            moduleState.frame.border:Show()
+        end
     end
-    
+
+    -- No-portrait portrait visibility
+    if PetPortrait then
+        if noPortrait then
+            PetPortrait:Hide()
+        else
+            PetPortrait:Show()
+        end
+    end
+
+    -- Reposition bars when no_portrait state changes (stretch / restore)
+    if PetFrameHealthBar then
+        PetFrameHealthBar:ClearAllPoints()
+        if noPortrait then
+            PetFrameHealthBar:SetPoint("LEFT", PetFrame, "LEFT", 6, 1)
+            PetFrameHealthBar:SetSize(104, 10)
+        else
+            PetFrameHealthBar:SetPoint("LEFT", PetPortrait, "RIGHT", 2, 1)
+            PetFrameHealthBar:SetSize(70.5, 10)
+        end
+    end
+    if PetFrameManaBar then
+        PetFrameManaBar:ClearAllPoints()
+        if noPortrait then
+            PetFrameManaBar:SetPoint("LEFT", PetFrame, "LEFT", 4, -9)
+            PetFrameManaBar:SetSize(107, 7.5)
+        else
+            PetFrameManaBar:SetPoint("LEFT", PetPortrait, "RIGHT", -1, -9)
+            PetFrameManaBar:SetSize(74, 7.5)
+        end
+    end
+
     UpdatePowerBarTexture()
     ConfigureCombatMode()
     ConfigurePetThreatGlow()
-    
+
     -- Update text system unit for vehicle support
     UpdatePetTextSystemUnit()
-    
+
     -- Update text system if available
     if moduleState.textSystem and moduleState.textSystem.update then
         moduleState.textSystem.update()
@@ -473,6 +667,34 @@ local function OnPetFrameUpdate()
 
     -- Ensure vanilla texts remain hidden
     HideBlizzardPetTexts()
+
+    -- Hover frames: click-through in no_portrait so clicks reach PetFrame
+    local healthHover = PetFrame.DragonUIHealthHover
+    local manaHover = PetFrame.DragonUIManaHover
+    if noPortrait then
+        if healthHover and not healthHover._npClickThrough then
+            healthHover._npOldMouse = healthHover:IsMouseEnabled()
+            healthHover:EnableMouse(false)
+            healthHover._npClickThrough = true
+        end
+        if manaHover and not manaHover._npClickThrough then
+            manaHover._npOldMouse = manaHover:IsMouseEnabled()
+            manaHover:EnableMouse(false)
+            manaHover._npClickThrough = true
+        end
+    else
+        if healthHover and healthHover._npClickThrough then
+            healthHover:EnableMouse(healthHover._npOldMouse ~= nil and healthHover._npOldMouse or true)
+            healthHover._npClickThrough = nil
+        end
+        if manaHover and manaHover._npClickThrough then
+            manaHover:EnableMouse(manaHover._npOldMouse ~= nil and manaHover._npOldMouse or true)
+            manaHover._npClickThrough = nil
+        end
+    end
+
+    -- No-portrait hit rect
+    UpdateNoPortraitHitRect()
 end
 
 -- ===============================================================
@@ -522,6 +744,13 @@ function addon.RefreshPetFrame()
     end
 end
 
+-- Visual-only refresh (skips UpdateWidgets/ApplyFramePositioning).
+-- Used by the no_portrait toggle so the frame stays in place.
+function addon.RefreshPetFrameVisual()
+    if UnitExists("pet") then
+        OnPetFrameUpdate()
+    end
+end
 
 
 -- ===============================================================
@@ -568,7 +797,7 @@ local function CreatePetAnchorFrame()
 
     --  USE CENTRALIZED FUNCTION FROM CORE.LUA
     PetFrameModule.anchor = addon.CreateUIFrame(130, 44, "PetFrame")
-    
+
     return PetFrameModule.anchor
 end
 
@@ -622,24 +851,24 @@ function PetFrameModule:LoadDefaultSettings()
     if not addon.db.profile.widgets then
         addon.db.profile.widgets = {}
     end
-    
+
     if not addon.db.profile.widgets.pet then
         addon.db.profile.widgets.pet = {
             anchor = "TOPRIGHT",
             posX = -50,
             posY = -150
         }
-        
+
     end
-    
+
     -- Ensure unitframe.pet config table exists
     if not addon.db.profile.unitframe then
         addon.db.profile.unitframe = {}
     end
-    
+
     if not addon.db.profile.unitframe.pet then
         -- Pet configuration should already exist in database.lua
-        
+
     end
 end
 
@@ -666,23 +895,23 @@ local function ShowPetFrameTest()
     -- Show the PET frame even if there is no pet
     if PetFrame then
         PetFrame:Show()
-        
+
         -- Simulate having a pet for the test
         if PetName then
             PetName:SetText(L["Test Pet"])
             PetName:Show()
         end
-        
+
         if PetPortrait then
             PetPortrait:Show()
         end
-        
+
         if PetFrameHealthBar then
             PetFrameHealthBar:SetMinMaxValues(0, 100)
             PetFrameHealthBar:SetValue(75)
             PetFrameHealthBar:Show()
         end
-        
+
         if PetFrameManaBar then
             PetFrameManaBar:SetMinMaxValues(0, 100)
             PetFrameManaBar:SetValue(50)
@@ -701,13 +930,13 @@ local function HidePetFrameTest()
             if PetName then
                 PetName:SetText(UnitName("pet") or "")
             end
-            
+
             -- Force update bars with real values
             if PetFrameHealthBar then
                 PetFrameHealthBar:SetMinMaxValues(0, UnitHealthMax("pet"))
                 PetFrameHealthBar:SetValue(UnitHealth("pet"))
             end
-            
+
             if PetFrameManaBar then
                 PetFrameManaBar:SetMinMaxValues(0, UnitPowerMax("pet"))
                 PetFrameManaBar:SetValue(UnitPower("pet"))
@@ -715,7 +944,7 @@ local function HidePetFrameTest()
         else
             -- If there is no real pet, hide everything
             PetFrame:Hide()
-            
+
             -- Clear test values
             if PetName then
                 PetName:SetText("")

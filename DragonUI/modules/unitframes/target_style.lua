@@ -176,6 +176,73 @@ function UF.TargetStyle.Create(opts)
         return config and config.no_portrait or false
     end
 
+    -- ============================================================================
+    -- NO-PORTRAIT HIT RECT ADJUSTMENT (target frame)
+    -- ============================================================================
+
+    -- The TargetFrame is mirrored vs PlayerFrame: portrait is on the RIGHT,
+    -- health bar on the LEFT. In no_portrait mode the portrait is hidden;
+    -- SetHitRectInsets shrinks the hit area to cover only the visible bar zone,
+    -- excluding the right-side portrait area and bottom overflow.
+    local function UpdateNoPortraitHitRect()
+        if InCombatLockdown() then return end
+
+        if IsNoPortraitActive() then
+            local scale = BlizzFrame:GetEffectiveScale() or 1.0
+
+            -- TOP INSET: trim dead space above the health bar.
+            -- The BlizzFrame extends well above the visible bar content.
+            local topInset = 0
+            local frameTop = BlizzFrame:GetTop()
+            local barTop = HealthBar:GetTop()
+
+            if barTop and frameTop and barTop > frameTop then
+                topInset = (barTop - frameTop) / scale
+                if topInset < 0 or topInset > 150 then
+                    topInset = 0
+                end
+            end
+
+            -- RIGHT INSET: exclude hidden portrait area (on the right side).
+            -- The portrait occupies ~103px from the frame's right edge.
+            local frameRight = BlizzFrame:GetRight()
+            local barRight = HealthBar:GetRight()
+            local rightInset = 0
+
+            if frameRight and barRight and frameRight > barRight then
+                rightInset = (frameRight - barRight) / scale
+                if rightInset < 30 or rightInset > 200 then
+                    rightInset = 0
+                end
+            end
+
+            -- BOTTOM INSET: trim dead space below the mana bar.
+            local bottomInset = 0
+            local frameBottom = BlizzFrame:GetBottom()
+            local manaBottom = ManaBar:GetBottom()
+
+            if manaBottom and frameBottom and frameBottom > manaBottom then
+                bottomInset = (frameBottom - manaBottom) / scale - 16
+                if bottomInset < 0 or bottomInset > 200 then
+                    bottomInset = 0
+                end
+            end
+
+            -- Safety fallback if dynamic calculation fails
+            if bottomInset <= 0 then
+                local frameHeight = BlizzFrame:GetHeight() or 128
+                if frameHeight > 80 then
+                    bottomInset = 48
+                end
+            end
+
+            BlizzFrame:SetHitRectInsets(0, rightInset, topInset, bottomInset)
+        else
+            -- Restore full-frame clickability
+            BlizzFrame:SetHitRectInsets(0, 0, 0, 0)
+        end
+    end
+
     -- ================================================================
     -- WIDGET POSITION
     -- ================================================================
@@ -619,6 +686,81 @@ function UF.TargetStyle.Create(opts)
         if UnitExists(unitToken) then
             ForceUpdatePowerBar()
             UpdateHealthBarColor(true)
+        end
+
+        -- Adjust hit rect for no-portrait: exclude hidden portrait area (right side)
+        -- and bottom gutter so the right-click dropdown only fires on visible content.
+        UpdateNoPortraitHitRect()
+
+        -- ---- Suppress Blizzard's default health/power text on hover ----
+        -- When hover frames go click-through, mouse events reach the Blizzard
+        -- StatusBars which have built-in TextString hover display. Permanently
+        -- hide them with the same pattern used by party/player frames.
+        local healthText = _G[namePrefix .. "FrameHealthBarText"] or (HealthBar.TextString)
+        local manaText   = _G[namePrefix .. "FrameManaBarText"]   or (ManaBar.TextString)
+
+        if noPortrait then
+            if healthText then
+                healthText:SetAlpha(0)
+                if not healthText._npAlphaHooked then
+                    hooksecurefunc(healthText, "SetAlpha", function(self, a)
+                        if not self._npAlphaGuard and a ~= 0 then
+                            self._npAlphaGuard = true
+                            self:SetAlpha(0)
+                            self._npAlphaGuard = nil
+                        end
+                    end)
+                    healthText._npAlphaHooked = true
+                end
+            end
+            if manaText then
+                manaText:SetAlpha(0)
+                if not manaText._npAlphaHooked then
+                    hooksecurefunc(manaText, "SetAlpha", function(self, a)
+                        if not self._npAlphaGuard and a ~= 0 then
+                            self._npAlphaGuard = true
+                            self:SetAlpha(0)
+                            self._npAlphaGuard = nil
+                        end
+                    end)
+                    manaText._npAlphaHooked = true
+                end
+            end
+        end
+
+        -- ---- Make text-system hover frames click-through in no-portrait mode ----
+        -- The text system creates health/mana hover frames (regular Frames, not secure
+        -- buttons) with EnableMouse(true) to drive hover text. In no_portrait those
+        -- frames sit on top of BlizzFrame and swallow clicks. Disable mouse capture
+        -- so clicks pass through to BlizzFrame. DragonUI's own text system handles
+        -- display; we don't need hover-triggered text here.
+        local healthHover = BlizzFrame.DragonUIHealthHover
+        local manaHover = BlizzFrame.DragonUIManaHover
+
+        if noPortrait then
+            if healthHover and not healthHover._npClickThrough then
+                healthHover._npOldMouse = healthHover:IsMouseEnabled()
+                healthHover:EnableMouse(false)
+                healthHover._npClickThrough = true
+            end
+            if manaHover and not manaHover._npClickThrough then
+                manaHover._npOldMouse = manaHover:IsMouseEnabled()
+                manaHover:EnableMouse(false)
+                manaHover._npClickThrough = true
+            end
+        else
+            if healthHover and healthHover._npClickThrough then
+                if healthHover._npOldMouse ~= nil then
+                    healthHover:EnableMouse(healthHover._npOldMouse)
+                end
+                healthHover._npClickThrough = nil
+            end
+            if manaHover and manaHover._npClickThrough then
+                if manaHover._npOldMouse ~= nil then
+                    manaHover:EnableMouse(manaHover._npOldMouse)
+                end
+                manaHover._npClickThrough = nil
+            end
         end
     end
 

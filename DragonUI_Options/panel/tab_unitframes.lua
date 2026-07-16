@@ -483,6 +483,11 @@ local function BuildPetSection(scroll)
     local refreshPet = function()
         if addon.RefreshPetFrame then addon.RefreshPetFrame() end
     end
+    -- Lightweight refresh for visual-only toggles (no_portrait) that should
+    -- NOT trigger ApplyFramePositioning / UpdateWidgets.
+    local refreshPetVisual = function()
+        if addon.RefreshPetFrameVisual then addon.RefreshPetFrameVisual() end
+    end
 
     local s = C:AddSection(scroll, LO["Pet Frame"])
 
@@ -523,6 +528,13 @@ local function BuildPetSection(scroll)
         label = LO["Threat Glow"],
         dbPath = "unitframe.pet.enableThreatGlow",
         callback = refreshPet,
+    })
+
+    C:AddToggle(s, {
+        label = LO["No Portrait Mode"],
+        desc = LO["Hide portrait and extend bars to fill the full frame width."],
+        dbPath = "unitframe.pet.no_portrait",
+        callback = refreshPetVisual,
     })
 
     C:AddHeading(s, LO["Position"])

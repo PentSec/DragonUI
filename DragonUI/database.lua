@@ -683,6 +683,7 @@ local defaults = {
                 enableThreatGlow = false,
                 scale = 1.0,
                 override = false,
+                no_portrait = false, -- No portrait mode (hides portrait, extends bars)
                 x = 18,
                 y = -80,
                 show_on_hover = false,

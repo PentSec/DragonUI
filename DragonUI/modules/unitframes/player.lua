@@ -208,6 +208,78 @@ local function IsNoPortraitActive()
     return config and config.no_portrait or false
 end
 
+-- ============================================================================
+-- NO-PORTRAIT HIT RECT ADJUSTMENT
+-- ============================================================================
+
+-- When no_portrait is active, the portrait area on the left is visually hidden
+-- but the underlying PlayerFrame button still registers clicks there, creating
+-- a dead zone where right-click opens a dropdown on empty space.
+-- SetHitRectInsets shrinks the hit area to match only the visible content:
+-- left side (portrait zone) and bottom overflow are excluded.
+-- Safe from taint because it only adjusts hit detection boundaries.
+local function UpdateNoPortraitHitRect()
+    if InCombatLockdown() then return end
+
+    if IsNoPortraitActive() and not IsInVehicle() then
+        local scale = PlayerFrame:GetEffectiveScale() or 1.0
+
+        -- LEFT INSET: exclude hidden portrait area.
+        -- Health bar begins ~99px right of the frame's left edge.
+        local frameLeft = PlayerFrame:GetLeft()
+        local barLeft = PlayerFrameHealthBar:GetLeft()
+        local leftInset = 0
+
+        if frameLeft and barLeft and frameLeft > 0 and barLeft > frameLeft then
+            leftInset = (barLeft - frameLeft) / scale
+            if leftInset < 30 or leftInset > 200 then
+                leftInset = 0
+            end
+        end
+
+        -- BOTTOM INSET: trim dead space below visible content.
+        -- The no-portrait background (131×130) defines the visual boundary;
+        -- its bottom edge is where the frame content actually ends.
+        -- Anything below that is empty gutter.
+        local bottomInset = 0
+        local frameBottom = PlayerFrame:GetBottom()
+        local frameHeight = PlayerFrame:GetHeight() or 128
+
+        local dragonFrame = _G["DragonUIUnitframeFrame"]
+        if dragonFrame and dragonFrame.PlayerFrameBackground and dragonFrame.PlayerFrameBackground:IsShown() then
+            local bgBottom = dragonFrame.PlayerFrameBackground:GetBottom()
+            if bgBottom and frameBottom and frameBottom > bgBottom then
+                local rawInset = (frameBottom - bgBottom) / scale
+                if rawInset > 0 and rawInset <= 200 then
+                    bottomInset = rawInset + 4
+                end
+            end
+        end
+
+        -- Fallback if background position is not available (shouldn't happen)
+        if bottomInset <= 0 then
+            local manaBottom = PlayerFrameManaBar:GetBottom()
+            if manaBottom and frameBottom and frameBottom > manaBottom then
+                bottomInset = (frameBottom - manaBottom) / scale + 4
+                if bottomInset < 0 or bottomInset > 200 then
+                    bottomInset = 0
+                end
+            end
+        end
+
+        -- Safety: if still zero but content clearly doesn't fill the full height,
+        -- use a reasonable estimate. PlayerFrame is ~128px tall; bars take ~60px.
+        if bottomInset <= 0 and frameHeight > 80 then
+            bottomInset = 48  -- frame-local pixels, covers typical dead zone
+        end
+
+        PlayerFrame:SetHitRectInsets(leftInset, 0, 0, bottomInset)
+    else
+        -- Restore full-frame clickability when no_portrait is off
+        PlayerFrame:SetHitRectInsets(0, 0, 0, 0)
+    end
+end
+
 -- Get the correct BASE texture path (fat or normal, not vehicle — vehicle uses atlas)
 local function GetBaseTexture()
     if IsNoPortraitActive() then return TEXTURES.BASE_NO_PORTRAIT end
@@ -2434,6 +2506,10 @@ local function ChangePlayerframe()
     -- Apply decoration LAST — after all positioning is finalized
     -- This ensures vehicle atlas, bg/border, and dragon decoration are properly placed
     UpdatePlayerDragonDecoration()
+
+    -- Adjust PlayerFrame hit rect for no_portrait mode (exclude hidden portrait area
+    -- from click detection so the right-click dropdown only fires on visible content)
+    UpdateNoPortraitHitRect()
 
 end
 
