@@ -64,6 +64,8 @@ end)
 local eventFrame          -- BAG_UPDATE listener
 local scanQueue     = {} -- {bag, slot} entries pending scan
 local isScanning    = false
+local knownCache    = {} -- { [guid] = true } GUIDs already collected this session
+local lastBagScan   = 0  -- timestamp of last ScanBags to throttle rapid BAG_UPDATE
 
 -- =============================================================================
 -- BAG SCANNER
@@ -92,31 +94,39 @@ local function ScanQueueProcessor()
         return
     end
 
-    isScanning = true
     local entry = tremove(scanQueue, 1)
     local bag = entry.bag
     local slot = entry.slot
     local guid = GetContainerItemGUID(bag, slot)
 
-    if not guid then
-        -- No GUID, skip to next
+    -- Skip if no GUID or already collected this session
+    if not guid or knownCache[guid] then
         addon:After(0, ScanQueueProcessor)
         return
     end
 
     local itemID = GetContainerItemID(bag, slot)
     if IsCollectableItem(itemID) and IsCollectionAvailable() then
+        -- Mark BEFORE calling to prevent re-entry; API is server-idempotent
+        knownCache[guid] = true
         C_AppearanceCollection.CollectItemAppearance(guid)
     end
 
-    -- Process next item in queue
-    addon:After(0.05, ScanQueueProcessor)
+    -- Throttle: 0.2s between API calls to avoid freezing during bulk crafts
+    addon:After(0.2, ScanQueueProcessor)
 end
 
 --- Scan all bag slots for new items and queue them for processing.
+--- Uses a cooldown to prevent rapid re-scans during profession crafting.
 local function ScanBags()
     if not TransmogCollector.applied then return end
     if isScanning then return end
+
+    -- 1-second cooldown between scans to prevent thrashing during bulk crafts
+    local now = GetTime()
+    if now - lastBagScan < 1.0 then return end
+    lastBagScan = now
+
     isScanning = true
 
     for bag = 0, NUM_BAG_SLOTS or 4 do
@@ -125,16 +135,20 @@ local function ScanBags()
             for slot = 1, numSlots do
                 local itemID = GetContainerItemID(bag, slot)
                 if itemID then
-                    tinsert(scanQueue, {bag = bag, slot = slot})
+                    local guid = GetContainerItemGUID(bag, slot)
+                    -- Skip items already collected this session
+                    if not knownCache[guid] then
+                        tinsert(scanQueue, {bag = bag, slot = slot})
+                    end
                 end
             end
         end
     end
 
-    isScanning = false
-
     if #scanQueue > 0 then
         addon:After(0.1, ScanQueueProcessor)
+    else
+        isScanning = false
     end
 end
 
@@ -178,7 +192,9 @@ function addon.RestoreTransmogCollectorSystem()
     end
 
     wipe(scanQueue)
+    wipe(knownCache)
     isScanning = false
+    lastBagScan = 0
 end
 
 function addon.RefreshTransmogCollectorSystem()
