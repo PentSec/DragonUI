@@ -1259,8 +1259,11 @@ function BuffFrameModule:Enable()
     -- ========================================================================
     if not BuffFrameModule._hookedBuffAnchors then
         BuffFrameModule._hookedBuffAnchors = true
+        local _inUpdateAllBuffAnchors = false
         hooksecurefunc("BuffFrame_UpdateAllBuffAnchors", function()
-            if not buffFramePositionLocked then return end
+            if _inUpdateAllBuffAnchors then return end
+            _inUpdateAllBuffAnchors = true
+            if not buffFramePositionLocked then _inUpdateAllBuffAnchors = false; return end
 
             -- 1) Re-anchor TemporaryEnchantFrame to follow ConsolidatedBuffs.
             --    Blizzard's ConsolidatedBuffs OnShow/OnHide handlers set this,
@@ -1298,6 +1301,7 @@ function BuffFrameModule:Enable()
             -- 4) Debuffs follow the latest buff / consolidated layout.
             FixDebuffPositions()
             BuffFrameModule:UpdateLayoutPreview()
+            _inUpdateAllBuffAnchors = false
         end)
     end
 
