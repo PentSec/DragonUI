@@ -41,6 +41,17 @@ local function ApplyNoopChangesImpl()
         BonusActionBarFrame:EnableMouse(false)
         BonusActionBarFrame:SetScale(0.001)
     end
+    -- PossessBarFrame: same treatment as BonusActionBarFrame. CoA classes that grant
+    -- a temporary "override" bar (e.g. Prophet's Burrow — buries the player and
+    -- surfaces a recast bar to exit elsewhere) drive Blizzard's PossessBarFrame.
+    -- If we leave it interactive, on exiting the override state it can keep
+    -- stealing focus / keybinds from the main ActionButton bar (residual version
+    -- of the Prophet keybind bug that motivated the keypress.lua fix). Neutralize
+    -- it here the same way BonusActionBarFrame is neutralized.
+    if PossessBarFrame then
+        PossessBarFrame:EnableMouse(false)
+        PossessBarFrame:SetScale(0.001)
+    end
     
     -- Kill ExhaustionTick OnUpdate to prevent Blizzard nil crashes
     -- (GetXPExhaustion() returns nil for non-rested players, Blizzard code doesn't check)
@@ -76,6 +87,7 @@ local function ApplyNoopChangesImpl()
         -- VehicleMenuBar,  -- RetailUI pattern: handled separately below (keep events alive)
         -- VehicleMenuBarArtFrame,
         BonusActionBarFrame,
+        PossessBarFrame,
         PetActionBarFrame,
         ShapeshiftBarFrame,
         ShapeshiftBarLeft,

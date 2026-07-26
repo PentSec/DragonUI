@@ -135,15 +135,31 @@ local function FlashActionButton(button)
     flashFrame:Show()
 end
 
+-- Resolve which physical button a "main action button id" maps to at click time.
+--
+-- IMPORTANT: DragonUI pages the main bar by setting the `actionpage` attribute
+-- on ActionButton1..12 via a state driver (see mainbars.lua `_onstate-page`).
+-- It does NOT rely on Blizzard's BonusActionBarFrame to surface shapeshift/stance
+-- actions. Therefore, even when BonusActionBarFrame:IsShown() is true (which it
+-- is in CoA whenever a class with bonusbar:N forms shapeshifts, e.g. Prophet
+-- Spider Form → bonusbar:1), keybinds MUST keep targeting ActionButtonN — the
+-- page driver has already remapped those slots to the correct bonus action page.
+--
+-- Previously the code redirected keybinds to BonusActionButtonN here when
+-- BonusActionBarFrame:IsShown() was true. That broke every class with a real
+-- bonusbar in CoA (Druid/Warrior/Prophet/etc.): BonusActionButtons are set
+-- click-through (mainbars.lua EnsureBonusButtonsClickThrough) and contain
+-- placeholder/empty slots in DragonUI's model, so keybinds fired the wrong
+-- action or nothing — the classic "se bugean las barras / pierde bindeos" PvP
+-- report for Prophet. Keeping only the VehicleMenuBar branch below is correct:
+-- the vehicle module manages VehicleMenuBarActionButton separately and is the
+-- only case where physical ActionButtonN is genuinely not the target.
 local function ResolveMainActionButton(id)
     id = tonumber(id)
     if not id then return nil end
     if VehicleMenuBar and VehicleMenuBar:IsProtected() and VehicleMenuBar:IsShown()
         and id <= VEHICLE_MAX_ACTIONBUTTONS then
         return _G["VehicleMenuBarActionButton" .. id]
-    end
-    if BonusActionBarFrame and BonusActionBarFrame:IsProtected() and BonusActionBarFrame:IsShown() then
-        return _G["BonusActionButton" .. id]
     end
     return _G["ActionButton" .. id]
 end
@@ -194,11 +210,9 @@ local function accelerateKey(key, command)
                 bindButton = CreateFrame("Button", bindButtonName, nil, "SecureActionButtonTemplate")
                 bindButton:RegisterForClicks("AnyDown")
                 SecureHandlerSetFrameRef(bindButton, "VehicleMenuBar", VehicleMenuBar)
-                SecureHandlerSetFrameRef(bindButton, "BonusActionBarFrame", BonusActionBarFrame)
                 SecureHandlerSetFrameRef(bindButton, "MultiCastSummonSpellButton", MultiCastSummonSpellButton)
                 SecureHandlerExecute(bindButton, [[
                     VehicleMenuBar = self:GetFrameRef("VehicleMenuBar");
-                    BonusActionBarFrame = self:GetFrameRef("BonusActionBarFrame");
                     MultiCastSummonSpellButton = self:GetFrameRef("MultiCastSummonSpellButton");
                 ]])
             end
@@ -215,13 +229,14 @@ local function accelerateKey(key, command)
                     bindButton:SetAttribute(attributeName, _G[attributeValue])
                 elseif attributeName == "actionbutton" then
                     bindButton._dragonUIActionId = tonumber(attributeValue)
-                    -- Decide vehicle/bonus/action at click time, like ActionButtonUp().
+                    -- Decide vehicle vs action at click time, like ActionButtonUp().
+                    -- (BonusActionBarFrame is intentionally NOT handled here — see
+                    -- ResolveMainActionButton above for why DragonUI never
+                    -- redirects main-bar keybinds to BonusActionButtonN.)
                     SecureHandlerWrapScript(bindButton, "OnClick", bindButton, [[
                         local clickMacro = "/click ActionButton]] .. attributeValue .. [[";
                         if (VehicleMenuBar:IsProtected() and VehicleMenuBar:IsShown() and ]] .. tostring(tonumber(attributeValue) <= VEHICLE_MAX_ACTIONBUTTONS) .. [[) then
                             clickMacro = "/click VehicleMenuBarActionButton]] .. attributeValue .. [[";
-                        elseif (BonusActionBarFrame:IsProtected() and BonusActionBarFrame:IsShown()) then
-                            clickMacro = "/click BonusActionButton]] .. attributeValue .. [[";
                         end
                         self:SetAttribute("macrotext", clickMacro);
                     ]])

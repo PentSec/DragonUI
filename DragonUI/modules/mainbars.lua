@@ -316,6 +316,9 @@ local mainBarPageByClass = {
   SPIRITMAGE = '[stealth] 7; [nostealth] 1;',
   HERO = '[bonusbar:1,nostealth] 7; [bonusbar:1,stealth] 8; [bonusbar:2] 8; [bonusbar:3] 9; [bonusbar:4] 10;',
   SONOFARUGAL = '[bonusbar:1] 7; [bonusbar:2] 8; [bonusbar:3] 9; [bonusbar:4] 10;',
+  BARBARIAN = "[bonusbar:1] 7; [bonusbar:2] 8; [bonusbar:3] 9;",
+  TINKER = "[bonusbar:1] 7;",
+  CULTIST = "[bonusbar:4] 10;",
   DEFAULT = '[bonusbar:5] 11; [bar:2] 2; [bar:3] 3; [bar:4] 4; [bar:5] 5; [bar:6] 6;'
 }
 
@@ -360,6 +363,10 @@ end
 -- Main bar pages are driven through ActionButton actionpage attributes.
 -- Keep BonusAction buttons click-through so they never steal mouse clicks
 -- when form/stance bars toggle visibility.
+-- Same treatment for Possess buttons: CoA override-bar abilities (e.g. Prophet
+-- Burrow) surface via PossessButtonN. If they are left interactive, exiting
+-- the override state can leave stale Possess buttons capturing clicks / focus
+-- away from the main ActionButton bar (residual Prophet keybind bug).
 local function EnsureBonusButtonsClickThrough()
     if InCombatLockdown() then
         if addon.CombatQueue then
@@ -371,9 +378,20 @@ local function EnsureBonusButtonsClickThrough()
     if BonusActionBarFrame and BonusActionBarFrame.EnableMouse then
         BonusActionBarFrame:EnableMouse(false)
     end
+    if PossessBarFrame and PossessBarFrame.EnableMouse then
+        PossessBarFrame:EnableMouse(false)
+    end
 
     for i = 1, NUM_ACTIONBAR_BUTTONS do
         local button = _G["BonusActionButton" .. i]
+        if button and button.EnableMouse then
+            button:EnableMouse(false)
+        end
+    end
+
+    local numPossess = NUM_POSSESS_SLOTS or 10
+    for i = 1, numPossess do
+        local button = _G["PossessButton" .. i]
         if button and button.EnableMouse then
             button:EnableMouse(false)
         end
