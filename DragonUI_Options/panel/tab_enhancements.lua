@@ -674,6 +674,18 @@ local function BuildEnhancementsTab(scroll)
                 end
             end
         end,
+    })
+    
+    C:AddToggle(ttSection, {
+        label = LO["Show Aura Source"],
+        desc = LO["Show the caster's name (class-colored) and spell ID on buff and debuff tooltips."],
+        getFunc = function()
+            return GetModuleField("tooltip", "show_aura_source") ~= false
+        end,
+        setFunc = function(val)
+            EnsureModuleTable("tooltip").show_aura_source = val
+        end,
+        disabled = function() return not IsEnabled("tooltip") end,
         requiresReload = false,
     })
 end

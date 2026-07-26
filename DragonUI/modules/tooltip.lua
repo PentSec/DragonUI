@@ -388,6 +388,117 @@ local function EnsureTooltipAnchorHook()
 end
 
 -- ============================================================================
+-- AURA SOURCE (caster name on buff/debuff tooltips)
+-- ============================================================================
+
+local function ShouldShowAuraSource()
+    if not IsModuleEnabled() then
+        return false
+    end
+    local cfg = GetModuleConfig()
+    return not cfg or cfg.show_aura_source ~= false
+end
+
+local function RGBToHex(r, g, b)
+    return string.format("|cff%02x%02x%02x",
+        math.floor((r or 1) * 255 + 0.5),
+        math.floor((g or 1) * 255 + 0.5),
+        math.floor((b or 1) * 255 + 0.5))
+end
+
+local AURA_ID_LABEL = _G.ID or "ID"
+local AURA_SOURCE_FALLBACK_COLOR = { r = 1, g = 1, b = 1 }
+
+local function AuraSourceAlreadyShown(tt, spellId)
+    if not spellId then
+        return false
+    end
+    local needle = tostring(spellId)
+    for i = 1, tt:NumLines() do
+        local left = _G["GameTooltipTextLeft" .. i]
+        local text = left and left:GetText()
+        if text and text:find(needle, 1, true) and text:find(AURA_ID_LABEL, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Returns UnitAura's 8th..11th values: unitCaster, isStealable, shouldConsolidate, spellId.
+local function GetAuraCasterAndSpellId(unit, index, filter)
+    if filter == "HARMFUL" then
+        return select(8, UnitDebuff(unit, index))
+    elseif filter == "HELPFUL" then
+        return select(8, UnitBuff(unit, index))
+    end
+    return select(8, UnitAura(unit, index, filter))
+end
+
+local function AddAuraSourceInfo(tt, unit, index, filter)
+    if not ShouldShowAuraSource() or not unit or not index then
+        return
+    end
+
+    local caster, _, _, spellId = GetAuraCasterAndSpellId(unit, index, filter)
+
+    if AuraSourceAlreadyShown(tt, spellId) then
+        return
+    end
+
+    local leftText
+    if spellId then
+        leftText = string.format("|cFFCA3C3C%s|r %d", AURA_ID_LABEL, spellId)
+    end
+
+    local rightText
+    if caster then
+        local name = UnitName(caster)
+        if name then
+            local _, class = UnitClass(caster)
+            local color = (class and CLASS_COLORS[class]) or AURA_SOURCE_FALLBACK_COLOR
+            rightText = RGBToHex(color.r, color.g, color.b) .. name
+        end
+    end
+
+    if leftText and rightText then
+        tt:AddDoubleLine(leftText, rightText)
+        tt:Show()
+    elseif leftText then
+        tt:AddLine(leftText)
+        tt:Show()
+    elseif rightText then
+        tt:AddLine(rightText)
+        tt:Show()
+    end
+end
+
+local function HookAuraTooltips()
+    if TooltipModule.hooks["AuraSource"] then
+        return
+    end
+
+    if GameTooltip.SetUnitBuff then
+        hooksecurefunc(GameTooltip, "SetUnitBuff", function(self, unit, index)
+            AddAuraSourceInfo(self, unit, index, "HELPFUL")
+        end)
+    end
+
+    if GameTooltip.SetUnitDebuff then
+        hooksecurefunc(GameTooltip, "SetUnitDebuff", function(self, unit, index)
+            AddAuraSourceInfo(self, unit, index, "HARMFUL")
+        end)
+    end
+
+    if GameTooltip.SetUnitAura then
+        hooksecurefunc(GameTooltip, "SetUnitAura", function(self, unit, index, filter)
+            AddAuraSourceInfo(self, unit, index, filter)
+        end)
+    end
+
+    TooltipModule.hooks["AuraSource"] = true
+end
+
+-- ============================================================================
 -- APPLY / RESTORE SYSTEM
 -- ============================================================================
 
@@ -397,6 +508,7 @@ local function ApplyTooltipSystem()
     EnsureTooltipAnchorHook()
     EnsureTooltipWidget()
     ApplyTooltipWidgetPosition()
+    HookAuraTooltips()
 
     -- Hook GameTooltip:SetUnit
     if not TooltipModule.hooks["SetUnit"] then

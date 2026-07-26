@@ -2,14 +2,6 @@
 -- DragonUI - Buff Frame Module
 -- Based on RetailUI by Dmitriy (MIT License)
 -- Adapted for DragonUI with Dragonflight-inspired positioning control.
---
--- KEY DESIGN (inspired by Ascension's clean BuffFrame pattern):
---   Instead of overriding SetPoint/ClearAllPoints or competing with
---   anchor chain via scattered hooks, we let native
---   BuffFrame_UpdateAllBuffAnchors run first, then move the ENTIRE BuffFrame
---   (with all its children already correctly anchored) to follow our
---   dragonUIBuffFrame in ONE pass. No per-icon re-anchoring, no offset
---   caching, no absolute UIParent positioning of sub-frames.
 -- ============================================================================
 
 local addon = select(2, ...);
@@ -41,17 +33,37 @@ local BUFF_DEFAULT_POSY = -15
 -- Y position when a GM ticket or GM chat panel is open
 local BUFF_TICKET_POSY = -60
 
--- Save original BuffFrame method BEFORE anything modifies it
+-- Save original BuffFrame methods BEFORE anything modifies them
 local original_BuffFrame_SetPoint = BuffFrame.SetPoint
+local original_BuffFrame_ClearAllPoints = BuffFrame.ClearAllPoints
 
--- Default weapon enchant frame position
-local WEAPON_DEFAULT_ANCHOR = "TOPRIGHT"
-local WEAPON_DEFAULT_POSX = -270
-local WEAPON_DEFAULT_POSY = -170
+-- Save original ConsolidatedBuffs methods — same lock pattern as BuffFrame
+local original_CB_SetPoint = ConsolidatedBuffs.SetPoint
+local original_CB_ClearAllPoints = ConsolidatedBuffs.ClearAllPoints
 
--- Flag: when true, our SetPoint override is active
+-- Flag: when true, our SetPoint/ClearAllPoints overrides are active
 local buffFramePositionLocked = false
 
+-- ============================================================================
+-- HELPER: Anchor VanityBuffs in the buff chain (Ascension custom frame)
+-- VanityBuffs is a global frame injected by Ascension (not part of stock
+-- 3.3.5a FrameXML), so every access is nil-guarded and no-ops in vanilla.
+-- Chain: ConsolidatedBuffs → VanityBuffs → TemporaryEnchantFrame → BuffButton1
+-- VanityBuffs anchors FROM ConsolidatedBuffs (anchoring to TempEnchantFrame
+-- would create a circular chain), matching the layout pattern used everywhere
+-- else in this module (frame-relative, never absolute UIParent coordinates).
+-- ============================================================================
+local function AnchorVanityBuffs()
+    if not VanityBuffs or not ConsolidatedBuffs then return end
+    VanityBuffs:ClearAllPoints()
+    if ConsolidatedBuffs:IsShown() and (BuffFrame.numConsolidated or 0) > 0 then
+        -- CB visible: VanityBuffs sits to CB's LEFT
+        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
+    else
+        -- CB hidden: VanityBuffs at CB's position (same spot as BuffFrame TOPRIGHT)
+        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+    end
+end
 
 -- Check if buff frame is at default position (not moved by editor)
 -- Uses a saved flag instead of coordinate comparison to avoid stale profile values
@@ -68,14 +80,6 @@ local function IsWeaponEnchantSeparationEnabled()
         and addon.db.profile.buffs.separate_weapon_enchants
 end
 
--- Debuffs have no fixed default screen position (it's dynamic, below the live
--- buff row), so custom_position is the sole source of truth for detach state.
-local function IsDebuffFrameDetached()
-    return addon.db and addon.db.profile and addon.db.profile.widgets
-        and addon.db.profile.widgets.debuffs
-        and addon.db.profile.widgets.debuffs.custom_position == true
-end
-
 -- Check if weapon enchant frame is at its default position
 local function IsWeaponEnchantAtDefaultPosition()
     if not addon.db or not addon.db.profile or not addon.db.profile.widgets
@@ -85,142 +89,557 @@ local function IsWeaponEnchantAtDefaultPosition()
     return not addon.db.profile.widgets.weapon_enchants.custom_position
 end
 
-
--- ============================================================================
--- HELPER: Re-anchor BuffFrame to dragonUIBuffFrame
--- Called after every layout pass so BuffFrame follows our controlled frame.
--- Children (ConsolidatedBuffs, TempEnchantFrame, BuffButtons) stay correctly
--- positioned relative to BuffFrame because Blizzard just laid them out.
--- ============================================================================
-local function AnchorBuffFrameToDragonUI()
-    if not buffFramePositionLocked or not dragonUIBuffFrame then return end
-    original_BuffFrame_SetPoint(BuffFrame, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+local function GetBuffsConfig()
+    return addon.db and addon.db.profile and addon.db.profile.buffs
 end
 
--- ============================================================================
--- HELPER: Anchor ConsolidatedBuffs to BuffFrame (fresh, no cached offset)
--- Blizzard's native layout anchors CB to BuffFrame, but something may break
--- that relationship. This re-establishes it with the standard offset.
--- ============================================================================
-local function AnchorConsolidatedBuffs()
-    if not ConsolidatedBuffs or not buffFramePositionLocked then return end
-    -- Standard WotLK offset: CB sits at BuffFrame's TOPRIGHT
-    ConsolidatedBuffs:ClearAllPoints()
-    ConsolidatedBuffs:SetPoint("TOPRIGHT", BuffFrame, "TOPRIGHT", -4, -5)
+local function GetBuffHorizontalGap()
+    local cfg = GetBuffsConfig()
+    return (cfg and tonumber(cfg.buff_horizontal_gap)) or 0
 end
 
--- ============================================================================
--- HELPER: Anchor VanityBuffs in the buff chain
--- The chain is: BuffFrame → ConsolidatedBuffs → VanityBuffs →
---               TemporaryEnchantFrame → BuffButton1 → ...
--- VanityBuffs anchors FROM ConsolidatedBuffs (not to TempEnchantFrame,
--- which would create a circular chain).
--- Uses frame-relative anchoring inspired by Ascension's clean pattern,
--- NOT absolute UIParent coordinates (which broke on scale changes).
--- ============================================================================
-local function AnchorVanityBuffs()
-    if not VanityBuffs then return end
-    VanityBuffs:ClearAllPoints()
-    if BuffFrame.numConsolidated > 0 then
-        -- CB visible: VanityBuffs sits to CB's LEFT
-        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-    else
-        -- CB hidden: VanityBuffs at CB's position (same spot as BuffFrame TOPRIGHT)
-        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+local function GetDebuffHorizontalGap()
+    local cfg = GetBuffsConfig()
+    return (cfg and tonumber(cfg.debuff_horizontal_gap)) or 0
+end
+
+local function GetBuffScale()
+    local cfg = GetBuffsConfig()
+    local scale = cfg and tonumber(cfg.buff_scale)
+    if not scale or scale <= 0 then
+        return 1
+    end
+    return scale
+end
+
+local function GetDebuffScale()
+    local cfg = GetBuffsConfig()
+    local scale = cfg and tonumber(cfg.debuff_scale)
+    if not scale or scale <= 0 then
+        return 1
+    end
+    return scale
+end
+
+local function GetBuffsPerRow()
+    local cfg = GetBuffsConfig()
+    local perRow = cfg and tonumber(cfg.buffs_per_row)
+    if not perRow or perRow < 1 then
+        return BUFFS_PER_ROW or 16
+    end
+    return math.floor(perRow)
+end
+
+local function GetDebuffsPerRow()
+    local cfg = GetBuffsConfig()
+    local perRow = cfg and tonumber(cfg.debuffs_per_row)
+    if not perRow or perRow < 1 then
+        return BUFFS_PER_ROW or 16
+    end
+    return math.floor(perRow)
+end
+
+local function GetMaxBuffRows()
+    local cfg = GetBuffsConfig()
+    local rows = cfg and tonumber(cfg.max_buff_rows)
+    if not rows or rows < 0 then
+        return 0
+    end
+    return math.floor(rows)
+end
+
+local function GetMaxDebuffRows()
+    local cfg = GetBuffsConfig()
+    local rows = cfg and tonumber(cfg.max_debuff_rows)
+    if not rows or rows < 0 then
+        return 0
+    end
+    return math.floor(rows)
+end
+
+local function GetBuffVerticalGap()
+    local cfg = GetBuffsConfig()
+    local gap = cfg and tonumber(cfg.buff_vertical_gap)
+    if gap == nil then
+        return 15
+    end
+    return math.max(0, gap)
+end
+
+local function GetDebuffVerticalGap()
+    local cfg = GetBuffsConfig()
+    local gap = cfg and tonumber(cfg.debuff_vertical_gap)
+    if gap == nil then
+        return 15
+    end
+    return math.max(0, gap)
+end
+
+local function GetDebuffOffsetY()
+    local cfg = GetBuffsConfig()
+    local offset = cfg and tonumber(cfg.debuff_offset_y)
+    if offset == nil then
+        return 60
+    end
+    return math.max(0, offset)
+end
+
+local BUFF_ORDER_BLIZZARD = "blizzard"
+
+local function GetBuffOrder()
+    local cfg = GetBuffsConfig()
+    local order = cfg and cfg.buff_order
+    if order == "player_first" or order == "other_first" or order == "duration" then
+        return order
+    end
+    return BUFF_ORDER_BLIZZARD
+end
+
+local function IsPlayerCaster(caster)
+    return caster == "player" or caster == "vehicle"
+end
+
+local function GetAuraRemaining(expires)
+    if not expires or expires <= 0 then
+        return 999999
+    end
+    local remaining = expires - GetTime()
+    if remaining < 0 then
+        return 0
+    end
+    return remaining
+end
+
+local sortedBuffs = {}
+local sortedBuffPool = {}
+local sortedBuffOrder = BUFF_ORDER_BLIZZARD
+local activeDebuffs = {}
+local debuffRowStarts = {}
+
+local function CompareBuffEntries(a, b)
+    if sortedBuffOrder == "player_first" then
+        if a.isPlayer ~= b.isPlayer then
+            return a.isPlayer
+        end
+    elseif sortedBuffOrder == "other_first" then
+        if a.isPlayer ~= b.isPlayer then
+            return not a.isPlayer
+        end
+    end
+    if a.remaining ~= b.remaining then
+        return a.remaining < b.remaining
+    end
+    return a.index < b.index
+end
+
+-- Runs on every aura update: reuses one scratch list and one entry pool so the
+-- layout pass allocates nothing. The two consumers never nest, so sharing is safe.
+local function CollectSortedBuffButtons()
+    local list = sortedBuffs
+    wipe(list)
+
+    sortedBuffOrder = GetBuffOrder()
+    local needsAuraData = sortedBuffOrder ~= BUFF_ORDER_BLIZZARD
+
+    local count = 0
+    for index = 1, BUFF_ACTUAL_DISPLAY do
+        local button = _G["BuffButton" .. index]
+        if button and button:IsShown() and not button.consolidated then
+            count = count + 1
+            local entry = sortedBuffPool[count]
+            if not entry then
+                entry = {}
+                sortedBuffPool[count] = entry
+            end
+
+            local auraIndex = button:GetID() or index
+            entry.button = button
+            entry.index = auraIndex
+
+            if needsAuraData then
+                -- Blizzard fills these buttons from PlayerFrame.unit, which is "vehicle" while mounted.
+                local unit = button.unit or PlayerFrame.unit or "player"
+                local _, _, _, _, _, _, expires, caster = UnitAura(unit, auraIndex, "HELPFUL")
+                entry.remaining = GetAuraRemaining(expires)
+                entry.isPlayer = IsPlayerCaster(caster)
+            else
+                entry.remaining = 0
+                entry.isPlayer = false
+            end
+
+            list[count] = entry
+        end
+    end
+
+    if needsAuraData then
+        table.sort(list, CompareBuffEntries)
+    end
+    return list
+end
+
+local function IsToggleButtonEnabled()
+    local cfg = GetBuffsConfig()
+    return not cfg or cfg.show_toggle_button ~= false
+end
+
+local function GetEnchantSlack()
+    if weaponEnchantsAreSeparated then
+        return 0
+    end
+    if not TemporaryEnchantFrame or not TemporaryEnchantFrame:IsShown() then
+        return 0
+    end
+    local enchants = (BuffFrame and BuffFrame.numEnchants) or 0
+    if enchants < 0 then
+        return 0
+    end
+    return enchants
+end
+
+-- Default weapon enchant frame position
+local WEAPON_DEFAULT_ANCHOR = "TOPRIGHT"
+local WEAPON_DEFAULT_POSX = -270
+local WEAPON_DEFAULT_POSY = -170
+
+-- Debuffs have no fixed default screen position (it's dynamic, below the live
+-- buff row), so custom_position is the sole source of truth for detach state.
+local function IsDebuffFrameDetached()
+    return addon.db and addon.db.profile and addon.db.profile.widgets
+        and addon.db.profile.widgets.debuffs
+        and addon.db.profile.widgets.debuffs.custom_position == true
+end
+
+local function SetBuffsCollapsed(collapsed)
+    -- The toggle button is the only way back out, so never stay collapsed without it.
+    if collapsed and not IsToggleButtonEnabled() then
+        collapsed = false
+    end
+
+    buffsHiddenByToggle = collapsed
+    if addon.db and addon.db.profile and addon.db.profile.buffs then
+        addon.db.profile.buffs.buffs_hidden = collapsed
+    end
+
+    if toggleButton then
+        toggleButton.toggle = not collapsed
+        local atlas = collapsed and 'CollapseButton-Left' or 'CollapseButton-Right'
+        local normalTexture = toggleButton:GetNormalTexture()
+        if normalTexture then
+            normalTexture:set_atlas(atlas, true)
+        end
+        local highlightTexture = toggleButton:GetHighlightTexture()
+        if highlightTexture then
+            highlightTexture:set_atlas(atlas, true)
+        end
+    end
+
+    for index = 1, BUFF_ACTUAL_DISPLAY do
+        local button = _G['BuffButton' .. index]
+        if button then
+            if collapsed then
+                button:Hide()
+            else
+                button:Show()
+            end
+        end
+    end
+
+    -- VanityBuffs is an Ascension-only global; nil in vanilla 3.3.5a so the
+    -- guard no-ops there. Hide it when the row is collapsed (matching the
+    -- BuffButton loop above) and show it when expanded.
+    if VanityBuffs then
+        if collapsed then
+            VanityBuffs:Hide()
+        else
+            VanityBuffs:Show()
+        end
     end
 end
 
-
--- ============================================================================
--- TOGGLE BUTTON
--- ============================================================================
-
 -- Create the collapse/expand toggle button
-local function CreateToggleButton(frame)
-    if toggleButton then return end
-
-    toggleButton = CreateFrame('Button', nil, UIParent)
+local function ReplaceBlizzardFrame(frame)
+    frame.toggleButton = frame.toggleButton or CreateFrame('Button', nil, UIParent)
+    toggleButton = frame.toggleButton
     toggleButton.toggle = true
+    toggleButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 12, -6)
     toggleButton:SetSize(9, 17)
     toggleButton:SetHitRectInsets(0, 0, 0, 0)
 
-    local normalTexture = toggleButton:CreateTexture(nil, "BORDER")
+    local normalTexture = toggleButton:GetNormalTexture() or toggleButton:CreateTexture(nil, "BORDER")
     normalTexture:SetAllPoints(toggleButton)
     normalTexture:set_atlas('CollapseButton-Right', true)
     toggleButton:SetNormalTexture(normalTexture)
 
-    local highlightTexture = toggleButton:CreateTexture(nil, "ARTWORK")
+    local highlightTexture = toggleButton:GetHighlightTexture() or toggleButton:CreateTexture(nil, "HIGHLIGHT")
     highlightTexture:SetAllPoints(toggleButton)
     highlightTexture:set_atlas('CollapseButton-Right', true)
     toggleButton:SetHighlightTexture(highlightTexture)
 
     toggleButton:SetScript("OnClick", function(self)
-        self.toggle = not self.toggle
-        if not self.toggle then
-            -- HIDE buffs
-            buffsHiddenByToggle = true
-            if addon.db and addon.db.profile and addon.db.profile.buffs then
-                addon.db.profile.buffs.buffs_hidden = true
-            end
-            local normalTexture = self:GetNormalTexture()
-            normalTexture:set_atlas('CollapseButton-Left', true)
-            local highlightTex = toggleButton:GetHighlightTexture()
-            if highlightTex then
-                highlightTex:set_atlas('CollapseButton-Left', true)
-            end
-
-            for index = 1, BUFF_ACTUAL_DISPLAY do
-                local button = _G['BuffButton' .. index]
-                if button then
-                    button:Hide()
-                end
-            end
-            if VanityBuffs then VanityBuffs:Hide() end
-            if TemporaryEnchantFrame then TemporaryEnchantFrame:Hide() end
-        else
-            -- SHOW buffs
-            buffsHiddenByToggle = false
-            if addon.db and addon.db.profile and addon.db.profile.buffs then
-                addon.db.profile.buffs.buffs_hidden = false
-            end
-            local normalTexture = self:GetNormalTexture()
-            normalTexture:set_atlas('CollapseButton-Right', true)
-            local highlightTex = toggleButton:GetHighlightTexture()
-            if highlightTex then
-                highlightTex:set_atlas('CollapseButton-Right', true)
-            end
-
-            for index = 1, BUFF_ACTUAL_DISPLAY do
-                local button = _G['BuffButton' .. index]
-                if button then
-                    button:Show()
-                end
-            end
-            if VanityBuffs then VanityBuffs:Show() end
-            if TemporaryEnchantFrame then TemporaryEnchantFrame:Show() end
-            if BuffFrame_UpdateAllBuffAnchors then
-                BuffFrame_UpdateAllBuffAnchors()
-            end
-        end
+        SetBuffsCollapsed(self.toggle)
     end)
 
-    -- Initial position (corrected on every layout pass by the hook)
-    if ConsolidatedBuffs then
-        toggleButton:SetPoint("LEFT", ConsolidatedBuffs, "RIGHT", 4, -6)
+    local consolidatedBuffFrame = ConsolidatedBuffs
+    consolidatedBuffFrame:SetMovable(true)
+    consolidatedBuffFrame:SetUserPlaced(true)
+    original_CB_ClearAllPoints(consolidatedBuffFrame)
+    -- Anchor ConsolidatedBuffs at its natural TOPRIGHT of the buff area so that
+    -- the Blizzard anchor chain (ConsolidatedBuffs → TemporaryEnchantFrame →
+    -- TempEnchant1/2/3 → BuffButton1) flows correctly.  Use the original
+    -- methods since our override may already be active.
+    original_CB_SetPoint(consolidatedBuffFrame, "TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+end
+
+-- Show/hide toggle button based on condition and profile setting
+local function ShowToggleButtonIf(condition)
+    if not dragonUIBuffFrame or not dragonUIBuffFrame.toggleButton then
+        return
+    end
+    if condition and IsToggleButtonEnabled() then
+        dragonUIBuffFrame.toggleButton:Show()
     else
-        toggleButton:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -12, -6)
+        dragonUIBuffFrame.toggleButton:Hide()
     end
 end
 
--- Show/hide toggle button based on condition
-local function ShowToggleButtonIf(condition)
-    if toggleButton then
-        if condition then
-            toggleButton:Show()
-        else
-            toggleButton:Hide()
+-- Tracks the value we last pushed; GetScale() reads back a float and would never compare equal.
+local function SetAuraScale(frame, scale)
+    if frame.dragonAuraScale ~= scale then
+        frame:SetScale(scale)
+        frame.dragonAuraScale = scale
+    end
+end
+
+local function ApplyAuraScales()
+    local buffScale = GetBuffScale()
+    local debuffScale = GetDebuffScale()
+
+    for index = 1, (BUFF_ACTUAL_DISPLAY or 32) do
+        local button = _G["BuffButton" .. index]
+        if button then
+            SetAuraScale(button, buffScale)
         end
     end
+
+    for index = 1, 3 do
+        local enchant = _G["TempEnchant" .. index]
+        if enchant then
+            SetAuraScale(enchant, buffScale)
+        end
+    end
+
+    if ConsolidatedBuffs then
+        SetAuraScale(ConsolidatedBuffs, buffScale)
+    end
+
+    -- Collapses the buff row, so it tracks the buff scale and ignores the debuff one.
+    if toggleButton then
+        SetAuraScale(toggleButton, buffScale)
+    end
+
+    for index = 1, (DEBUFF_MAX_DISPLAY or 16) do
+        local debuff = _G["DebuffButton" .. index]
+        if debuff then
+            SetAuraScale(debuff, debuffScale)
+        end
+    end
+end
+
+-- ============================================================================
+-- LAYOUT PREVIEW
+-- ============================================================================
+
+local PREVIEW_ICON_SIZE = 30
+local PREVIEW_BUFF_TEXTURE = "Interface\\Icons\\Spell_Holy_WordFortitude"
+local PREVIEW_DEBUFF_TEXTURE = "Interface\\Icons\\Spell_Shadow_CurseOfMannoroth"
+local previewBuffButtons = {}
+local previewDebuffButtons = {}
+
+local function IsLayoutPreviewEnabled()
+    local cfg = GetBuffsConfig()
+    return cfg and cfg.layout_preview == true
+end
+
+local function GetPreviewBuffCount()
+    local cfg = GetBuffsConfig()
+    local n = cfg and tonumber(cfg.layout_preview_buffs)
+    if not n or n < 0 then
+        return 40
+    end
+    return math.min(64, math.floor(n))
+end
+
+local function GetPreviewDebuffCount()
+    local cfg = GetBuffsConfig()
+    local n = cfg and tonumber(cfg.layout_preview_debuffs)
+    if not n or n < 0 then
+        return 16
+    end
+    return math.min(40, math.floor(n))
+end
+
+local function AcquirePreviewIcon(pool, index, isDebuff)
+    local button = pool[index]
+    if not button then
+        button = CreateFrame("Frame", nil, UIParent)
+        button:SetSize(PREVIEW_ICON_SIZE, PREVIEW_ICON_SIZE)
+        button:EnableMouse(false)
+        button:SetFrameStrata("HIGH")
+
+        -- Match AuraButtonTemplate: icon on BACKGROUND so auraborders can raise it to BORDER.
+        local icon = button:CreateTexture(nil, "BACKGROUND")
+        icon:SetAllPoints()
+        icon:SetTexture(isDebuff and PREVIEW_DEBUFF_TEXTURE or PREVIEW_BUFF_TEXTURE)
+        button.icon = icon
+
+        if isDebuff then
+            local border = button:CreateTexture(nil, "OVERLAY")
+            border:SetTexture("Interface\\Buttons\\UI-Debuff-Overlays")
+            border:SetTexCoord(0.296875, 0.5703125, 0, 0.515625)
+            border:SetVertexColor(0.8, 0.1, 0.1)
+            border:SetSize(33, 32)
+            border:SetPoint("CENTER")
+            button.Border = border
+        end
+
+        local label = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        label:SetPoint("BOTTOMRIGHT", -2, 2)
+        button.label = label
+        pool[index] = button
+    end
+    button.label:SetText(tostring(index))
+    return button
+end
+
+local function HidePreviewPool(pool)
+    for _, button in pairs(pool) do
+        button:Hide()
+        button:ClearAllPoints()
+    end
+end
+
+local function SetRealAuraButtonsShown(shown)
+    for index = 1, (BUFF_MAX_DISPLAY or 40) do
+        local button = _G["BuffButton" .. index]
+        if button and not shown then
+            button:Hide()
+        end
+    end
+    for index = 1, (DEBUFF_MAX_DISPLAY or 16) do
+        local button = _G["DebuffButton" .. index]
+        if button and not shown then
+            button:Hide()
+        end
+    end
+end
+
+local function LayoutPreviewGrid(pool, count, anchorFrame, perRow, hGap, vGap, scale, maxRows, isDebuff)
+    if not anchorFrame or count <= 0 then
+        HidePreviewPool(pool)
+        return nil, nil
+    end
+
+    local spacing = 6 + math.max(0, hGap)
+    local maxVisible = count
+    if maxRows and maxRows > 0 then
+        maxVisible = math.min(count, maxRows * perRow)
+    end
+
+    local previous = nil
+    local rowStarts = {}
+    local firstButton = nil
+    local lastRowStart = nil
+    local poolCount = 0
+    for _ in pairs(pool) do
+        poolCount = poolCount + 1
+    end
+
+    for i = 1, math.max(count, poolCount) do
+        if i > count then
+            if pool[i] then
+                pool[i]:Hide()
+                pool[i]:ClearAllPoints()
+            end
+        else
+            local button = AcquirePreviewIcon(pool, i, isDebuff)
+            button:SetScale(scale)
+            if i > maxVisible then
+                button:Hide()
+            else
+                button:Show()
+                local row = math.floor((i - 1) / perRow) + 1
+                local column = math.fmod(i - 1, perRow) + 1
+                button:ClearAllPoints()
+                if i == 1 then
+                    button:SetPoint("TOPRIGHT", anchorFrame, "TOPRIGHT", 0, 0)
+                    firstButton = button
+                    lastRowStart = button
+                    rowStarts[row] = button
+                elseif column == 1 then
+                    local previousRowStart = rowStarts[row - 1] or rowStarts[1] or previous
+                    button:SetPoint("TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
+                    rowStarts[row] = button
+                    lastRowStart = button
+                else
+                    button:SetPoint("TOPRIGHT", previous, "TOPLEFT", -spacing, 0)
+                end
+                if addon.StyleAuraButton then
+                    addon.StyleAuraButton(button, isDebuff)
+                end
+                previous = button
+            end
+        end
+    end
+
+    return firstButton, lastRowStart
+end
+
+function BuffFrameModule:UpdateLayoutPreview()
+    if not IsLayoutPreviewEnabled() then
+        HidePreviewPool(previewBuffButtons)
+        HidePreviewPool(previewDebuffButtons)
+        return
+    end
+
+    if not dragonUIBuffFrame then
+        return
+    end
+
+    -- Hide live aura icons so the fake grid is easy to read.
+    SetRealAuraButtonsShown(false)
+
+    local buffCount = GetPreviewBuffCount()
+    local debuffCount = GetPreviewDebuffCount()
+    local firstBuff, lastBuffRow = LayoutPreviewGrid(
+        previewBuffButtons,
+        buffCount,
+        dragonUIBuffFrame,
+        GetBuffsPerRow(),
+        GetBuffHorizontalGap(),
+        GetBuffVerticalGap(),
+        GetBuffScale(),
+        GetMaxBuffRows(),
+        false
+    )
+
+    local debuffAnchor = dragonUIDebuffFrame
+    if debuffAnchor and not IsDebuffFrameDetached() then
+        debuffAnchor:ClearAllPoints()
+        local attachTo = lastBuffRow or firstBuff or dragonUIBuffFrame
+        debuffAnchor:SetPoint("TOPRIGHT", attachTo, "BOTTOMRIGHT", 0, -GetDebuffOffsetY())
+    end
+
+    LayoutPreviewGrid(
+        previewDebuffButtons,
+        debuffCount,
+        debuffAnchor or dragonUIBuffFrame,
+        GetDebuffsPerRow(),
+        GetDebuffHorizontalGap(),
+        GetDebuffVerticalGap(),
+        GetDebuffScale(),
+        GetMaxDebuffRows(),
+        true
+    )
 end
 
 -- Count active buffs on a unit
@@ -237,11 +656,10 @@ end
 
 -- ============================================================================
 -- POSITIONING SYSTEM
--- We override BuffFrame.SetPoint so that NO Blizzard code can move BuffFrame
--- independently of dragonUIBuffFrame. Every SetPoint call redirects to anchor
--- it to our frame. Unlike the old approach, we do NOT noop ClearAllPoints
--- (that broke other code paths) — we only redirect SetPoint. Children are
--- never orphaned because we always maintain the anchor relationship.
+-- We permanently override BuffFrame.SetPoint and ClearAllPoints so that
+-- NO Blizzard code (BuffFrame_Update, UIParent_ManageFramePositions, etc.)
+-- can move BuffFrame. Every SetPoint call on BuffFrame gets redirected to
+-- anchor it to our dragonUIBuffFrame. We only touch dragonUIBuffFrame position.
 -- ============================================================================
 
 -- Update the position of dragonUIBuffFrame (BuffFrame follows via override)
@@ -250,9 +668,9 @@ function BuffFrameModule:UpdatePosition()
     if not addon.db or not addon.db.profile or not addon.db.profile.widgets or not addon.db.profile.widgets.buffs then
         return
     end
-
+    
     local widgetOptions = addon.db.profile.widgets.buffs
-
+    
     if IsBuffFrameAtDefaultPosition() then
         -- Default position: shift down when ticket/GM panel is open
         local ticketOpen = (TicketStatusFrame and TicketStatusFrame:IsShown())
@@ -279,16 +697,6 @@ function BuffFrameModule:ResetBuffFramePosition()
         w.custom_position = false
     end
     self:UpdatePosition()
-end
-
--- Reset the debuff mover back to following the buff row (attached/default)
-function BuffFrameModule:ResetDebuffPosition()
-    if addon.db and addon.db.profile and addon.db.profile.widgets and addon.db.profile.widgets.debuffs then
-        addon.db.profile.widgets.debuffs.custom_position = false
-    end
-    if BuffFrame_UpdateAllBuffAnchors then
-        BuffFrame_UpdateAllBuffAnchors()
-    end
 end
 
 -- ============================================================================
@@ -324,7 +732,7 @@ local function AnchorWeaponEnchantsToFrame()
     TemporaryEnchantFrame:SetPoint("TOPRIGHT", dragonUIWeaponBuffFrame, "TOPRIGHT", 0, 0)
 end
 
--- Restore TemporaryEnchantFrame to the natural buff chain
+-- Restore TemporaryEnchantFrame to the normal buff chain
 local function RestoreWeaponEnchantsToChain()
     if not TemporaryEnchantFrame then return end
     local cb = _G.ConsolidatedBuffs
@@ -397,12 +805,22 @@ function BuffFrameModule:ToggleWeaponEnchantSeparation(enabled)
     end
 end
 
+-- Reset the debuff mover back to following the buff row (attached/default)
+function BuffFrameModule:ResetDebuffPosition()
+    if addon.db and addon.db.profile and addon.db.profile.widgets and addon.db.profile.widgets.debuffs then
+        addon.db.profile.widgets.debuffs.custom_position = false
+    end
+    if self._FixDebuffPositions then
+        self._FixDebuffPositions()
+    end
+end
+
 -- Toggle module on/off
 function BuffFrameModule:Toggle(enabled)
     if not addon.db or not addon.db.profile then return end
-
+    
     addon.db.profile.buffs.enabled = enabled
-
+    
     if enabled then
         self:Enable()
     else
@@ -416,11 +834,10 @@ end
 -- Enable the buff frame module
 function BuffFrameModule:Enable()
     if not addon.db.profile.buffs.enabled then return end
-    if dragonUIBuffFrame then return end  -- already enabled
-
+    
     -- Create auxiliary frame for editor mode
-    dragonUIBuffFrame = addon.CreateUIFrame(BuffFrame:GetWidth(), BuffFrame:GetHeight(), "Auras")
-
+    dragonUIBuffFrame = addon.CreateUIFrame(BuffFrame:GetWidth(), BuffFrame:GetHeight(), "Buff")
+    
     -- Register with editor system
     addon:RegisterEditableFrame({
         name = "buffs",
@@ -439,9 +856,6 @@ function BuffFrameModule:Enable()
                 and math.abs(w.posY - expectedPosY) <= 5
             w.custom_position = not isDefault
             self:UpdatePosition()
-            if BuffFrame_UpdateAllBuffAnchors then
-                BuffFrame_UpdateAllBuffAnchors()
-            end
         end,
         module = self
     })
@@ -461,6 +875,10 @@ function BuffFrameModule:Enable()
         end)
     end
 
+    -- Real body assigned further down (needs GetBuffLayoutInfo); forward
+    -- declared here so the Debuffs mover's editor hooks can call it via upvalue.
+    local FixDebuffPositions
+
     -- ========================================================================
     -- DEBUFF INDEPENDENT POSITIONING (Editor Mode)
     -- Debuffs follow the buff row by default (unchanged). Dragging this mover
@@ -475,9 +893,7 @@ function BuffFrameModule:Enable()
             blizzardFrame = _G["DebuffButton1"],
             configPath = {"widgets", "debuffs"},
             onHide = function()
-                if BuffFrame_UpdateAllBuffAnchors then
-                    BuffFrame_UpdateAllBuffAnchors()
-                end
+                if FixDebuffPositions then FixDebuffPositions() end
             end,
             module = self
         })
@@ -504,9 +920,7 @@ function BuffFrameModule:Enable()
         end)
 
         dragonUIDebuffFrame:HookScript("OnDragStop", function()
-            if BuffFrame_UpdateAllBuffAnchors then
-                BuffFrame_UpdateAllBuffAnchors()
-            end
+            if FixDebuffPositions then FixDebuffPositions() end
         end)
     end
 
@@ -514,172 +928,360 @@ function BuffFrameModule:Enable()
     -- WEAPON ENCHANT SEPARATION (FEATURE)
     -- When enabled, weapon enchant icons (TempEnchant1/2/3) are detached from
     -- the regular buff chain and anchored to their own independently-moveable
-    -- frame.
+    -- frame.  The editor mode system lets users position it freely.
     -- ========================================================================
     self:SetupWeaponEnchantSeparation()
-
-    -- ========================================================================
-    -- SETPOINT OVERRIDE
-    -- We override BuffFrame.SetPoint to redirect EVERY SetPoint call to anchor
-    -- BuffFrame to our dragonUIBuffFrame. This prevents Blizzard from moving
-    -- BuffFrame away from our controlled position.
-    --
-    -- KEY DESIGN: Unlike the old approach, we do NOT noop ClearAllPoints
-    -- (which broke Blizzard's UIParent_ManageFramePositions), and we do NOT
-    -- call ClearAllPoints ourselves inside the override (which would orphan
-    -- children during layout). We simply redirect the anchor point.
-    --
-    -- Because all children (CB, TempEnchant, BuffButtons) are anchored to
-    -- BuffFrame, they follow when the parent moves. No per-icon re-anchoring
-    -- is needed in the common case.
-    -- ========================================================================
+    
+    -- PERMANENTLY OVERRIDE BuffFrame positioning methods.
+    -- Every call to BuffFrame:SetPoint() from ANY code path (BuffFrame_Update,
+    -- UIParent_ManageFramePositions, etc.) gets redirected to anchor BuffFrame
+    -- to our dragonUIBuffFrame. This is the ONLY reliable way to prevent
+    -- Blizzard from moving the buff icons.
     buffFramePositionLocked = true
-
+    
+    BuffFrame.ClearAllPoints = function(self)
+        -- Noop: don't let anyone clear BuffFrame's anchor.
+        -- Our SetPoint override handles re-anchoring when needed.
+    end
+    
     BuffFrame.SetPoint = function(self, ...)
+        -- ALWAYS redirect: anchor BuffFrame to our controlled frame
         if not buffFramePositionLocked or not dragonUIBuffFrame then
-            -- Module disabled or not ready: use original behavior
+            -- Module disabled or not ready: use original
             return original_BuffFrame_SetPoint(self, ...)
         end
-        -- Redirect: anchor BuffFrame to our controlled frame instead of
-        -- wherever Blizzard tried to put it. Children follow automatically
-        -- because they're anchored to BuffFrame.
-        return original_BuffFrame_SetPoint(self, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+        -- Redirect to our frame
+        original_BuffFrame_ClearAllPoints(self)
+        original_BuffFrame_SetPoint(self, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+        -- DON'T call UpdatePosition() here - it would reset dragonUIBuffFrame
+        -- position during editor drag. UpdatePosition is called on events instead.
+    end
+    
+    -- PERMANENTLY OVERRIDE ConsolidatedBuffs positioning methods.
+    -- Same pattern as BuffFrame above: ConsolidatedBuffs is the ROOT of the
+    -- buff icon anchor chain (CB → TemporaryEnchantFrame → BuffButton1 → …).
+    -- Without this lock, Blizzard re-anchors CB on ticket open/close, pulling
+    -- the entire buff chain to the wrong position even though dragonUIBuffFrame
+    -- (and the toggle button) stay put.
+    ConsolidatedBuffs.ClearAllPoints = function(self)
+        if not buffFramePositionLocked or not dragonUIBuffFrame then
+            return original_CB_ClearAllPoints(self)
+        end
+        -- Noop when locked
+    end
+    
+    ConsolidatedBuffs.SetPoint = function(self, ...)
+        if not buffFramePositionLocked or not dragonUIBuffFrame then
+            return original_CB_SetPoint(self, ...)
+        end
+        original_CB_ClearAllPoints(self)
+        original_CB_SetPoint(self, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+    end
+    
+    -- Set initial position: anchor BuffFrame and ConsolidatedBuffs to our frame
+    original_BuffFrame_ClearAllPoints(BuffFrame)
+    original_BuffFrame_SetPoint(BuffFrame, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+    original_CB_ClearAllPoints(ConsolidatedBuffs)
+    original_CB_SetPoint(ConsolidatedBuffs, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+    BuffFrameModule:UpdatePosition()
+    ApplyAuraScales()
+    
+    -- ========================================================================
+    -- HELPER: Find buff layout info (first buff, last-row-start buff, row count)
+    -- Used by both buff row-2 fix and debuff anchoring.
+    -- ========================================================================
+    local function GetBuffLayoutInfo()
+        local slack = GetEnchantSlack()
+        local perRow = GetBuffsPerRow()
+        local sorted = CollectSortedBuffButtons()
+        local firstBuff = nil
+        local lastRowStart = nil
+        local numVisible = #sorted
+        for i, entry in ipairs(sorted) do
+            local button = entry.button
+            if i == 1 then
+                firstBuff = button
+                lastRowStart = button
+            end
+            local layoutIndex = i + slack
+            if layoutIndex > 1 and math.fmod(layoutIndex, perRow) == 1 then
+                lastRowStart = button
+            end
+        end
+
+        -- When Consolidated Buffs is on, many (or all) icons live in that button.
+        -- With no visible BuffButtons, anchor debuffs below ConsolidatedBuffs /
+        -- weapon enchants instead of the empty mover frame.
+        if not firstBuff then
+            if ConsolidatedBuffs and ConsolidatedBuffs:IsShown() then
+                firstBuff = ConsolidatedBuffs
+                lastRowStart = ConsolidatedBuffs
+            elseif not weaponEnchantsAreSeparated
+                and TemporaryEnchantFrame and TemporaryEnchantFrame:IsShown() then
+                firstBuff = TemporaryEnchantFrame
+                lastRowStart = TemporaryEnchantFrame
+            end
+        end
+
+        return firstBuff, lastRowStart, numVisible
     end
 
-    -- Set initial position: anchor BuffFrame to our controlled frame.
-    BuffFrame:ClearAllPoints()
-    original_BuffFrame_SetPoint(BuffFrame, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
-    BuffFrameModule:UpdatePosition()
+    -- ========================================================================
+    -- HELPER: Re-anchor ConsolidatedBuffs to our toggle button.
+    -- Blizzard code (UIParent_ManageFramePositions, etc.) may reposition
+    -- ConsolidatedBuffs; this restores our custom placement.
+    -- ========================================================================
+    local function RestoreConsolidatedBuffsAnchor()
+        local cb = _G.ConsolidatedBuffs
+        if cb and dragonUIBuffFrame then
+            original_CB_ClearAllPoints(cb)
+            original_CB_SetPoint(cb, "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
+        end
+        -- When weapon enchants are separated, TemporaryEnchantFrame is managed
+        -- by the weapon enchant system — do NOT re-anchor it to ConsolidatedBuffs.
+        if weaponEnchantsAreSeparated then return end
+        -- Also ensure TemporaryEnchantFrame follows ConsolidatedBuffs correctly
+        if TemporaryEnchantFrame and cb then
+            TemporaryEnchantFrame:ClearAllPoints()
+            if cb:IsShown() then
+                TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", -6, 0)
+            else
+                TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPRIGHT", 0, 0)
+            end
+        end
+    end
 
     -- ========================================================================
-    -- HOOK: BuffFrame_UpdateAllBuffAnchors — THE ONE AUTHORITATIVE HOOK
+    -- HELPER: Position the debuff mover (attached: dynamic below the last buff
+    -- row; detached: from saved profile coords), then anchor the real debuff
+    -- icon to the mover so it always follows whichever mode is active.
+    -- ========================================================================
+    FixDebuffPositions = function()
+        if not buffFramePositionLocked or not dragonUIDebuffFrame then return end
+
+        local debuffOffsetY = GetDebuffOffsetY()
+
+        if IsDebuffFrameDetached() then
+            local w = addon.db.profile.widgets.debuffs
+            dragonUIDebuffFrame:ClearAllPoints()
+            dragonUIDebuffFrame:SetPoint(w.anchor or "TOPRIGHT", UIParent, w.anchor or "TOPRIGHT",
+                w.posX or -270, w.posY or -75)
+        else
+            local firstBuff, lastRowStart = GetBuffLayoutInfo()
+            local anchor = lastRowStart or firstBuff
+            if not anchor and ConsolidatedBuffs and ConsolidatedBuffs:IsShown() then
+                anchor = ConsolidatedBuffs
+            end
+            dragonUIDebuffFrame:ClearAllPoints()
+            if anchor then
+                dragonUIDebuffFrame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -debuffOffsetY)
+            else
+                -- No buffs / consolidated button visible — below the buff mover
+                dragonUIDebuffFrame:SetPoint("TOPRIGHT", dragonUIBuffFrame, "BOTTOMRIGHT", 0, -debuffOffsetY)
+            end
+        end
+
+        -- Collect active debuffs first, then lay them out with OUR per-row setting.
+        -- Blizzard's DebuffButton_UpdateAnchors uses BUFFS_PER_ROW and would
+        -- otherwise overwrite any independent debuffs_per_row value.
+        local active = activeDebuffs
+        wipe(active)
+        local activeCount = 0
+        for index = 1, (DEBUFF_MAX_DISPLAY or 16) do
+            local debuff = _G["DebuffButton" .. index]
+            if debuff and debuff:IsShown() then
+                activeCount = activeCount + 1
+                active[activeCount] = debuff
+            end
+        end
+
+        if activeCount == 0 then
+            return
+        end
+
+        local firstDebuff = active[1]
+        firstDebuff:ClearAllPoints()
+        firstDebuff:SetPoint("TOPRIGHT", dragonUIDebuffFrame, "TOPRIGHT", 0, 0)
+
+        local perRow = GetDebuffsPerRow()
+        local spacing = 6 + math.max(0, GetDebuffHorizontalGap())
+        local vGap = GetDebuffVerticalGap()
+        local maxRows = GetMaxDebuffRows()
+        local maxVisible = (maxRows > 0) and (maxRows * perRow) or activeCount
+        local previousDebuff = nil
+        local rowStarts = debuffRowStarts
+        wipe(rowStarts)
+
+        for count, debuff in ipairs(active) do
+            if count > maxVisible then
+                debuff:Hide()
+            else
+                local row = math.floor((count - 1) / perRow) + 1
+                local column = math.fmod(count - 1, perRow) + 1
+
+                if count == 1 then
+                    rowStarts[row] = debuff
+                elseif column == 1 then
+                    local previousRowStart = rowStarts[row - 1] or rowStarts[1] or previousDebuff
+                    if previousRowStart then
+                        debuff:ClearAllPoints()
+                        debuff:SetPoint("TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
+                    end
+                    rowStarts[row] = debuff
+                elseif previousDebuff then
+                    debuff:ClearAllPoints()
+                    debuff:SetPoint("TOPRIGHT", previousDebuff, "TOPLEFT", -spacing, 0)
+                end
+
+                previousDebuff = debuff
+            end
+        end
+    end
+    BuffFrameModule._FixDebuffPositions = FixDebuffPositions
+
+    local function AnchorFirstBuff(button, slack)
+        if weaponEnchantsAreSeparated and ConsolidatedBuffs then
+            button:ClearAllPoints()
+            if ConsolidatedBuffs:IsShown() then
+                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
+            else
+                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+            end
+            return
+        end
+
+        if slack > 0 then
+            local lastEnchant = _G["TempEnchant" .. slack]
+            if lastEnchant and lastEnchant:IsShown() then
+                button:ClearAllPoints()
+                button:SetPoint("TOPRIGHT", lastEnchant, "TOPLEFT", -6, 0)
+                return
+            end
+        end
+
+        if ConsolidatedBuffs then
+            button:ClearAllPoints()
+            if ConsolidatedBuffs:IsShown() then
+                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
+            else
+                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+            end
+        end
+    end
+
+    local buffRowStarts = {}
+
+    local function ReanchorBuffButtons()
+        local buffGap = GetBuffHorizontalGap()
+        local perRow = GetBuffsPerRow()
+        local slack = GetEnchantSlack()
+        local vGap = GetBuffVerticalGap()
+        local maxRows = GetMaxBuffRows()
+        local maxVisible = nil
+        if maxRows > 0 then
+            maxVisible = math.max(0, maxRows * perRow - slack)
+        end
+        local previousBuff = nil
+        local rowStarts = buffRowStarts
+        wipe(rowStarts)
+        local spacing = 6 + math.max(0, buffGap)
+        local sorted = CollectSortedBuffButtons()
+
+        for count, entry in ipairs(sorted) do
+            local button = entry.button
+
+            if maxVisible and count > maxVisible then
+                button:Hide()
+            else
+                local layoutIndex = count + slack
+                local row = math.floor((layoutIndex - 1) / perRow) + 1
+                local column = math.fmod(layoutIndex - 1, perRow) + 1
+
+                if count == 1 then
+                    AnchorFirstBuff(button, slack)
+                    rowStarts[row] = button
+                elseif column == 1 then
+                    local previousRowStart = rowStarts[row - 1] or rowStarts[1] or previousBuff
+                    if previousRowStart then
+                        button:ClearAllPoints()
+                        button:SetPoint("TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
+                    end
+                    rowStarts[row] = button
+                elseif previousBuff then
+                    button:ClearAllPoints()
+                    button:SetPoint("TOPRIGHT", previousBuff, "TOPLEFT", -spacing, 0)
+                end
+
+                previousBuff = button
+            end
+        end
+    end
+
+    function BuffFrameModule:RefreshAuraSpacing()
+        -- Called when the user changes aura config (per-row, gaps, scale, etc.)
+        -- in the options panel. Applies custom layout settings that Blizzard's
+        -- native BuffFrame_UpdateAllBuffAnchors doesn't know about.
+        self:UpdateToggleButtonVisibility()
+        ApplyAuraScales()
+        ReanchorBuffButtons()
+        if BuffFrame_Update then
+            BuffFrame_Update()
+        end
+        FixDebuffPositions()
+        self:UpdatePosition()
+        self:UpdateLayoutPreview()
+    end
+
+    function BuffFrameModule:UpdateToggleButtonVisibility()
+        if buffsHiddenByToggle and not IsToggleButtonEnabled() then
+            SetBuffsCollapsed(false)
+        end
+        local hasBuffs = GetUnitBuffCount("player", 16) > 0
+        if not hasBuffs and UnitExists and UnitExists("vehicle") then
+            hasBuffs = GetUnitBuffCount("vehicle", 16) > 0
+        end
+        ShowToggleButtonIf(hasBuffs)
+    end
+
+    -- ========================================================================
+    -- HOOK: BuffFrame_UpdateAllBuffAnchors — MINIMAL post-anchoring pass.
     --
-    -- After Blizzard lays out ALL children (ConsolidatedBuffs, VanityBuffs,
-    -- TemporaryEnchantFrame, BuffButtons, DebuffButtons), we do a single
-    -- corrective pass:
+    -- KEY DESIGN (matching Ascension's pattern):
+    --   We let Blizzard lay out ALL children first (ConsolidatedBuffs,
+    --   TemporaryEnchantFrame, BuffButtons). Then we do ONE corrective pass
+    --   for things Blizzard doesn't know about: VanityBuffs (Ascension),
+    --   toggle state, and weapon enchant separation.
     --
-    -- 1. Ensure ConsolidatedBuffs is anchored to BuffFrame (handles rare cases
-    --    where Blizzard's native anchor was lost)
-    -- 2. Anchor VanityBuffs cleanly in the frame chain
-    -- 3. Handle weapon enchant separation (re-parent TempEnchantFrame if needed)
-    -- 4. Anchor first DebuffButton below the last buff row
-    -- 5. Position the toggle button to the right of ConsolidatedBuffs
-    -- 6. Apply the hidden-by-toggle state
-    -- 7. Re-anchor BuffFrame to dragonUIBuffFrame (moves everything as a unit)
-    --
-    -- No per-icon offsets cached. No absolute UIParent positioning.
-    -- No competing hooks. This is THE ONLY place we fix icon positions.
+    --   We do NOT re-anchor individual BuffButtons here — that causes flicker
+    --   because Blizzard already anchored them and re-anchoring mid-frame
+    --   creates visible jumps. Custom per-row / gap / scale settings are
+    --   applied only via RefreshAuraSpacing() when the user changes config.
     -- ========================================================================
     if not BuffFrameModule._hookedBuffAnchors then
         BuffFrameModule._hookedBuffAnchors = true
         hooksecurefunc("BuffFrame_UpdateAllBuffAnchors", function()
             if not buffFramePositionLocked then return end
 
-            -- 1) Ensure ConsolidatedBuffs is anchored to BuffFrame
-            if ConsolidatedBuffs then
-                local _, rel = ConsolidatedBuffs:GetPoint(1)
-                if not rel or rel ~= BuffFrame then
-                    AnchorConsolidatedBuffs()
-                end
-            end
-
-            -- 2) Anchor VanityBuffs cleanly in the frame chain
-            if VanityBuffs then
-                AnchorVanityBuffs()
-            end
-
-            -- 3) Handle weapon enchant separation
-            if weaponEnchantsAreSeparated then
-                -- Blizzard's VanityBuffs_OnShow put TempEnchantFrame in the
-                -- normal chain. Undo that and re-parent to our frame.
-                AnchorWeaponEnchantsToFrame()
-
-                -- When enchants are separated, BuffButton1 would anchor to
-                -- TempEnchantFrame (which is now on its own frame). Re-anchor
-                -- the first non-consolidated buff to the correct place in the
-                -- chain: ConsolidatedBuffs → VanityBuffs → firstBuffButton.
-                -- Without this, VanityBuffs and the first buff both anchor to
-                -- the same ConsolidatedBuffs:TOPLEFT point and overlap.
-                local numVisible = 0
-                for i = 1, BUFF_ACTUAL_DISPLAY do
-                    local btn = _G["BuffButton" .. i]
-                    if btn and btn:IsShown() and not btn.consolidated then
-                        numVisible = numVisible + 1
-                        if numVisible == 1 then
-                            btn:ClearAllPoints()
-                            if VanityBuffs and VanityBuffs:IsShown() and VanityBuffs:IsVisible() then
-                                -- VanityBuffs is already anchored left of ConsolidatedBuffs.
-                                -- Anchor the first buff left of VanityBuffs to keep the chain.
-                                btn:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0)
-                            elseif ConsolidatedBuffs and ConsolidatedBuffs:IsShown() then
-                                btn:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-                            else
-                                btn:SetPoint("TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
-                            end
-                        end
-                        break
+            -- 1) Re-anchor TemporaryEnchantFrame to follow ConsolidatedBuffs.
+            --    Blizzard's ConsolidatedBuffs OnShow/OnHide handlers set this,
+            --    but other code paths may move it; force it every update.
+            --    SKIP when weapon enchants are separated (they have their own frame).
+            if not weaponEnchantsAreSeparated then
+                if TemporaryEnchantFrame and ConsolidatedBuffs then
+                    TemporaryEnchantFrame:ClearAllPoints()
+                    if ConsolidatedBuffs:IsShown() then
+                        TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
+                    else
+                        TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
                     end
                 end
             end
 
-            -- 4) Fix first debuff position: anchor below the last buff row
-            --    Blizzard anchors debuffs to ConsolidatedBuffs, but since we
-            --    moved BuffFrame (and CB with it), the default debuff position
-            --    is too far right. Re-anchor below the last visible buff.
-            local lastBuffInLastRow = nil
-            local numVisible = 0
-            local slack = weaponEnchantsAreSeparated and 0 or (BuffFrame.numEnchants or 0)
-            local perRow = BUFFS_PER_ROW or 16
-            for i = 1, BUFF_ACTUAL_DISPLAY do
-                local btn = _G["BuffButton" .. i]
-                if btn and btn:IsShown() and not btn.consolidated then
-                    numVisible = numVisible + 1
-                    local idx = numVisible + slack
-                    if idx > 1 and math.fmod(idx, perRow) == 1 then
-                        -- New row starts here — store this as "first in last row"
-                        lastBuffInLastRow = btn
-                    end
-                    -- Always track the LAST visible buff
-                    lastBuffInLastRow = btn
-                end
-            end
-            -- Position the debuff mover (attached: dynamic below the last
-            -- buff row; detached: from saved profile coords), then anchor
-            -- DebuffButton1 to the mover so it always follows whichever mode
-            -- is active. Subsequent debuffs still chain from #1 as before.
-            if dragonUIDebuffFrame then
-                if IsDebuffFrameDetached() then
-                    local w = addon.db.profile.widgets.debuffs
-                    dragonUIDebuffFrame:ClearAllPoints()
-                    dragonUIDebuffFrame:SetPoint(w.anchor or "TOPRIGHT", UIParent, w.anchor or "TOPRIGHT",
-                        w.posX or -270, w.posY or -75)
-                else
-                    dragonUIDebuffFrame:ClearAllPoints()
-                    if lastBuffInLastRow then
-                        dragonUIDebuffFrame:SetPoint("TOPRIGHT", lastBuffInLastRow, "BOTTOMRIGHT", 0, -60)
-                    elseif dragonUIBuffFrame then
-                        dragonUIDebuffFrame:SetPoint("TOPRIGHT", dragonUIBuffFrame, "BOTTOMRIGHT", 0, -60)
-                    end
-                end
+            -- 2) Anchor VanityBuffs in the chain (Ascension custom frame).
+            --    Vanilla 3.3.5a: VanityBuffs is nil, this is a no-op.
+            AnchorVanityBuffs()
 
-                local debuff1 = _G["DebuffButton1"]
-                if debuff1 then
-                    debuff1:ClearAllPoints()
-                    debuff1:SetPoint("TOPRIGHT", dragonUIDebuffFrame, "TOPRIGHT", 0, 0)
-                end
-            end
-
-            -- 5) Position the toggle button to the right of ConsolidatedBuffs
-            if toggleButton then
-                toggleButton:ClearAllPoints()
-                if ConsolidatedBuffs then
-                    toggleButton:SetPoint("LEFT", ConsolidatedBuffs, "RIGHT", 4, -6)
-                else
-                    toggleButton:SetPoint("TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 12, -6)
-                end
-            end
-
-            -- 6) Respect buff toggle: re-hide buffs if user collapsed them
+            -- 3) Respect buff toggle: re-hide buffs if user collapsed them
             if buffsHiddenByToggle then
                 for i = 1, BUFF_ACTUAL_DISPLAY do
                     local btn = _G["BuffButton" .. i]
@@ -689,22 +1291,47 @@ function BuffFrameModule:Enable()
                 end
                 if VanityBuffs then VanityBuffs:Hide() end
                 if TemporaryEnchantFrame then TemporaryEnchantFrame:Hide() end
+            else
+                if VanityBuffs then VanityBuffs:Show() end
             end
 
-            -- 7) MOVE BUFFRAME TO OUR CONTROLLED POSITION (final step)
-            --    After Blizzard laid out all children relative to BuffFrame,
-            --    we move the entire frame+children as a unit to follow
-            --    dragonUIBuffFrame. No flicker because this is the last thing
-            --    that happens in the layout pass.
-            AnchorBuffFrameToDragonUI()
+            -- 4) Debuffs follow the latest buff / consolidated layout.
+            FixDebuffPositions()
+            BuffFrameModule:UpdateLayoutPreview()
         end)
     end
 
     -- ========================================================================
-    -- HOOK: UIParent_ManageFramePositions — fires on ticket open/close and
-    -- other layout events. We update our frame position and ensure the anchor
-    -- chain is intact. This does NOT re-lay out icons — that's the job of
-    -- the BuffFrame_UpdateAllBuffAnchors hook, which fires on UNIT_AURA.
+    -- HOOK: DebuffButton_UpdateAnchors — fix debuff positioning
+    -- Blizzard anchors the first debuff to ConsolidatedBuffs BOTTOMRIGHT and
+    -- wraps later icons with BUFFS_PER_ROW. We defer one frame so our full
+    -- grid (using debuffs_per_row) runs AFTER Blizzard finishes the whole pass.
+    -- ========================================================================
+    if not BuffFrameModule._hookedDebuffAnchors then
+        BuffFrameModule._hookedDebuffAnchors = true
+        local debuffFixPending = false
+        local debuffFixFrame = CreateFrame("Frame")
+        debuffFixFrame:Hide()
+        debuffFixFrame:SetScript("OnUpdate", function(self)
+            self:Hide()
+            debuffFixPending = false
+            if not buffFramePositionLocked then return end
+            FixDebuffPositions()
+            BuffFrameModule:UpdateLayoutPreview()
+        end)
+
+        hooksecurefunc("DebuffButton_UpdateAnchors", function()
+            if not buffFramePositionLocked then return end
+            if debuffFixPending then return end
+            debuffFixPending = true
+            debuffFixFrame:Show()
+        end)
+    end
+
+    -- ========================================================================
+    -- HOOK: UIParent_ManageFramePositions — fires on ticket open/close.
+    -- We update our frame position AND re-anchor ConsolidatedBuffs + debuffs
+    -- so nothing drifts horizontally.
     -- ========================================================================
     if not BuffFrameModule._hookedManagePositions then
         BuffFrameModule._hookedManagePositions = true
@@ -715,78 +1342,72 @@ function BuffFrameModule:Enable()
             -- UpdatePosition() is safe at ANY position: at default it shifts
             -- for tickets, at custom it re-applies the saved coords (no-op).
             BuffFrameModule:UpdatePosition()
-            -- Re-anchor BuffFrame to dragonUIBuffFrame — Blizzard may have
-            -- moved BuffFrame during UIParent_ManageFramePositions, and our
-            -- SetPoint override handles most cases, but in rare instances
-            -- (profile change, reload) the override may not fire. This ensures
-            -- the anchor is solid.
-            AnchorBuffFrameToDragonUI()
-            -- Also ensure ConslidatedBuffs didn't lose its anchor to BuffFrame
-            if ConsolidatedBuffs then
-                local _, rel = ConsolidatedBuffs:GetPoint(1)
-                if not rel or rel ~= BuffFrame then
-                    AnchorConsolidatedBuffs()
-                end
-            end
+            -- ALWAYS restore the anchor chain — Blizzard's code may have
+            -- re-anchored ConsolidatedBuffs/TemporaryEnchantFrame away from
+            -- our frame.  These helpers only fix the chain, they never move
+            -- dragonUIBuffFrame itself, so they're safe at custom position.
+            RestoreConsolidatedBuffsAnchor()
+            FixDebuffPositions()
         end)
     end
-
-    -- ========================================================================
-    -- TICKET FRAME HOOKS — update position without re-laying out icons
-    -- ========================================================================
+    
+    -- Also hook TicketStatusFrame Show/Hide directly for reliable detection
     if not BuffFrameModule._hookedTicketFrame then
         BuffFrameModule._hookedTicketFrame = true
-        local function OnTicketChange()
-            if dragonUIBuffFrame and IsBuffFrameAtDefaultPosition() then
-                BuffFrameModule:UpdatePosition()
-                AnchorBuffFrameToDragonUI()
-            end
-        end
         if TicketStatusFrame then
-            hooksecurefunc(TicketStatusFrame, "Show", OnTicketChange)
-            hooksecurefunc(TicketStatusFrame, "Hide", OnTicketChange)
+            hooksecurefunc(TicketStatusFrame, "Show", function()
+                if dragonUIBuffFrame and IsBuffFrameAtDefaultPosition() then
+                    BuffFrameModule:UpdatePosition()
+                    RestoreConsolidatedBuffsAnchor()
+                    FixDebuffPositions()
+                end
+            end)
+            hooksecurefunc(TicketStatusFrame, "Hide", function()
+                if dragonUIBuffFrame and IsBuffFrameAtDefaultPosition() then
+                    BuffFrameModule:UpdatePosition()
+                    RestoreConsolidatedBuffsAnchor()
+                    FixDebuffPositions()
+                end
+            end)
         end
         if GMChatStatusFrame then
-            hooksecurefunc(GMChatStatusFrame, "Show", OnTicketChange)
-            hooksecurefunc(GMChatStatusFrame, "Hide", OnTicketChange)
+            hooksecurefunc(GMChatStatusFrame, "Show", function()
+                if dragonUIBuffFrame and IsBuffFrameAtDefaultPosition() then
+                    BuffFrameModule:UpdatePosition()
+                    RestoreConsolidatedBuffsAnchor()
+                    FixDebuffPositions()
+                end
+            end)
+            hooksecurefunc(GMChatStatusFrame, "Hide", function()
+                if dragonUIBuffFrame and IsBuffFrameAtDefaultPosition() then
+                    BuffFrameModule:UpdatePosition()
+                    RestoreConsolidatedBuffsAnchor()
+                    FixDebuffPositions()
+                end
+            end)
         end
     end
-
-    -- ========================================================================
-    -- EVENTS
-    -- ========================================================================
+    
+    --  CONFIGURE EVENTS
     if not buffFrame then
         buffFrame = CreateFrame("Frame")
         buffFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-        buffFrame:RegisterEvent("UNIT_AURA")
+        addon.RegisterUnitEventSafe(buffFrame, "UNIT_AURA", "player", "vehicle")
         buffFrame:RegisterEvent("UNIT_ENTERED_VEHICLE")
         buffFrame:RegisterEvent("UNIT_EXITED_VEHICLE")
-
+        
         buffFrame:SetScript("OnEvent", function(self, event, unit)
             if event == "PLAYER_ENTERING_WORLD" then
-                CreateToggleButton(dragonUIBuffFrame)
+                ReplaceBlizzardFrame(dragonUIBuffFrame)
                 ShowToggleButtonIf(GetUnitBuffCount("player", 16) > 0)
                 BuffFrameModule:UpdatePosition()
-
+                
                 -- Restore buff toggle state from saved profile
                 if addon.db and addon.db.profile and addon.db.profile.buffs
                    and addon.db.profile.buffs.buffs_hidden then
-                    buffsHiddenByToggle = true
-                    toggleButton.toggle = false
-                    local normalTex = toggleButton:GetNormalTexture()
-                    normalTex:set_atlas('CollapseButton-Left', true)
-                    local highlightTex = toggleButton:GetHighlightTexture()
-                    if highlightTex then
-                        highlightTex:set_atlas('CollapseButton-Left', true)
-                    end
-                    for index = 1, BUFF_ACTUAL_DISPLAY do
-                        local button = _G['BuffButton' .. index]
-                        if button then button:Hide() end
-                    end
-                    if VanityBuffs then VanityBuffs:Hide() end
-                    if TemporaryEnchantFrame then TemporaryEnchantFrame:Hide() end
+                    SetBuffsCollapsed(true)
                 end
-
+                
                 -- Reposition the GM ticket frame so it doesn't overlap the minimap
                 if TicketStatusFrame then
                     TicketStatusFrame:ClearAllPoints()
@@ -813,10 +1434,16 @@ end
 
 -- Disable the buff frame module
 function BuffFrameModule:Disable()
-    -- Restore original BuffFrame positioning method
+    HidePreviewPool(previewBuffButtons)
+    HidePreviewPool(previewDebuffButtons)
+
+    -- Restore original BuffFrame and ConsolidatedBuffs positioning methods
     buffFramePositionLocked = false
     BuffFrame.SetPoint = original_BuffFrame_SetPoint
-
+    BuffFrame.ClearAllPoints = original_BuffFrame_ClearAllPoints
+    ConsolidatedBuffs.SetPoint = original_CB_SetPoint
+    ConsolidatedBuffs.ClearAllPoints = original_CB_ClearAllPoints
+    
     -- Clean up weapon enchant separation
     if weaponEnchantsAreSeparated then
         weaponEnchantsAreSeparated = false
@@ -826,18 +1453,18 @@ function BuffFrameModule:Disable()
         dragonUIWeaponBuffFrame:Hide()
         -- Don't nil it — may be re-enabled without reload
     end
-
+    
     if buffFrame then
         buffFrame:UnregisterAllEvents()
         buffFrame:SetScript("OnEvent", nil)
         buffFrame = nil
     end
-
+    
     if toggleButton then
         toggleButton:Hide()
         toggleButton = nil
     end
-
+    
     if dragonUIBuffFrame then
         dragonUIBuffFrame:Hide()
         dragonUIBuffFrame = nil
@@ -854,8 +1481,12 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, addonName)
     if addonName == "DragonUI" then
-        if addon.db and addon.db.profile and addon.db.profile.buffs and addon.db.profile.buffs.enabled then
-            BuffFrameModule:Enable()
+        if addon.db and addon.db.profile and addon.db.profile.buffs then
+            -- Preview hides every real aura; carrying it across sessions looks like a broken UI.
+            addon.db.profile.buffs.layout_preview = false
+            if addon.db.profile.buffs.enabled then
+                BuffFrameModule:Enable()
+            end
         end
         self:UnregisterEvent("ADDON_LOADED")
     end
