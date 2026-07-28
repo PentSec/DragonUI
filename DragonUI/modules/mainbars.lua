@@ -1,6 +1,6 @@
 local addon = select(2, ...)
 local L = addon.L
-addon._dir = "Interface\\AddOns\\DragonUI\\assets\\"
+addon._dir = "Interface\\AddOns\\DragonUI\\Textures\\"
 local class = addon._class
 
 -- ============================================================================
@@ -1599,7 +1599,7 @@ end
         local cfg = GetXpRepConfig() or {}
         local barW = cfg.bar_width or 466
         local barH = GetXpBarHeight("retailui")
-        local ExperienceBarAsset = "Interface\\AddOns\\DragonUI\\Textures\\UI\\ExperienceBar"
+        local ExperienceBarAsset = addon._dir .. "uiexperiencebar"
 
         -- === XP BAR ===
         -- NOTE: Do NOT ClearAllPoints here — positioning is handled by

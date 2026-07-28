@@ -536,7 +536,6 @@ local defaults = {
                 show_on_hover = false,
                 show_in_combat = false,
                 visibility_logic = "and",
-                slots = {},
             }
         },
 
