@@ -20,6 +20,9 @@ local ItemLevelModule = {
     texts = {} -- Track every created FontString for cleanup
 }
 
+-- Ascension replaces the stock Character/Inspect paper-doll with its own frames.
+local isAscension = _G.PathToAscensionMicroButton ~= nil
+
 if addon.RegisterModule then
     addon:RegisterModule("itemlevel", ItemLevelModule,
         (addon.L and addon.L["Item Level"]) or "Item Level",
@@ -468,9 +471,14 @@ local function ScanInspectSlot(unit, slotID)
     return ilvl, link, r, g, b
 end
 
+local function GetInspectFrame()
+    return _G.AscensionInspectFrame or InspectFrame
+end
+
 local function UpdateInspectSlot(button)
     if not button or not IsContextEnabled("inspect") then return end
-    if not InspectFrame or not InspectFrame.unit then return end
+    local inspectFrame = GetInspectFrame()
+    if not inspectFrame or not inspectFrame.unit then return end
 
     local slotID = button:GetID()
     if not slotID or slotID < 0 then return end
@@ -479,7 +487,7 @@ local function UpdateInspectSlot(button)
         return
     end
 
-    local unit = InspectFrame.unit
+    local unit = inspectFrame.unit
     if not inspectDataReady or not GetInventoryItemTexture(unit, slotID) then
         HideButtonItemLevel(button)
         return
@@ -524,13 +532,13 @@ local function CalculateAverage(unit, useTooltipScan)
     end
 
     if count == 0 then return nil, incomplete end
-    return math.floor((total / count) + 0.5), incomplete
+    return math.floor((total / count) * 100 + 0.5) / 100, incomplete
 end
 
 -- Model frames draw the 3D model over their own regions, so the text needs its own
 -- frame at a higher level; a FontString inside the model frame stays invisible.
 -- Height above the model frame's bottom edge; the two panels need different clearance
-local AVERAGE_Y_OFFSET = { player = 24, inspect = 0 }
+local AVERAGE_Y_OFFSET = { player = 24, inspect = 24 }
 
 local function GetOrCreateAverageText(key, parent, modelFrame)
     if averageTexts[key] then return averageTexts[key] end
@@ -575,7 +583,9 @@ local function UpdateAverageFor(key, context, unit, parent, modelFrame, useToolt
         return
     end
 
-    fontString:SetFormattedText((addon.L and addon.L["Item Level: %d"]) or "Item Level: %d", average)
+    local template = addon.L and addon.L["Item Level: %d"]
+    if template then template = template:gsub("%%d", "%%.2f") end
+    fontString:SetFormattedText(template or "Item Level: %.2f", average)
     fontString:Show()
 end
 
@@ -586,7 +596,13 @@ local function HideAllAverages()
 end
 
 local function UpdateCharacterAverage()
-    UpdateAverageFor("player", "character", "player", PaperDollFrame, CharacterModelFrame)
+    if isAscension then
+        UpdateAverageFor("player", "character", "player",
+            _G.AscensionCharacterFrame or PaperDollFrame,
+            _G.AscensionPaperDollPanelModel or CharacterModelFrame)
+    else
+        UpdateAverageFor("player", "character", "player", PaperDollFrame, CharacterModelFrame)
+    end
 end
 
 local function HideInspectTexts()
@@ -599,12 +615,19 @@ local function HideInspectTexts()
 end
 
 local function UpdateInspectAverage()
-    if not InspectFrame or not InspectFrame.unit then return end
+    local inspectFrame = GetInspectFrame()
+    if not inspectFrame or not inspectFrame.unit then return end
     if not inspectDataReady then
         if averageTexts["inspect"] then averageTexts["inspect"]:Hide() end
         return
     end
-    UpdateAverageFor("inspect", "inspect", InspectFrame.unit, InspectPaperDollFrame, InspectModelFrame, true)
+    if isAscension then
+        UpdateAverageFor("inspect", "inspect", inspectFrame.unit,
+            AscensionInspectFrame, InspectPaperDollPanelModel, true)
+    else
+        UpdateAverageFor("inspect", "inspect", inspectFrame.unit,
+            InspectPaperDollFrame, InspectModelFrame, true)
+    end
 end
 
 -- Slot hooks fire once per slot; without this the inspect average would rescan
@@ -631,7 +654,8 @@ end
 
 local function UpdateAllInspectSlots()
     if not IsContextEnabled("inspect") then return end
-    if not InspectFrame or not InspectFrame:IsShown() then return end
+    local inspectFrame = GetInspectFrame()
+    if not inspectFrame or not inspectFrame:IsShown() then return end
     for _, frameName in ipairs(INSPECT_SLOT_FRAMES) do
         local resolved = ResolveInspectSlotFrame(frameName)
         local button = _G[resolved]
@@ -877,21 +901,21 @@ addon.ApplyItemLevelTooltipCVar = ApplyTooltipCVar
 
 local function InstallInspectHooks()
     if ItemLevelModule.hooks["Inspect"] then return end
-    if not InspectPaperDollItemSlotButton_Update then return end
 
-    hooksecurefunc("InspectPaperDollItemSlotButton_Update", function(button)
-        UpdateInspectSlot(button)
-        ScheduleAverageUpdate("inspect")
-    end)
+    if isAscension then
+        -- Ascension replaces the Blizzard inspect paper-doll entirely.
+        -- Wait for the Ascension inspect addon to load; retry from ADDON_LOADED.
+        if not _G.AscensionInspectFrame then return end
 
-    -- Retargeting reuses the open frame: InspectFrame_UnitChanged calls this right
-    -- after NotifyInspect, so the tooltips still hold the previous unit's gear.
-    if InspectPaperDollFrame_OnShow then
-        hooksecurefunc("InspectPaperDollFrame_OnShow", function()
+        hooksecurefunc(AscensionInspectFrame, "UpdateCharacterInfo", function()
+            inspectDataReady = true
+            UpdateAllInspectSlots()
+            ScheduleAverageUpdate("inspect")
+        end)
+        AscensionInspectFrame:HookScript("OnShow", function()
             RefillRetryBudget()
             inspectDataReady = false
             HideInspectTexts()
-            -- Safety net: draw anyway if INSPECT_TALENT_READY never arrives
             Debounce("inspectfallback", 1.5, function()
                 if not inspectDataReady then
                     inspectDataReady = true
@@ -899,6 +923,31 @@ local function InstallInspectHooks()
                 end
             end)
         end)
+    else
+        -- Stock Blizzard inspect UI
+        if not InspectPaperDollItemSlotButton_Update then return end
+
+        hooksecurefunc("InspectPaperDollItemSlotButton_Update", function(button)
+            UpdateInspectSlot(button)
+            ScheduleAverageUpdate("inspect")
+        end)
+
+        -- Retargeting reuses the open frame: InspectFrame_UnitChanged calls this right
+        -- after NotifyInspect, so the tooltips still hold the previous unit's gear.
+        if InspectPaperDollFrame_OnShow then
+            hooksecurefunc("InspectPaperDollFrame_OnShow", function()
+                RefillRetryBudget()
+                inspectDataReady = false
+                HideInspectTexts()
+                -- Safety net: draw anyway if INSPECT_TALENT_READY never arrives
+                Debounce("inspectfallback", 1.5, function()
+                    if not inspectDataReady then
+                        inspectDataReady = true
+                        UpdateAllInspectSlots()
+                    end
+                end)
+            end)
+        end
     end
 
     ItemLevelModule.hooks["Inspect"] = true
@@ -957,6 +1006,15 @@ local function ApplyItemLevelSystem()
             addon:After(0.05, UpdateAllCharacterSlots)
         end)
         ItemLevelModule.hooks["PaperDollShow"] = true
+    end
+
+    -- Ascension: the stock PaperDollFrame is hidden; hook the Ascension frame directly.
+    if isAscension and not ItemLevelModule.hooks["AscensionPaperDoll"] and _G.AscensionCharacterFrame then
+        AscensionCharacterFrame:HookScript("OnShow", function()
+            RefillRetryBudget()
+            addon:After(0.05, UpdateAllCharacterSlots)
+        end)
+        ItemLevelModule.hooks["AscensionPaperDoll"] = true
     end
 
     if not ItemLevelModule.hooks["Merchant"] and MerchantFrame_UpdateMerchantInfo then
@@ -1112,7 +1170,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             end)
         elseif not IsModuleEnabled() then
             return
-        elseif arg1 == "Blizzard_InspectUI" then
+        elseif arg1 == "Blizzard_InspectUI" or arg1 == "Ascension_InspectUI" then
             InstallInspectHooks()
         elseif arg1 == "Blizzard_GuildBankUI" then
             InstallGuildBankHooks()
@@ -1175,7 +1233,8 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         Debounce("inspect", 0.1, UpdateAllInspectSlots)
 
     elseif event == "UNIT_INVENTORY_CHANGED" then
-        if InspectFrame and InspectFrame:IsShown() and InspectFrame.unit and arg1 == InspectFrame.unit then
+        local inspectFrame = GetInspectFrame()
+        if inspectFrame and inspectFrame:IsShown() and inspectFrame.unit and arg1 == inspectFrame.unit then
             Debounce("inspect", 0.2, UpdateAllInspectSlots)
         end
     end
