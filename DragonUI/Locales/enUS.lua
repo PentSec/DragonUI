@@ -261,9 +261,6 @@ L["Use DragonUI"] = true
 L["Disable Both"] = true
 L["Use DragonUI Unit Frame Layers"] = true
 L["Disable both Unit Frame Layers"] = true
-L["DragonUI - Party Frame Issue"] = true
-L["You joined a party while in combat. Due to CompactRaidFrame taint issues, party frames may not display correctly."] = true
-L["Reload the UI to fix party frame display?"] = true
 
 -- Nameplate conflict detection
 L["DragonUI - Nameplate Conflict"] = true
@@ -276,7 +273,6 @@ L["Don't ask again"] = true
 
 -- Conflict reasons
 L["Conflicts with DragonUI's custom unit frame textures and power bar system."] = true
-L["Known taint issues when manipulating party frames during combat. DragonUI provides automatic fixes."] = true
 L["Resets minimap mask and blip textures. DragonUI re-applies its custom textures automatically."] = true
 L["SexyMap modifies the minimap borders, shape, and zone text which conflicts with DragonUI's minimap module."] = true
 L["Nameplate functionality conflicts with DragonUI's nameplate module."] = true
