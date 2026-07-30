@@ -96,6 +96,8 @@
 
     <!-- Level Up Enhance (animated level-up notification) -->
     <Script file="levelupenhance.lua"/>
+    <!-- Alt Gold module (other characters' money on the bag coin tooltip) -->
+    <Script file="altmoney.lua"/>
 
     <!-- Version Check module (cross-player version broadcast) -->
     <Script file="versioncheck.lua"/>
