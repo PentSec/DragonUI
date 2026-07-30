@@ -574,7 +574,7 @@ local defaults = {
             visibility_logic = "and",
         },
 
-        --  BUFFS SETTINGS (NEW)
+        --  BUFFS SETTINGS 
         buffs = {
             enabled = true,
             show_toggle_button = true,
@@ -584,8 +584,8 @@ local defaults = {
             debuff_horizontal_gap = 0,
             buff_scale = 1,
             debuff_scale = 1,
-            buffs_per_row = 16,
-            debuffs_per_row = 16,
+            buffs_per_row = 12,
+            debuffs_per_row = 12,
             max_buff_rows = 0,
             max_debuff_rows = 0,
             buff_vertical_gap = 15,
@@ -608,6 +608,7 @@ local defaults = {
             sizeY = 16,
             showIcon = false,
             sizeIcon = 27,
+            modernIconBorder = true,
             holdTime = 0.3,
             holdTimeInterrupt = 0.8,
 
@@ -632,6 +633,7 @@ local defaults = {
                 sizeY = 10,
                 showIcon = true,
                 sizeIcon = 20,
+                modernIconBorder = true,
                 holdTime = 0.3,
                 holdTimeInterrupt = 0.8,
                 anchorFrame = 'TargetFrame',
@@ -654,6 +656,7 @@ local defaults = {
                 sizeY = 10,
                 showIcon = true,
                 sizeIcon = 20,
+                modernIconBorder = true,
                 holdTime = 0.3,
                 holdTimeInterrupt = 0.8,
                 anchorFrame = 'FocusFrame',
@@ -953,6 +956,7 @@ local defaults = {
                 castBarOffTargetSafeOnly = true, -- legacy mirror of safe mode (now the default)
                 castBarPvPAggressive = false, -- legacy reaction filter (no longer exposed in UI)
                 showPartyRaidCastBars = false, -- show cast bars on party/raid member nameplates
+                castBarModernIconBorder = true, -- action-bar style frame around the cast icon
                 castBarHeight = 9, -- height of the cast bar in pixels
                 castBarGap = 3, -- vertical gap between health, power, and cast bars
                 showCastBarSpellName = false, -- show the spell name text on the cast bar
@@ -961,6 +965,7 @@ local defaults = {
                 castBarSpellNameOffsetY = 0, -- vertical offset for the cast bar spell name text
                 threatGlow = true, -- show threat glow indicator (colored border)
                 tankMode = false, -- invert threat colors for a tank perspective (holding aggro = green)
+                dpsMode = false, -- ThreatPlates-style DPS threat colors (in combat); exclusive with tankMode
                 raidMarkHealthColor = false, -- tint health bar by raid marker, allies and enemies alike
                 tapDeniedGray = true, -- gray health bar when unit is tapped by another player/group (GUID memory)
                 showTargetHighlight = true,
