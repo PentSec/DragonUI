@@ -1056,29 +1056,46 @@ function BuffFrameModule:Enable()
     -- row; detached: from saved profile coords), then anchor the real debuff
     -- icon to the mover so it always follows whichever mode is active.
     -- ========================================================================
+    -- Anchor signature cache for debuff buttons. Re-anchoring a button that is
+    -- already at its target position triggers the FrameXML manager reflow and is
+    -- the primary source of "buffs jump around searching for a position" flicker.
+    -- We diff the cached signature and only call ClearAllPoints/SetPoint when the
+    -- desired anchor actually changed.
+    local _debuffAnchorCache = {}
+
     FixDebuffPositions = function()
         if not buffFramePositionLocked or not dragonUIDebuffFrame then return end
 
         local debuffOffsetY = GetDebuffOffsetY()
 
+        -- Compute the desired anchor signature for the debuff mover itself.
+        local moverPoint, moverRel, moverRelPoint, moverX, moverY
         if IsDebuffFrameDetached() then
             local w = addon.db.profile.widgets.debuffs
-            dragonUIDebuffFrame:ClearAllPoints()
-            dragonUIDebuffFrame:SetPoint(w.anchor or "TOPRIGHT", UIParent, w.anchor or "TOPRIGHT",
-                w.posX or -270, w.posY or -75)
+            moverPoint = w.anchor or "TOPRIGHT"
+            moverRel = UIParent
+            moverRelPoint = w.anchor or "TOPRIGHT"
+            moverX = w.posX or -270
+            moverY = w.posY or -75
         else
             local firstBuff, lastRowStart = GetBuffLayoutInfo()
             local anchor = lastRowStart or firstBuff
             if not anchor and ConsolidatedBuffs and ConsolidatedBuffs:IsShown() then
                 anchor = ConsolidatedBuffs
             end
+            moverPoint = "TOPRIGHT"
+            moverRel = anchor or dragonUIBuffFrame
+            moverRelPoint = "BOTTOMRIGHT"
+            moverX = 0
+            moverY = -debuffOffsetY
+        end
+
+        local moverSig = moverPoint .. "|" .. tostring(moverRel) .. "|" .. moverRelPoint
+                          .. "|" .. tostring(moverX) .. "|" .. tostring(moverY)
+        if _debuffAnchorCache["__mover"] ~= moverSig then
             dragonUIDebuffFrame:ClearAllPoints()
-            if anchor then
-                dragonUIDebuffFrame:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -debuffOffsetY)
-            else
-                -- No buffs / consolidated button visible — below the buff mover
-                dragonUIDebuffFrame:SetPoint("TOPRIGHT", dragonUIBuffFrame, "BOTTOMRIGHT", 0, -debuffOffsetY)
-            end
+            dragonUIDebuffFrame:SetPoint(moverPoint, moverRel, moverRelPoint, moverX, moverY)
+            _debuffAnchorCache["__mover"] = moverSig
         end
 
         -- Collect active debuffs first, then lay them out with OUR per-row setting.
@@ -1099,10 +1116,6 @@ function BuffFrameModule:Enable()
             return
         end
 
-        local firstDebuff = active[1]
-        firstDebuff:ClearAllPoints()
-        firstDebuff:SetPoint("TOPRIGHT", dragonUIDebuffFrame, "TOPRIGHT", 0, 0)
-
         local perRow = GetDebuffsPerRow()
         local spacing = 6 + math.max(0, GetDebuffHorizontalGap())
         local vGap = GetDebuffVerticalGap()
@@ -1119,18 +1132,33 @@ function BuffFrameModule:Enable()
                 local row = math.floor((count - 1) / perRow) + 1
                 local column = math.fmod(count - 1, perRow) + 1
 
+                -- Compute desired anchor signature for this debuff button.
+                local dPoint, dRel, dRelPoint, dX, dY
                 if count == 1 then
+                    dPoint, dRel, dRelPoint = "TOPRIGHT", dragonUIDebuffFrame, "TOPRIGHT"
+                    dX, dY = 0, 0
                     rowStarts[row] = debuff
                 elseif column == 1 then
                     local previousRowStart = rowStarts[row - 1] or rowStarts[1] or previousDebuff
                     if previousRowStart then
-                        debuff:ClearAllPoints()
-                        debuff:SetPoint("TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
+                        dPoint, dRel, dRelPoint = "TOPRIGHT", previousRowStart, "BOTTOMRIGHT"
+                        dX, dY = 0, -vGap
                     end
                     rowStarts[row] = debuff
                 elseif previousDebuff then
-                    debuff:ClearAllPoints()
-                    debuff:SetPoint("TOPRIGHT", previousDebuff, "TOPLEFT", -spacing, 0)
+                    dPoint, dRel, dRelPoint = "TOPRIGHT", previousDebuff, "TOPLEFT"
+                    dX, dY = -spacing, 0
+                end
+
+                if dPoint then
+                    local key = debuff
+                    local sig = dPoint .. "|" .. tostring(dRel) .. "|" .. dRelPoint
+                                  .. "|" .. tostring(dX) .. "|" .. tostring(dY)
+                    if _debuffAnchorCache[key] ~= sig then
+                        debuff:ClearAllPoints()
+                        debuff:SetPoint(dPoint, dRel, dRelPoint, dX, dY)
+                        _debuffAnchorCache[key] = sig
+                    end
                 end
 
                 previousDebuff = debuff
@@ -1259,43 +1287,91 @@ function BuffFrameModule:Enable()
     -- ========================================================================
     if not BuffFrameModule._hookedBuffAnchors then
         BuffFrameModule._hookedBuffAnchors = true
+        -- Re-entrancy guard for our own hook (Blizzard sometimes calls
+        -- BuffFrame_UpdateAllBuffAnchors from within ConsolidatedBuffs
+        -- OnShow/OnHide, which our AnchorVanityBuffs/RestoreConsolidatedBuffsAnchor
+        -- calls can re-trigger, causing visible "searching" flicker).
         local _inUpdateAllBuffAnchors = false
+
+        -- Cached anchor signatures per frame. SetPoint/ClearAllPoints on an
+        -- already-correctly-anchored frame still triggers the frame manager to
+        -- reflow children visibly on 3.3.5a, which is the exact source of the
+        -- "buffs move wildly looking for a position" flicker. We diff against
+        -- the last anchor we applied and only touch the frame when the desired
+        -- anchor actually changed.
+        local _anchorCache = {}
+
+        local function _desiredTempEnchantAnchor()
+            if weaponEnchantsAreSeparated then return nil end
+            if not (TemporaryEnchantFrame and ConsolidatedBuffs) then return nil end
+            if ConsolidatedBuffs:IsShown() then
+                return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+            end
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+        end
+
+        local function _desiredVanityBuffsAnchor()
+            if not (VanityBuffs and ConsolidatedBuffs) then return nil end
+            if ConsolidatedBuffs:IsShown() and (BuffFrame.numConsolidated or 0) > 0 then
+                return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+            end
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+        end
+
+        -- Apply an anchor only if it differs from the cached one. Returns true
+        -- when something actually moved (so callers can batch follow-up work).
+        local function _applyAnchor(frame, key, point, relFrame, relPoint, x, y)
+            if not frame then return false end
+            local sig = point .. "|" .. tostring(relFrame) .. "|" .. relPoint
+                          .. "|" .. tostring(x) .. "|" .. tostring(y)
+            if _anchorCache[key] == sig then
+                -- Already at the desired anchor — do NOT touch the frame.
+                return false
+            end
+            frame:ClearAllPoints()
+            frame:SetPoint(point, relFrame, relPoint, x, y)
+            _anchorCache[key] = sig
+            return true
+        end
+
         hooksecurefunc("BuffFrame_UpdateAllBuffAnchors", function()
             if _inUpdateAllBuffAnchors then return end
             _inUpdateAllBuffAnchors = true
             if not buffFramePositionLocked then _inUpdateAllBuffAnchors = false; return end
 
             -- 1) Re-anchor TemporaryEnchantFrame to follow ConsolidatedBuffs.
-            --    Blizzard's ConsolidatedBuffs OnShow/OnHide handlers set this,
-            --    but other code paths may move it; force it every update.
-            --    SKIP when weapon enchants are separated (they have their own frame).
-            if not weaponEnchantsAreSeparated then
-                if TemporaryEnchantFrame and ConsolidatedBuffs then
-                    TemporaryEnchantFrame:ClearAllPoints()
-                    if ConsolidatedBuffs:IsShown() then
-                        TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-                    else
-                        TemporaryEnchantFrame:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
-                    end
-                end
+            --    Only touch it when the desired anchor changed (idempotent) so
+            --    we don't trigger a reflow every aura tick.
+            local pt, rf, rp, x, y = _desiredTempEnchantAnchor()
+            if pt then
+                _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
             end
 
             -- 2) Anchor VanityBuffs in the chain (Ascension custom frame).
-            --    Vanilla 3.3.5a: VanityBuffs is nil, this is a no-op.
-            AnchorVanityBuffs()
+            --    Same idempotent guard. nil in vanilla → no-op.
+            do
+                local vpt, vrf, vrp, vx, vy = _desiredVanityBuffsAnchor()
+                if vpt then
+                    _applyAnchor(VanityBuffs, "vanityBuffs", vpt, vrf, vrp, vx, vy)
+                end
+            end
 
-            -- 3) Respect buff toggle: re-hide buffs if user collapsed them
+            -- 3) Respect buff toggle. Hide/Show are also guarded to avoid
+            --    re-entrant OnShow/OnHide -> UpdateAllBuffAnchors loops that
+            --    cause the "searching position" flicker.
             if buffsHiddenByToggle then
                 for i = 1, BUFF_ACTUAL_DISPLAY do
                     local btn = _G["BuffButton" .. i]
-                    if btn then
+                    if btn and btn:IsShown() then
                         btn:Hide()
                     end
                 end
-                if VanityBuffs then VanityBuffs:Hide() end
-                if TemporaryEnchantFrame then TemporaryEnchantFrame:Hide() end
+                if VanityBuffs and VanityBuffs:IsShown() then VanityBuffs:Hide() end
+                if TemporaryEnchantFrame and TemporaryEnchantFrame:IsShown() then
+                    TemporaryEnchantFrame:Hide()
+                end
             else
-                if VanityBuffs then VanityBuffs:Show() end
+                if VanityBuffs and not VanityBuffs:IsShown() then VanityBuffs:Show() end
             end
 
             -- 4) Debuffs follow the latest buff / consolidated layout.
