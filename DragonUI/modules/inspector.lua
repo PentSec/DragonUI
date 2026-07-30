@@ -75,11 +75,11 @@ end
 
 local assets = addon._dir
 local TEX = {
-    frame_metal   = assets .. 'uiframemetal2x',
-    frame_metal_h = assets .. 'uiframemetalhorizontal2x',
-    frame_metal_v = assets .. 'uiframemetalvertical2x',
-    frame_bg      = assets .. 'ui-background-rock',
-    close_btn     = assets .. 'redbutton2x',
+    frame_metal   = assets .. 'UI\\uiframemetal2x',
+    frame_metal_h = assets .. 'UI\\uiframemetalhorizontal2x',
+    frame_metal_v = assets .. 'UI\\uiframemetalvertical2x',
+    frame_bg      = assets .. 'UI\\ui-background-rock',
+    close_btn     = assets .. 'UI\\redbutton2x',
 }
 
 local SOLID = "Interface\\ChatFrame\\ChatFrameBackground"
@@ -689,7 +689,7 @@ function TP.Get()
     local iconLevel = frame:GetFrameLevel()
     classIconFrame:SetFrameLevel(iconLevel + 10)
     local corner = classIconFrame:CreateTexture(nil, "OVERLAY")
-    corner:SetTexture("Interface\\AddOns\\DragonUI\\assets\\bagborder2")
+    corner:SetTexture("Interface\\AddOns\\DragonUI\\Textures\\Bags\\bagborder2")
     corner:SetAllPoints(classIconFrame)
     frame.classIconFrame = classIconFrame
 

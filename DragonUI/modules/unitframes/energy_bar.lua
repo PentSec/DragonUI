@@ -11,7 +11,7 @@ local _G = _G
 local BG_TEXTURE = "Interface\\AddOns\\DragonUI\\Textures\\Nameplates\\bar-bg-power"
 
 -- Border from castbar atlas
-local TEXTURE_PATH = "Interface\\AddOns\\DragonUI\\Textures\\CastbarOriginal\\"
+local TEXTURE_PATH = "Interface\\AddOns\\DragonUI\\Textures\\Castbar\\"
 local ATLAS_TEXTURE = TEXTURE_PATH .. "uicastingbar2x"
 
 -- UV coordinates from the atlas (border only)
@@ -24,13 +24,13 @@ local BARS = {
     {
         globalName = "PlayerFrameEnergyBar",
         textGlobalName = "PlayerFrameEnergyBarText",
-        texture = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Energy",
+        texture = "Interface\\AddOns\\DragonUI\\Textures\\UnitFrames\\Bars\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Energy",
         vertical = false,
     },
     {
         globalName = "PlayerFrameRageBar",
         textGlobalName = "PlayerFrameRageBarText",
-        texture = "Interface\\Addons\\DragonUI\\Textures\\Unitframe\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Rage",
+        texture = "Interface\\AddOns\\DragonUI\\Textures\\UnitFrames\\Bars\\UI-HUD-UnitFrame-Player-PortraitOn-Bar-Rage",
         vertical = true,
     },
 }
