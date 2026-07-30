@@ -531,11 +531,11 @@ function NP.gather.GetHealthBarColor(plateData, skipFriendlyClass)
     if reaction == "FRIENDLY" and unitType == "NPC" and cfg.friendlyNPCColor then
         return cfg.friendlyNPCColor.r, cfg.friendlyNPCColor.g, cfg.friendlyNPCColor.b
     end
-    -- Ascension: HOSTILE+PLAYER with a blue-ish bar (same-faction Mercenary)
-    -- needs manual class color from unit token; the CVar won't recolor same-faction bars.
-    if reaction == "HOSTILE" and unitType == "PLAYER"
-        and plateData.barB and plateData.barB > 0.5
-        and (plateData.barR or 0) < 0.3 and (plateData.barG or 0) < 0.3 then
+    -- Ascension: any hostile player needs manual class color from the unit token.
+    -- The CVar ShowClassColorInNameplate may not recolor the native bar on custom
+    -- class forks (Reaper/Engineer/...), and custom class tokens are not in the
+    -- bar-color table, so we cannot rely on plateData.barR/barG/barB here.
+    if reaction == "HOSTILE" and unitType == "PLAYER" then
         if cfg.enemyPlayerClassColors ~= false then
             local token = ResolvePlateToken(plateData)
             if token and UnitExists(token) and UnitIsPlayer(token) then
@@ -545,7 +545,15 @@ function NP.gather.GetHealthBarColor(plateData, skipFriendlyClass)
                 end
             end
         end
-        -- Even without class colors, use enemy red instead of copying the blue bar.
+        -- Same-faction Mercenary keeps a blue native bar; never copy it to a hostile plate.
+        if plateData.barB and plateData.barB > 0.5
+            and (plateData.barR or 0) < 0.3 and (plateData.barG or 0) < 0.3 then
+            return 1, 0.1, 0.1
+        end
+        -- Class colors disabled or class unresolved: fall back to native bar (red hostil, etc.).
+        if plateData.barR then
+            return plateData.barR, plateData.barG, plateData.barB
+        end
         return 1, 0.1, 0.1
     end
     if plateData.barR then
@@ -818,9 +826,25 @@ function NP.gather.SyncName(plateData, unit)
 
     local r, g, b = 1, 1, 1
     local classKey = plateData.classKey
-    local classColor = classKey and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classKey]
-    local isEnemyPlayer = classColor and classKey ~= "FRIENDLY_PLAYER"
+    -- Custom Ascension classes (Reaper/Engineer/...) are not in the bar-color table,
+    -- so plateData.classKey is nil for them; resolve the real class via UnitClass.
     local nameReaction, nameUnitType = NP.native_style.GetPlateReaction(plateData)
+    local isEnemyPlayer = (nameReaction == "HOSTILE" and nameUnitType == "PLAYER")
+    if isEnemyPlayer and not classKey and cfg.enemyPlayerClassColors ~= false then
+        local token = ResolvePlateToken(plateData)
+        if token and UnitExists(token) and UnitIsPlayer(token) then
+            local _, class = UnitClass(token)
+            if class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] then
+                classKey = class
+                plateData.classKey = class
+            end
+        end
+    end
+    local classColor = classKey and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classKey]
+    if classKey == "FRIENDLY_PLAYER" then
+        isEnemyPlayer = false
+        classColor = nil
+    end
     local isFriendlyPlayer = nameReaction == "FRIENDLY" and nameUnitType == "PLAYER"
     local allowEnemyNameClass = cfg.enemyPlayerClassColors ~= false and cfg.enemyNameClassColors == true
     local allowFriendlyNameClass = cfg.friendlyNameClassColors == true
