@@ -314,7 +314,13 @@ end
 
 local function stancebutton_position()
     if not IsModuleEnabled() or not stancebar or not anchor then return end
-    
+
+    -- PLAYER_LOGIN also fires on a mid-combat /reload; reparenting secure buttons there is blocked.
+    if InCombatLockdown() then
+        addon.CombatQueue:Add("stance_position_buttons", stancebutton_position)
+        return
+    end
+
     -- READ VALUES FROM DATABASE
     local stanceConfig = GetStanceConfig()
     local additionalConfig = (addon.db and addon.db.profile and addon.db.profile.additional) or {}
@@ -747,45 +753,6 @@ function addon.RefreshStance()
 		addon.VisibilityFade.Update("stancebar")
 	end
 end
-end
-
--- Debug function for troubleshooting stance bar issues
-function addon.DebugStanceBar()
-    if not IsModuleEnabled() then
-        
-        return {enabled = false}
-    end
-    
-	local info = {
-		stanceBarInitialized = stanceBarInitialized,
-		moduleEnabled = IsModuleEnabled(),
-		inCombat = InCombatLockdown(),
-		unitInCombat = UnitAffectingCombat('player'),
-		anchorExists = anchor and true or false,
-		stanceBarExists = _G.pUiStanceBar and true or false,
-		numShapeshiftForms = GetNumShapeshiftForms(),
-		stanceConfig = GetStanceConfig()
-	};
-	
-	
-	for k, v in pairs(info) do
-	
-	end
-	
-	if anchor then
-		local point, relativeTo, relativePoint, x, y = anchor:GetPoint();
-	
-	end
-	
-	return info;
-end
-
--- Export the stance bar frame for the action bar visibility system (hover/combat fade)
-function addon.GetStanceBarVisibilityFrame()
-    if StanceModule.frames.stancebar then
-        return StanceModule.frames.stancebar
-    end
-    return ShapeshiftBarFrame
 end
 
 -- ============================================================================

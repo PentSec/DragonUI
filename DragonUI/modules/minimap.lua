@@ -14,7 +14,6 @@ local MinimapModule = {
     initialized = false,
     applied = false,
     originalStates = {},
-    registeredEvents = {},
     hooks = {},
     stateDrivers = {},
     frames = {},
@@ -470,10 +469,7 @@ end
 local function ReplaceBlizzardFrame(frame)
     -- Check combat lockdown before making secure frame changes
     if InCombatLockdown() then
-        MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = function()
-            ReplaceBlizzardFrame(frame)
-            MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = nil
-        end
+        addon.CombatQueue:Add("minimap_replace_blizzard_frame", ReplaceBlizzardFrame, frame)
         return
     end
 
@@ -825,8 +821,10 @@ local function ReplaceBlizzardFrame(frame)
     for _, points in ipairs(MINIMAP_POINTS) do
         Minimap:SetPoint(points[1], points[2], points[3], points[4] / blipScale, points[5] / blipScale)
     end
-    function GetMinimapShape()
-        return "ROUND"
+    if not isHybridMode then
+        function GetMinimapShape()
+            return "ROUND"
+        end
     end
 
     -- Enable mouse wheel zooming on minimap
@@ -864,15 +862,15 @@ local function ReplaceBlizzardFrame(frame)
         zoomInButton:SetSize(25, 24)
         zoomInButton:SetHitRectInsets(0, 0, 0, 0)
 
-        normalTexture = zoomInButton:GetNormalTexture()
+        local normalTexture = zoomInButton:GetNormalTexture()
         normalTexture:SetAllPoints(zoomInButton)
         normalTexture:set_atlas('Minimap-ZoomIn-Normal', true)
 
-        highlightTexture = zoomInButton:GetHighlightTexture()
+        local highlightTexture = zoomInButton:GetHighlightTexture()
         highlightTexture:SetAllPoints(zoomInButton)
         highlightTexture:set_atlas('Minimap-ZoomIn-Highlight', true)
 
-        pushedTexture = zoomInButton:GetPushedTexture()
+        local pushedTexture = zoomInButton:GetPushedTexture()
         pushedTexture:SetAllPoints(zoomInButton)
         pushedTexture:set_atlas('Minimap-ZoomIn-Pushed', true)
 
@@ -887,19 +885,19 @@ local function ReplaceBlizzardFrame(frame)
         zoomOutButton:SetSize(20, 12)
         zoomOutButton:SetHitRectInsets(0, 0, 0, 0)
 
-        normalTexture = zoomOutButton:GetNormalTexture()
+        local normalTexture = zoomOutButton:GetNormalTexture()
         normalTexture:SetAllPoints(zoomOutButton)
         normalTexture:set_atlas('Minimap-ZoomOut-Normal', true)
 
-        highlightTexture = zoomOutButton:GetHighlightTexture()
+        local highlightTexture = zoomOutButton:GetHighlightTexture()
         highlightTexture:SetAllPoints(zoomOutButton)
         highlightTexture:set_atlas('Minimap-ZoomOut-Highlight', true)
 
-        pushedTexture = zoomOutButton:GetPushedTexture()
+        local pushedTexture = zoomOutButton:GetPushedTexture()
         pushedTexture:SetAllPoints(zoomOutButton)
         pushedTexture:set_atlas('Minimap-ZoomOut-Pushed', true)
 
-        disabledTexture = zoomOutButton:GetDisabledTexture()
+        local disabledTexture = zoomOutButton:GetDisabledTexture()
         disabledTexture:SetAllPoints(zoomOutButton)
         disabledTexture:set_atlas('Minimap-ZoomOut-Pushed', true)
     end -- not isHybridMode (backdrop, border, circle, zoom buttons)
@@ -1740,6 +1738,7 @@ local function GetUnmanagedCollectorButtonCount()
 end
 
 local minimapCollectorSyncFrame = CreateFrame("Frame")
+local SetCollectorSyncEnabled
 do
     local elapsed = 0
     local syncInterval = 1.00
@@ -1753,7 +1752,7 @@ do
         lastBackdropChildCount = -1
     end
 
-    minimapCollectorSyncFrame:SetScript("OnUpdate", function(_, dt)
+    local function CollectorSync_OnUpdate(_, dt)
         elapsed = elapsed + dt
         if elapsed < syncInterval then
             return
@@ -1805,7 +1804,14 @@ do
                 addon.VisibilityFade.AddHoverFrames("minimap", CollectMinimapClickThroughFrames())
             end
         end
-    end)
+    end
+
+    -- Armed by Apply, disarmed by Restore: a disabled module must not keep a per-frame poller.
+    SetCollectorSyncEnabled = function(enabled)
+        ResetSyncState()
+        elapsed = 0
+        minimapCollectorSyncFrame:SetScript("OnUpdate", enabled and CollectorSync_OnUpdate or nil)
+    end
 end
 
 -- Style PVP battleground frame with faction detection
@@ -2216,9 +2222,9 @@ function MinimapModule:ApplyMinimapSystem()
 
     -- Check combat lockdown
     if InCombatLockdown() then
-        self.registeredEvents.PLAYER_REGEN_ENABLED = function()
-            self:ApplyMinimapSystem()
-        end
+        addon.CombatQueue:Add("minimap_apply", function()
+            MinimapModule:ApplyMinimapSystem()
+        end)
         return
     end
 
@@ -2235,24 +2241,7 @@ function MinimapModule:ApplyMinimapSystem()
     self.applied = true
     self._initializingMinimapSystem = nil
     self.isEnabled = true -- Legacy compatibility
-    
-
-end
-
--- EVENT HANDLING: Proper event registration/cleanup
-local function RegisterModuleEvents()
-    if MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED then
-        local eventFrame = CreateFrame("Frame")
-        eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-        eventFrame:SetScript("OnEvent", function(self, event)
-            if MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED then
-                MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED()
-                MinimapModule.registeredEvents.PLAYER_REGEN_ENABLED = nil
-                self:UnregisterAllEvents()
-            end
-        end)
-        MinimapModule.frames.eventFrame = eventFrame
-    end
+    SetCollectorSyncEnabled(true)
 end
 
 function MinimapModule:RestoreMinimapSystem()
@@ -2262,13 +2251,15 @@ function MinimapModule:RestoreMinimapSystem()
 
     -- Check combat lockdown
     if InCombatLockdown() then
-        self.registeredEvents.PLAYER_REGEN_ENABLED = function()
-            self:RestoreMinimapSystem()
-        end
+        addon.CombatQueue:Add("minimap_restore", function()
+            MinimapModule:RestoreMinimapSystem()
+        end)
         return
     end
 
     if addon.VisibilityFade then addon.VisibilityFade.Reset("minimap", 1) end
+
+    SetCollectorSyncEnabled(false)
 
     -- Hide DragonUI frames
     if self.minimapFrame then
@@ -2501,7 +2492,7 @@ function MinimapModule:InitializeMinimapSystem()
         LoadAddOn('Blizzard_TimeManager')
     end
 
-    self.minimapFrame = CreateUIFrame(230, 230, "MinimapFrame")
+    self.minimapFrame = addon.CreateUIFrame(230, 230, "MinimapFrame")
     -- Simple visual tweak: keep minimap editor overlay 10px lower.
     do
         local slice = self.minimapFrame and self.minimapFrame.NineSlice

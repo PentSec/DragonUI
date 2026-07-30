@@ -639,9 +639,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         -- Register profile callbacks
         addon:After(0.5, function()
             if addon.db and addon.db.RegisterCallback then
-                addon.db.RegisterCallback(addon, "OnProfileChanged", OnProfileChanged)
-                addon.db.RegisterCallback(addon, "OnProfileCopied", OnProfileChanged)
-                addon.db.RegisterCallback(addon, "OnProfileReset", OnProfileChanged)
+                addon.db.RegisterCallback(ItemQualityModule, "OnProfileChanged", OnProfileChanged)
+                addon.db.RegisterCallback(ItemQualityModule, "OnProfileCopied", OnProfileChanged)
+                addon.db.RegisterCallback(ItemQualityModule, "OnProfileReset", OnProfileChanged)
             end
         end)
 
@@ -661,7 +661,13 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
     elseif event == "BAG_UPDATE" then
         if not IsModuleEnabled() then return end
-        addon:After(0.2, UpdateAllBags)
+        -- One BAG_UPDATE per changed bag; without this a sweep is scheduled per event.
+        if ItemQualityModule.bagSweepPending then return end
+        ItemQualityModule.bagSweepPending = true
+        addon:After(0.2, function()
+            ItemQualityModule.bagSweepPending = false
+            UpdateAllBags()
+        end)
 
     elseif event == "BANKFRAME_OPENED" or event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED" then
         if not IsModuleEnabled() then return end

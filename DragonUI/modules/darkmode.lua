@@ -1116,9 +1116,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
         addon:After(0.5, function()
             if addon.db and addon.db.RegisterCallback then
-                addon.db.RegisterCallback(addon, "OnProfileChanged", OnProfileChanged)
-                addon.db.RegisterCallback(addon, "OnProfileCopied", OnProfileChanged)
-                addon.db.RegisterCallback(addon, "OnProfileReset", OnProfileChanged)
+                addon.db.RegisterCallback(DarkModeModule, "OnProfileChanged", OnProfileChanged)
+                addon.db.RegisterCallback(DarkModeModule, "OnProfileCopied", OnProfileChanged)
+                addon.db.RegisterCallback(DarkModeModule, "OnProfileReset", OnProfileChanged)
             end
         end)
 
@@ -1285,7 +1285,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         -- These fire frequently during shapeshift/flight when Blizzard resets
         -- button textures. Delay so Blizzard finishes its own vertex color changes first.
         if not DarkModeModule.applied then return end
+        if DarkModeModule.borderSweepPending then return end
+        DarkModeModule.borderSweepPending = true
         addon:After(0.05, function()
+            DarkModeModule.borderSweepPending = false
             if not DarkModeModule.applied then return end
             local tint = GetTintValues()
             DarkenActionButtonBorders(tint)

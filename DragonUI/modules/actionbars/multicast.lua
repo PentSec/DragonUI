@@ -67,6 +67,10 @@ local function GetTotemConfig()
     return addon.db.profile.additional.totem
 end
 
+local function IsModuleEnabled()
+    return addon:IsModuleEnabled("multicast")
+end
+
 -- =============================================================================
 -- DYNAMIC ANCHOR SYSTEM
 -- Anchors totem bar based on which action bars are visible:
@@ -490,7 +494,9 @@ end
 -- UNIFIED REFRESH FUNCTION (using SCALE, not SetSize)
 -- =============================================================================
 function addon.RefreshMulticast(fullRefresh)
-    if InCombatLockdown() or UnitAffectingCombat("player") then 
+    if not IsModuleEnabled() then return end
+
+    if InCombatLockdown() or UnitAffectingCombat("player") then
         addon.CombatQueue:Add(fullRefresh and "multicast_RefreshFull" or "multicast_Refresh", function()
             addon.RefreshMulticast(fullRefresh)
         end)
@@ -520,17 +526,12 @@ function addon.RefreshMulticast(fullRefresh)
     end
 end
 
--- Full rebuild
-function addon.RefreshMulticastFull()
-    if InCombatLockdown() or UnitAffectingCombat("player") then return end
-    addon.RefreshMulticast(true)
-end
 
 -- =============================================================================
 -- APPLY SYSTEM FUNCTION
 -- =============================================================================
 local function ApplyMulticastSystem()
-    if MulticastModule.applied then return end
+    if MulticastModule.applied or not IsModuleEnabled() then return end
     
     -- Create frames
     CreateMulticastFrames()
@@ -650,15 +651,15 @@ local function RegisterEvents()
         if event == "ADDON_LOADED" and addonName == "DragonUI" then
             -- Initialize multicast system as early as possible
             if addon.core and addon.core.RegisterMessage then
-                addon.core.RegisterMessage(addon, "DRAGONUI_READY", ApplyMulticastSystem)
+                addon.core.RegisterMessage(MulticastModule, "DRAGONUI_READY", ApplyMulticastSystem)
             end
             
             -- Register profile callbacks
             DelayedCall(0.5, function()
                 if addon.db and addon.db.RegisterCallback then
-                    addon.db.RegisterCallback(addon, "OnProfileChanged", OnProfileChanged)
-                    addon.db.RegisterCallback(addon, "OnProfileCopied", OnProfileChanged)
-                    addon.db.RegisterCallback(addon, "OnProfileReset", OnProfileChanged)
+                    addon.db.RegisterCallback(MulticastModule, "OnProfileChanged", OnProfileChanged)
+                    addon.db.RegisterCallback(MulticastModule, "OnProfileCopied", OnProfileChanged)
+                    addon.db.RegisterCallback(MulticastModule, "OnProfileReset", OnProfileChanged)
                 end
             end)
             
