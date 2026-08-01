@@ -244,7 +244,14 @@ local function CollectSortedBuffButtons()
     local count = 0
     for index = 1, BUFF_ACTUAL_DISPLAY do
         local button = _G["BuffButton" .. index]
-        if button and button:IsShown() and not button.consolidated then
+        -- Skip consolidated AND vanity buttons: Ascension's VanityBuffs addon
+        -- reparents vanity-marked auras into VanityBuffsContainer and lays them
+        -- out in its own tooltip grid (see _ref-/vanitybuff/BuffFrame.lua).
+        -- If we touch them here, ReanchorBuffButtons fights Ascension every
+        -- UNIT_AURA tick for the same button's parent/anchor -> visible flicker
+        -- where the buff jumps out of the vanity container into the buff row
+        -- and back. Match the consolidated-skip pattern exactly.
+        if button and button:IsShown() and not button.consolidated and not button.vanity then
             count = count + 1
             local entry = sortedBuffPool[count]
             if not entry then
@@ -430,6 +437,12 @@ local function ApplyAuraScales()
 
     if ConsolidatedBuffs then
         SetAuraScale(ConsolidatedBuffs, buffScale)
+    end
+
+    -- VanityBuffs container (Ascension) — part of the buff chain, so it must
+    -- track the buff scale like every other buff icon. Nil in vanilla 3.3.5a.
+    if VanityBuffs then
+        SetAuraScale(VanityBuffs, buffScale)
     end
 
     -- Collapses the buff row, so it tracks the buff scale and ignores the debuff one.
@@ -1040,12 +1053,18 @@ function BuffFrameModule:Enable()
         -- When weapon enchants are separated, TemporaryEnchantFrame is managed
         -- by the weapon enchant system — do NOT re-anchor it to ConsolidatedBuffs.
         if weaponEnchantsAreSeparated then return end
-        -- Also ensure TemporaryEnchantFrame follows ConsolidatedBuffs correctly
-        if TemporaryEnchantFrame and cb then
+        -- Respect Ascension's chain: if VanityBuffs is active, TEF must
+        -- follow VanityBuffs (not CB), matching VanityBuffs_OnShow in the
+        -- Ascension reference (see _ref-/vanitybuff/BuffFrame.lua l.726).
+        -- Otherwise we'll fight Ascension's layout every time
+        -- UIParent_ManageFramePositions fires, causing icon wobble.
+        if TemporaryEnchantFrame then
             TemporaryEnchantFrame:ClearAllPoints()
-            if cb:IsShown() then
+            if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+                TemporaryEnchantFrame:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0)
+            elseif cb and cb:IsShown() then
                 TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", -6, 0)
-            else
+            elseif cb then
                 TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPRIGHT", 0, 0)
             end
         end
@@ -1168,12 +1187,30 @@ function BuffFrameModule:Enable()
     BuffFrameModule._FixDebuffPositions = FixDebuffPositions
 
     local function AnchorFirstBuff(button, slack)
-        if weaponEnchantsAreSeparated and ConsolidatedBuffs then
-            button:ClearAllPoints()
-            if ConsolidatedBuffs:IsShown() then
-                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-            else
-                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+        -- VanityBuffs is the innermost container in Ascension's buff chain
+        -- (see _ref-/vanitybuff/BuffFrame.xml: ConsolidatedBuffs →
+        -- VanityBuffs → TemporaryEnchantFrame → BuffButton1). When vanity
+        -- buffs are active, the first regular buff must chain off
+        -- VanityBuffs.LEFT. This holds regardless of whether weapon
+        -- enchants are attached or separated — in either case VanityBuffs
+        -- is the closest element to the first icon.
+        local vanityAnchor = VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0
+
+        if weaponEnchantsAreSeparated then
+            -- No TemporaryEnchantFrame in the chain; anchor to whatever is
+            -- immediately to the left of the first buff.
+            if vanityAnchor then
+                button:ClearAllPoints()
+                button:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0)
+                return
+            end
+            if ConsolidatedBuffs then
+                button:ClearAllPoints()
+                if ConsolidatedBuffs:IsShown() then
+                    button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
+                else
+                    button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+                end
             end
             return
         end
@@ -1185,6 +1222,16 @@ function BuffFrameModule:Enable()
                 button:SetPoint("TOPRIGHT", lastEnchant, "TOPLEFT", -6, 0)
                 return
             end
+        end
+
+        -- Match Ascension's first-buff anchor priority exactly (see _ref-/
+        -- vanitybuff/BuffFrame.lua l.370-374): when VanityBuffs is shown, the
+        -- first non-vanity buff anchors to VanityBuffs.LEFT so the normal row
+        -- starts right after the vanity container.
+        if vanityAnchor then
+            button:ClearAllPoints()
+            button:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0)
+            return
         end
 
         if ConsolidatedBuffs then
@@ -1303,19 +1350,23 @@ function BuffFrameModule:Enable()
 
         local function _desiredTempEnchantAnchor()
             if weaponEnchantsAreSeparated then return nil end
-            if not (TemporaryEnchantFrame and ConsolidatedBuffs) then return nil end
-            if ConsolidatedBuffs:IsShown() then
-                return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+            if not TemporaryEnchantFrame then return nil end
+            -- Respect Ascension's anchor chain: When VanityBuffs is shown,
+            -- Ascension reroutes TemporaryEnchantFrame to VanityBuffs (see
+            -- VanityBuffs_OnShow in _ref-/vanitybuff/BuffFrame.lua l.726),
+            -- not ConsolidatedBuffs. Anchoring TEF to CB while Ascension
+            -- expects it on VanityBuffs toggles point-fighting between our
+            -- hook and Ascension's layout manager every aura tick -> flicker.
+            if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+                return "TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0
             end
-            return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
-        end
-
-        local function _desiredVanityBuffsAnchor()
-            if not (VanityBuffs and ConsolidatedBuffs) then return nil end
-            if ConsolidatedBuffs:IsShown() and (BuffFrame.numConsolidated or 0) > 0 then
-                return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+            if ConsolidatedBuffs then
+                if ConsolidatedBuffs:IsShown() then
+                    return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+                end
+                return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
             end
-            return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+            return nil
         end
 
         -- Apply an anchor only if it differs from the cached one. Returns true
@@ -1347,13 +1398,20 @@ function BuffFrameModule:Enable()
                 _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
             end
 
-            -- 2) Anchor VanityBuffs in the chain (Ascension custom frame).
-            --    Same idempotent guard. nil in vanilla → no-op.
-            do
-                local vpt, vrf, vrp, vx, vy = _desiredVanityBuffsAnchor()
-                if vpt then
-                    _applyAnchor(VanityBuffs, "vanityBuffs", vpt, vrf, vrp, vx, vy)
-                end
+            -- 2) VanityBuffs (Ascension custom frame): DO NOT re-anchor it here.
+            --    Ascension anchors VanityBuffs to ConsolidatedBuffs directly in
+            --    its XML + OnShow/OnHide handlers (see _ref-/vanitybuff/BuffFrame.xml
+            --    and VanityBuffs_OnShow), and our ConsolidatedBuffs.SetPoint
+            --    override already pins CB to dragonUIBuffFrame, so VanityBuffs
+            --    inherits the right screen position transitively. Calling
+            --    _applyAnchor(VanityBuffs, ...) here fought Ascension for the
+            --    frame's anchor every aura tick: the ClearAllPoints it issued
+            --    triggered a visible reflow of VanityBuffsContainer children
+            --    (the very buttons Ascension just reparented there) -> the buff
+            --    "jumps out of the container into the row then back" flicker.
+            --    Only sync scale (idempotent via dragonAuraScale, no reflow).
+            if VanityBuffs then
+                SetAuraScale(VanityBuffs, GetBuffScale())
             end
 
             -- 3) Respect buff toggle. Hide/Show are also guarded to avoid
@@ -1378,6 +1436,30 @@ function BuffFrameModule:Enable()
             FixDebuffPositions()
             BuffFrameModule:UpdateLayoutPreview()
             _inUpdateAllBuffAnchors = false
+        end)
+    end
+
+    -- ========================================================================
+    -- HOOK: AuraButton_Update — scale lazily-created aura buttons.
+    -- BuffButtonN/DebuffButtonN don't exist at ADDON_LOADED: Blizzard creates
+    -- them on demand inside AuraButton_Update the first time an aura shows, so
+    -- ApplyAuraScales() in Enable() misses them and they spawn at scale 1.0.
+    -- Scaling the individual button here (idempotent via dragonAuraScale) fixes
+    -- the "scale resets after /reload" bug WITHOUT re-iterating the whole chain
+    -- on every anchor pass — do NOT move this into the BuffFrame_UpdateAllBuffAnchors
+    -- hook, that is what caused the flicker regression.
+    -- ========================================================================
+    if not BuffFrameModule._hookedAuraButtonScale then
+        BuffFrameModule._hookedAuraButtonScale = true
+        hooksecurefunc("AuraButton_Update", function(buttonName, index)
+            if not buffFramePositionLocked then return end
+            local button = _G[buttonName .. index]
+            if not button then return end
+            if buttonName == "BuffButton" then
+                SetAuraScale(button, GetBuffScale())
+            elseif buttonName == "DebuffButton" then
+                SetAuraScale(button, GetDebuffScale())
+            end
         end)
     end
 
