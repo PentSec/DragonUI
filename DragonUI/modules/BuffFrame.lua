@@ -41,6 +41,22 @@ local original_BuffFrame_ClearAllPoints = BuffFrame.ClearAllPoints
 local original_CB_SetPoint = ConsolidatedBuffs.SetPoint
 local original_CB_ClearAllPoints = ConsolidatedBuffs.ClearAllPoints
 
+-- Save original TemporaryEnchantFrame methods — overridden while weapon
+-- enchant separation is active so Blizzard's BuffFrame_UpdateAllBuffAnchors /
+-- UIParent_ManageFramePositions cannot pull TEF back onto ConsolidatedBuffs.
+local original_TEF_SetPoint = TemporaryEnchantFrame and TemporaryEnchantFrame.SetPoint
+local original_TEF_ClearAllPoints = TemporaryEnchantFrame and TemporaryEnchantFrame.ClearAllPoints
+
+-- Save original BuffButton methods per index. Blizzard's
+-- BuffFrame_UpdateAllBuffAnchors anchors the first non-consolidated BuffButton
+-- to "TemporaryEnchantFrame" whenever there are enchants. When weapon enchants
+-- are separated TEF lives on dragonUIWeaponBuffFrame, so that single SetPoint
+-- drags the ENTIRE buff row onto the weapon frame. We override each BuffButton's
+-- SetPoint/ClearAllPoints while separated to reroute any TEF-targeted SetPoint
+-- back to ConsolidatedBuffs / VanityBuffs (the normal buff chain root).
+local original_BuffButton_SetPoint = {}
+local original_BuffButton_ClearAllPoints = {}
+
 -- Flag: when true, our SetPoint/ClearAllPoints overrides are active
 local buffFramePositionLocked = false
 
@@ -359,6 +375,18 @@ local function SetBuffsCollapsed(collapsed)
             VanityBuffs:Hide()
         else
             VanityBuffs:Show()
+        end
+    end
+
+    -- TemporaryEnchantFrame: hide it with the buffs when collapsed (only when
+    -- NOT separated — when separated it lives on dragonUIWeaponBuffFrame and
+    -- must stay visible), and always show it again when expanded. The stock
+    -- client never hides TEF itself, only its inner TempEnchant1/2 buttons.
+    if TemporaryEnchantFrame then
+        if collapsed and not weaponEnchantsAreSeparated then
+            TemporaryEnchantFrame:Hide()
+        elseif not collapsed and not TemporaryEnchantFrame:IsShown() then
+            TemporaryEnchantFrame:Show()
         end
     end
 end
@@ -745,16 +773,132 @@ local function AnchorWeaponEnchantsToFrame()
     TemporaryEnchantFrame:SetPoint("TOPRIGHT", dragonUIWeaponBuffFrame, "TOPRIGHT", 0, 0)
 end
 
+-- Desired anchor for TemporaryEnchantFrame in the NORMAL buff chain (used when
+-- weapon enchants are NOT separated). Respects Ascension's chain: when
+-- VanityBuffs is shown, TEF follows VanityBuffs (its LEFT), not ConsolidatedBuffs.
+local function DesiredChainTempEnchantAnchor()
+    if not TemporaryEnchantFrame then return nil end
+    if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+        return "TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0
+    end
+    if ConsolidatedBuffs then
+        if ConsolidatedBuffs:IsShown() then
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+        end
+        return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+    end
+    return nil
+end
+
 -- Restore TemporaryEnchantFrame to the normal buff chain
 local function RestoreWeaponEnchantsToChain()
     if not TemporaryEnchantFrame then return end
-    local cb = _G.ConsolidatedBuffs
-    if cb then
+    local pt, rf, rp, x, y = DesiredChainTempEnchantAnchor()
+    if pt then
         TemporaryEnchantFrame:ClearAllPoints()
-        if cb:IsShown() then
-            TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", -6, 0)
-        else
-            TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPRIGHT", 0, 0)
+        TemporaryEnchantFrame:SetPoint(pt, rf, rp, x, y)
+    end
+end
+
+-- Apply the persistent TemporaryEnchantFrame SetPoint/ClearAllPoints override
+-- so Blizzard's reanchor attempts (BuffFrame_UpdateAllBuffAnchors,
+-- UIParent_ManageFramePositions) are redirected to dragonUIWeaponBuffFrame.
+local function LockTempEnchantFrameToWeaponFrame()
+    if not TemporaryEnchantFrame or not original_TEF_SetPoint then return end
+
+    TemporaryEnchantFrame.ClearAllPoints = function(self)
+        -- Noop: don't let Blizzard clear TEF's anchor while separated.
+        -- Our SetPoint override handles re-anchoring when needed.
+    end
+
+    TemporaryEnchantFrame.SetPoint = function(self, ...)
+        -- ALWAYS redirect: anchor TEF to our weapon enchant frame
+        original_TEF_ClearAllPoints(self)
+        original_TEF_SetPoint(self, "TOPRIGHT", dragonUIWeaponBuffFrame, "TOPRIGHT", 0, 0)
+    end
+end
+
+-- Restore TemporaryEnchantFrame's original methods and re-anchor to the chain.
+local function UnlockTempEnchantFrameFromWeaponFrame()
+    if not TemporaryEnchantFrame then return end
+    if original_TEF_SetPoint then
+        TemporaryEnchantFrame.SetPoint = original_TEF_SetPoint
+    end
+    if original_TEF_ClearAllPoints then
+        TemporaryEnchantFrame.ClearAllPoints = original_TEF_ClearAllPoints
+    end
+end
+
+-- Desired anchor for the first non-consolidated BuffButton when weapon enchants
+-- are separated. Mirrors the "separated" branch of AnchorFirstBuff below:
+-- the buff row roots off ConsolidatedBuffs (or VanityBuffs when shown) so it
+-- stays put on dragonUIBuffFrame instead of following the weapon frame.
+local function DesiredSeparatedBuffAnchor()
+    if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+        return "TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0
+    end
+    if ConsolidatedBuffs then
+        if ConsolidatedBuffs:IsShown() then
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+        end
+        return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+    end
+    return nil
+end
+
+-- Does this SetPoint reference point at TemporaryEnchantFrame? Blizzard passes
+-- the frame NAME as a string ("TemporaryEnchantFrame"), but we accept the frame
+-- reference too for safety.
+local function PointsAtTempEnchantFrame(relFrame)
+    return relFrame == TemporaryEnchantFrame or relFrame == "TemporaryEnchantFrame"
+end
+
+-- Apply the persistent BuffButton SetPoint/ClearAllPoints override while weapon
+-- enchant separation is active. Any Blizzard SetPoint aimed at
+-- TemporaryEnchantFrame is rerouted to ConsolidatedBuffs / VanityBuffs so the
+-- buff row never follows TEF onto the weapon enchant frame.
+local function LockBuffButtonsAwayFromTempEnchants()
+    for index = 1, BUFF_ACTUAL_DISPLAY do
+        local button = _G["BuffButton" .. index]
+        if button and not button._dragonUIEnchantLocked then
+            local origSetPoint = button.SetPoint
+            local origClearAllPoints = button.ClearAllPoints
+            original_BuffButton_SetPoint[index] = origSetPoint
+            original_BuffButton_ClearAllPoints[index] = origClearAllPoints
+            button._dragonUIEnchantLocked = true
+
+            button.ClearAllPoints = function(self)
+                -- Noop: don't let Blizzard clear the buff button's anchor.
+                -- Our SetPoint override handles re-anchoring when needed.
+            end
+
+            button.SetPoint = function(self, point, relFrame, relPoint, x, y)
+                if PointsAtTempEnchantFrame(relFrame) then
+                    local p, rf, rp, ox, oy = DesiredSeparatedBuffAnchor()
+                    if p then
+                        origClearAllPoints(self)
+                        origSetPoint(self, p, rf, rp, ox, oy)
+                        return
+                    end
+                end
+                origSetPoint(self, point, relFrame, relPoint, x, y)
+            end
+        end
+    end
+end
+
+-- Restore each BuffButton's original methods.
+local function UnlockBuffButtonsFromTempEnchants()
+    for index = 1, BUFF_ACTUAL_DISPLAY do
+        local button = _G["BuffButton" .. index]
+        if button and button._dragonUIEnchantLocked then
+            if original_BuffButton_SetPoint[index] then
+                button.SetPoint = original_BuffButton_SetPoint[index]
+            end
+            if original_BuffButton_ClearAllPoints[index] then
+                button.ClearAllPoints = original_BuffButton_ClearAllPoints[index]
+            end
+            button._dragonUIEnchantLocked = nil
         end
     end
 end
@@ -766,6 +910,8 @@ function BuffFrameModule:SetupWeaponEnchantSeparation()
         -- Feature disabled — make sure runtime flag is off and clean up
         if weaponEnchantsAreSeparated then
             weaponEnchantsAreSeparated = false
+            UnlockTempEnchantFrameFromWeaponFrame()
+            UnlockBuffButtonsFromTempEnchants()
             RestoreWeaponEnchantsToChain()
             if dragonUIWeaponBuffFrame then
                 dragonUIWeaponBuffFrame:Hide()
@@ -774,6 +920,8 @@ function BuffFrameModule:SetupWeaponEnchantSeparation()
         return
     end
 
+    -- No-op if already active (avoids re-installing SetPoint overrides twice)
+    if weaponEnchantsAreSeparated then return end
     weaponEnchantsAreSeparated = true
 
     -- Create the frame once
@@ -804,6 +952,10 @@ function BuffFrameModule:SetupWeaponEnchantSeparation()
 
     dragonUIWeaponBuffFrame:Show()
     self:UpdateWeaponEnchantPosition()
+    -- Install the persistent override BEFORE the first AnchorWeaponEnchantsToFrame
+    -- call so that line gets redirected to dragonUIWeaponBuffFrame too.
+    LockTempEnchantFrameToWeaponFrame()
+    LockBuffButtonsAwayFromTempEnchants()
     AnchorWeaponEnchantsToFrame()
 end
 
@@ -1350,23 +1502,7 @@ function BuffFrameModule:Enable()
 
         local function _desiredTempEnchantAnchor()
             if weaponEnchantsAreSeparated then return nil end
-            if not TemporaryEnchantFrame then return nil end
-            -- Respect Ascension's anchor chain: When VanityBuffs is shown,
-            -- Ascension reroutes TemporaryEnchantFrame to VanityBuffs (see
-            -- VanityBuffs_OnShow in _ref-/vanitybuff/BuffFrame.lua l.726),
-            -- not ConsolidatedBuffs. Anchoring TEF to CB while Ascension
-            -- expects it on VanityBuffs toggles point-fighting between our
-            -- hook and Ascension's layout manager every aura tick -> flicker.
-            if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
-                return "TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0
-            end
-            if ConsolidatedBuffs then
-                if ConsolidatedBuffs:IsShown() then
-                    return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
-                end
-                return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
-            end
-            return nil
+            return DesiredChainTempEnchantAnchor()
         end
 
         -- Apply an anchor only if it differs from the cached one. Returns true
@@ -1390,12 +1526,23 @@ function BuffFrameModule:Enable()
             _inUpdateAllBuffAnchors = true
             if not buffFramePositionLocked then _inUpdateAllBuffAnchors = false; return end
 
-            -- 1) Re-anchor TemporaryEnchantFrame to follow ConsolidatedBuffs.
-            --    Only touch it when the desired anchor changed (idempotent) so
-            --    we don't trigger a reflow every aura tick.
-            local pt, rf, rp, x, y = _desiredTempEnchantAnchor()
-            if pt then
-                _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
+            -- 1) Re-anchor TemporaryEnchantFrame.
+            --    When weapon enchants are SEPARATED, our persistent TEF
+            --    SetPoint/ClearAllPoints override already redirects every
+            --    Blizzard SetPoint to dragonUIWeaponBuffFrame. But Blizzard
+            --    sometimes calls TEF:ClearAllPoints() and never re-issues
+            --    SetPoint (or only re-issues AFTER our override was removed),
+            --    which can leave TEF visually stranded. Anchor it explicitly
+            --    so the pin survives even in those edge cases.
+            --    When NOT separated, anchor it to follow ConsolidatedBuffs /
+            --    VanityBuffs (the regular chain), idempotent via _applyAnchor.
+            if weaponEnchantsAreSeparated then
+                AnchorWeaponEnchantsToFrame()
+            else
+                local pt, rf, rp, x, y = _desiredTempEnchantAnchor()
+                if pt then
+                    _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
+                end
             end
 
             -- 2) VanityBuffs (Ascension custom frame): DO NOT re-anchor it here.
@@ -1425,11 +1572,25 @@ function BuffFrameModule:Enable()
                     end
                 end
                 if VanityBuffs and VanityBuffs:IsShown() then VanityBuffs:Hide() end
-                if TemporaryEnchantFrame and TemporaryEnchantFrame:IsShown() then
+                -- When weapon enchants are separated they live on their own
+                -- moveable frame (dragonUIWeaponBuffFrame), so collapsing the
+                -- buff row must NOT hide TemporaryEnchantFrame — that would hide
+                -- the separated weapon enchants too. In the stock client TEF is
+                -- never hidden anyway (only its TempEnchant1/2 buttons are).
+                if not weaponEnchantsAreSeparated
+                   and TemporaryEnchantFrame and TemporaryEnchantFrame:IsShown() then
                     TemporaryEnchantFrame:Hide()
                 end
             else
                 if VanityBuffs and not VanityBuffs:IsShown() then VanityBuffs:Show() end
+                -- The collapse toggle hid TEF (when not separated); expanding
+                -- the buff row must bring it back. When separated it must also
+                -- stay visible on dragonUIWeaponBuffFrame. Show() is safe in
+                -- both cases — the stock client only ever hides TEF's inner
+                -- TempEnchant1/2 buttons, never the frame itself.
+                if TemporaryEnchantFrame and not TemporaryEnchantFrame:IsShown() then
+                    TemporaryEnchantFrame:Show()
+                end
             end
 
             -- 4) Debuffs follow the latest buff / consolidated layout.
@@ -1509,6 +1670,14 @@ function BuffFrameModule:Enable()
             -- our frame.  These helpers only fix the chain, they never move
             -- dragonUIBuffFrame itself, so they're safe at custom position.
             RestoreConsolidatedBuffsAnchor()
+            -- When weapon enchants are SEPARATED, RestoreConsolidatedBuffsAnchor
+            -- early-returns without touching TEF (it mustn't pin TEF back to
+            -- ConsolidatedBuffs). Anchor it to dragonUIWeaponBuffFrame instead
+            -- so Blizzard's UIParent_ManageFramePositions reanchor can't strand
+            -- TEF visually off the weapon frame.
+            if weaponEnchantsAreSeparated then
+                AnchorWeaponEnchantsToFrame()
+            end
             FixDebuffPositions()
         end)
     end
@@ -1609,6 +1778,12 @@ function BuffFrameModule:Disable()
     -- Clean up weapon enchant separation
     if weaponEnchantsAreSeparated then
         weaponEnchantsAreSeparated = false
+        -- Restore TEF's and the BuffButtons' original SetPoint/ClearAllPoints
+        -- BEFORE calling RestoreWeaponEnchantsToChain, so the latter can
+        -- re-anchor TEF using Blizzard's native methods instead of our
+        -- redirected overrides.
+        UnlockTempEnchantFrameFromWeaponFrame()
+        UnlockBuffButtonsFromTempEnchants()
         RestoreWeaponEnchantsToChain()
     end
     if dragonUIWeaponBuffFrame then
