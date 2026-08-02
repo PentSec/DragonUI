@@ -52,10 +52,12 @@ local original_TEF_ClearAllPoints = TemporaryEnchantFrame and TemporaryEnchantFr
 -- to "TemporaryEnchantFrame" whenever there are enchants. When weapon enchants
 -- are separated TEF lives on dragonUIWeaponBuffFrame, so that single SetPoint
 -- drags the ENTIRE buff row onto the weapon frame. We override each BuffButton's
--- SetPoint/ClearAllPoints while separated to reroute any TEF-targeted SetPoint
--- back to ConsolidatedBuffs / VanityBuffs (the normal buff chain root).
+-- SetPoint while separated to reroute any TEF-targeted SetPoint back to
+-- ConsolidatedBuffs / VanityBuffs (the normal buff chain root). ClearAllPoints
+-- is NOT overridden: VanityBuffs_UpdateAllAnchors and
+-- ConsolidatedBuffs_UpdateAllAnchors rely on it to re-anchor auras inside their
+-- containers each pass.
 local original_BuffButton_SetPoint = {}
-local original_BuffButton_ClearAllPoints = {}
 
 -- Flag: when true, our SetPoint/ClearAllPoints overrides are active
 local buffFramePositionLocked = false
@@ -853,36 +855,35 @@ local function PointsAtTempEnchantFrame(relFrame)
     return relFrame == TemporaryEnchantFrame or relFrame == "TemporaryEnchantFrame"
 end
 
--- Apply the persistent BuffButton SetPoint/ClearAllPoints override while weapon
--- enchant separation is active. Any Blizzard SetPoint aimed at
--- TemporaryEnchantFrame is rerouted to ConsolidatedBuffs / VanityBuffs so the
--- buff row never follows TEF onto the weapon enchant frame.
+-- Apply the persistent BuffButton SetPoint override while weapon enchant
+-- separation is active. Any Blizzard SetPoint aimed at TemporaryEnchantFrame is
+-- rerouted to ConsolidatedBuffs / VanityBuffs so the buff row never follows TEF
+-- onto the weapon enchant frame.
+local function LockBuffButtonAwayFromTempEnchants(button, index)
+    if not button or button._dragonUIEnchantLocked then return end
+    local origSetPoint = button.SetPoint
+    local origClearAllPoints = button.ClearAllPoints
+    original_BuffButton_SetPoint[index] = origSetPoint
+    button._dragonUIEnchantLocked = true
+
+    button.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        if PointsAtTempEnchantFrame(relFrame) then
+            local p, rf, rp, ox, oy = DesiredSeparatedBuffAnchor()
+            if p then
+                origClearAllPoints(self)
+                origSetPoint(self, p, rf, rp, ox, oy)
+                return
+            end
+        end
+        origSetPoint(self, point, relFrame, relPoint, x, y)
+    end
+end
+
 local function LockBuffButtonsAwayFromTempEnchants()
     for index = 1, BUFF_ACTUAL_DISPLAY do
         local button = _G["BuffButton" .. index]
-        if button and not button._dragonUIEnchantLocked then
-            local origSetPoint = button.SetPoint
-            local origClearAllPoints = button.ClearAllPoints
-            original_BuffButton_SetPoint[index] = origSetPoint
-            original_BuffButton_ClearAllPoints[index] = origClearAllPoints
-            button._dragonUIEnchantLocked = true
-
-            button.ClearAllPoints = function(self)
-                -- Noop: don't let Blizzard clear the buff button's anchor.
-                -- Our SetPoint override handles re-anchoring when needed.
-            end
-
-            button.SetPoint = function(self, point, relFrame, relPoint, x, y)
-                if PointsAtTempEnchantFrame(relFrame) then
-                    local p, rf, rp, ox, oy = DesiredSeparatedBuffAnchor()
-                    if p then
-                        origClearAllPoints(self)
-                        origSetPoint(self, p, rf, rp, ox, oy)
-                        return
-                    end
-                end
-                origSetPoint(self, point, relFrame, relPoint, x, y)
-            end
+        if button then
+            LockBuffButtonAwayFromTempEnchants(button, index)
         end
     end
 end
@@ -894,9 +895,6 @@ local function UnlockBuffButtonsFromTempEnchants()
         if button and button._dragonUIEnchantLocked then
             if original_BuffButton_SetPoint[index] then
                 button.SetPoint = original_BuffButton_SetPoint[index]
-            end
-            if original_BuffButton_ClearAllPoints[index] then
-                button.ClearAllPoints = original_BuffButton_ClearAllPoints[index]
             end
             button._dragonUIEnchantLocked = nil
         end
@@ -1618,6 +1616,9 @@ function BuffFrameModule:Enable()
             if not button then return end
             if buttonName == "BuffButton" then
                 SetAuraScale(button, GetBuffScale())
+                if weaponEnchantsAreSeparated then
+                    LockBuffButtonAwayFromTempEnchants(button, index)
+                end
             elseif buttonName == "DebuffButton" then
                 SetAuraScale(button, GetDebuffScale())
             end
