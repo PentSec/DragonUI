@@ -118,7 +118,7 @@ local enemyMHAnchor
 -- Textures (matching castbar)
 -- ============================================================================
 
-local TEXTURE_PATH = "Interface\\AddOns\\DragonUI\\Textures\\CastbarOriginal\\"
+local TEXTURE_PATH = "Interface\\AddOns\\DragonUI\\Textures\\Castbar\\"
 local TEXTURES = {
     fill    = TEXTURE_PATH .. "CastingBarStandard2",
     spark   = TEXTURE_PATH .. "CastingBarSpark",
