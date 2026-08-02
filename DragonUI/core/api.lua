@@ -2276,10 +2276,12 @@ local function IsWrongArmorOrShield(link)
     local subs = GetArmorSubs()
 
     if equipLoc == "INVTYPE_SHIELD" then
+        if not CLASS_ARMOR[classFile] then return false end -- unknown class (CoA): defer to tooltip scan
         return not CLASS_SHIELD[classFile]
     end
     if not ARMOR_SLOTS[equipLoc] then return false end
     if itemType ~= select(2, GetAuctionItemClasses()) then return false end
+    if not CLASS_ARMOR[classFile] then return false end -- unknown class (CoA): defer to tooltip scan
 
     local key = (subType == subs.cloth and "cloth")
         or (subType == subs.leather and "leather")
@@ -2303,7 +2305,8 @@ local function IsWrongWeapon(link)
 
     local _, classFile = UnitClass("player")
     if not classFile then return false end
-    return not (CLASS_WEAPONS[classFile] and CLASS_WEAPONS[classFile][key])
+    if not CLASS_WEAPONS[classFile] then return false end -- unknown class (CoA): defer to tooltip scan
+    return not CLASS_WEAPONS[classFile][key]
 end
 
 -- Equippable leftovers only (class/race/faction). Returns nil if tooltip empty (uncached).
@@ -2325,19 +2328,25 @@ local function EquippableHasRedRequirement(link, bag, slot)
         return nil
     end
     local redCode = RED_FONT_COLOR_CODE or "|cffff2020"
+
+    -- Tooltip FontStrings are reused across calls; only trust ones that are
+    -- currently shown with real text, to avoid stale color from prior items.
+    local function IsRed(fs)
+        if not fs or not fs:IsShown() then return false end
+        local text = fs:GetText()
+        if not text or text == "" then return false end
+        if text:find(redCode, 1, true) then return true end
+        local r, g, b = fs:GetTextColor()
+        if r and r > 0.9 and g < 0.2 and b < 0.2 then return true end
+        return false
+    end
+
     for i = 2, numLines do
-        local fs = _G[scanTipName .. "TextLeft" .. i]
-        if fs then
-            local text = fs:GetText()
-            if text and text:find(redCode, 1, true) then
-                scanTip:Hide()
-                return true
-            end
-            local r, g, b = fs:GetTextColor()
-            if r and r > 0.9 and g < 0.2 and b < 0.2 then
-                scanTip:Hide()
-                return true
-            end
+        local fsLeft = _G[scanTipName .. "TextLeft" .. i]
+        local fsRight = _G[scanTipName .. "TextRight" .. i]
+        if IsRed(fsLeft) or IsRed(fsRight) then
+            scanTip:Hide()
+            return true
         end
     end
     scanTip:Hide()
@@ -2373,19 +2382,19 @@ function addon:IsItemUnusableForTint(link, bag, slot)
     elseif wrongArmor or wrongWeapon then
         unusable = true
     else
-        -- Gear slots only — not consumables.
-        local _, _, _, _, reqLevel, _, _, _, equipLoc = GetItemInfo(link)
+        -- Gear slots only — not consumables. Level requirement is intentionally
+        -- left to the tooltip scan below: server-side item level/level
+        -- rescaling (e.g. custom CoA itemization) can differ from the value
+        -- cached client-side by GetItemInfo, so the tooltip is the only
+        -- reliable source of truth here.
+        local equipLoc = select(9, GetItemInfo(link))
         if equipLoc and EQUIPPABLE_SLOTS[equipLoc] then
-            if reqLevel and reqLevel > UnitLevel("player") then
-                unusable = true
+            local red = EquippableHasRedRequirement(link, bag, slot)
+            if red == nil then
+                cacheable = false
+                unusable = false
             else
-                local red = EquippableHasRedRequirement(link, bag, slot)
-                if red == nil then
-                    cacheable = false
-                    unusable = false
-                else
-                    unusable = red
-                end
+                unusable = red
             end
         end
     end
