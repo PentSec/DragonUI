@@ -2,7 +2,7 @@
 ## Title: |cff1784d1DragonUI|r |cffffffffOptions|r
 ## Notes: Configuration UI for DragonUI
 ## Author: DragonUI Team
-## Version: 3.0.9
+## Version: 3.1.0
 ## LoadOnDemand: 1
 ## Dependencies: DragonUI
 ## X-License: MIT for project-authored code; bundled dependencies retain their own licenses
