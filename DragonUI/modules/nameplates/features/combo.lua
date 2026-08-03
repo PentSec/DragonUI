@@ -160,6 +160,15 @@ local function ResolveComboProvider()
     return "class", maxStacks, cur
 end
 
+-- Cheap cached check: is the player an Ascension custom class with a stack
+-- resource entry? Used to gate UNIT_AURA-driven combo refreshes on vanilla
+-- clients / classes without a custom resource (avoids per-aura work).
+function NP.widgets.HasCustomClassCombo()
+    local token = GetPlayerCustomClass()
+    if not token then return false end
+    return CLASS_STACKS[token] ~= nil
+end
+
 function NP.widgets.GetPlayerComboPoints()
     local kind, _max, cur = ResolveComboProvider()
     return (kind == "none") and 0 or (tonumber(cur) or 0)
@@ -213,7 +222,8 @@ end
 
 -- Host + N segment textures created lazily. We keep the historical _comboHost
 -- name (engine.lua inspects it) but the host now owns a pool of segment frames
--- rather than a single textured icon.
+-- rather than a single textured icon. For the native path the original single
+-- `combo-<points>` icon is preserved via host.icon.
 function NP.widgets.EnsureComboWidget(plateData)
     if plateData._comboHost then return plateData._comboHost end
     local plate = plateData.plate
@@ -223,11 +233,12 @@ function NP.widgets.EnsureComboWidget(plateData)
     host:Hide()
     host.segments = {}
     plateData._comboHost = host
-    -- Backwards-compat: legacy callers expected an .icon texture on the host.
-    -- Keep a dummy (hidden) one so any stray :SetTexture call is inert.
-    local dummy = host:CreateTexture(nil, "OVERLAY")
-    dummy:Hide()
-    host.icon = dummy
+    -- Native-path icon: single texture covering the host (original behavior).
+    -- Segmented class resources use host.segments instead; icon stays hidden.
+    local icon = host:CreateTexture(nil, "OVERLAY")
+    icon:SetAllPoints(host)
+    icon:Hide()
+    host.icon = icon
     plateData._depthDirty = true
     return host
 end
@@ -254,7 +265,8 @@ local function ApplySegmentAtlas(seg, atlasName)
     seg.bg:SetAtlas(atlasName, true)
 end
 
--- Lay out `count` segments horizontally, centered on the host.
+-- Lay out the widget. Native combo keeps the original single 64x32 icon;
+-- custom-class resources lay out N square segments centered on the host.
 function NP.widgets.LayoutComboWidget(plateData)
     local host = plateData._comboHost
     local hp = plateData.minaHp
@@ -263,15 +275,15 @@ function NP.widgets.LayoutComboWidget(plateData)
     local kind, maxStacks, _cur, entry = GetComboRender()
     if kind == "none" then return false end
 
-    local segSize, spacing
     if kind == "native" then
-        -- Reuse vanilla combo-1..5 textures like the original widget.
-        segSize = 16
-        spacing = 2
-    else
-        segSize = (entry and entry.segSize) or 16
-        spacing = (entry and entry.segSpacing) or 2
+        host:SetSize(C.COMBO_ICON_W or 64, C.COMBO_ICON_H or 32)
+        host:ClearAllPoints()
+        host:SetPoint("BOTTOM", hp, "TOP", 0, 3)
+        return true
     end
+
+    local segSize = (entry and entry.segSize) or 16
+    local spacing = (entry and entry.segSpacing) or 2
     -- Ensure the right N segments exist; refresh geometry.
     local count = tonumber(maxStacks) or NATIVE_MAX
     local totalW = count * segSize + math.max(0, count - 1) * spacing
@@ -290,7 +302,7 @@ function NP.widgets.LayoutComboWidget(plateData)
     end
 
     host:ClearAllPoints()
-    host:SetPoint("BOTTOM", hp, "TOP", 0, 3)
+    host:SetPoint("BOTTOM", hp, "TOP", 0, C.COMBO_CLASS_OFFSET_Y or 6)
     return true
 end
 
@@ -329,28 +341,28 @@ function NP.widgets.SyncComboPoints(plateData)
     end
 
     local pts = math.min(cur, count)
-    for i = 1, count do
-        local seg = host.segments[i]
-        if seg then
-            if kind == "native" then
-                -- Native vanilla combo stays as a single icon texture variant
-                -- like the original; render full vs empty as fill/empty color.
-                local tex = seg.bg
-                if i <= pts then
-                    tex:SetTexture(C.COMBO_TEX .. i)
-                else
-                    tex:SetTexture(C.COMBO_TEX .. i)
-                    tex:SetVertexColor(0.25, 0.25, 0.25, 0.55)
-                end
-            else
+    if kind == "native" then
+        -- Original behavior: a single combo-<points> icon already draws the
+        -- 1..5 pips; do NOT split into per-pip segments.
+        host.icon:SetTexture(C.COMBO_TEX .. pts)
+        host.icon:SetVertexColor(1, 1, 1, 1)
+        host.icon:Show()
+        for _, seg in ipairs(host.segments) do
+            seg:Hide()
+        end
+    else
+        host.icon:Hide()
+        for i = 1, count do
+            local seg = host.segments[i]
+            if seg then
                 seg.bg:SetVertexColor(1, 1, 1, 1)
                 if i <= pts then
                     ApplySegmentAtlas(seg, entry.fillAtlas)
                 else
                     ApplySegmentAtlas(seg, entry.emptyAtlas)
                 end
+                seg:Show()
             end
-            seg:Show()
         end
     end
 

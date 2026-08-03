@@ -82,6 +82,7 @@ NP.const = {
     COMBO_TEX = "Interface\\AddOns\\DragonUI\\Textures\\Nameplates\\combo-",
     COMBO_ICON_W = 64,
     COMBO_ICON_H = 32,
+    COMBO_CLASS_OFFSET_Y = 8, -- custom-class stack strip raised above native combo offset
     TOTEM_ICON_W = 26,
     TOTEM_ICON_H = 26,
     TOTEM_ICON_OFFSET_X = 0,

@@ -720,6 +720,14 @@ local function EngineOnEvent(_, event, unit, ...)
     if not unit then return end
 
     if event == "UNIT_AURA" then
+        if unit == "player"
+            and NP.widgets.HasCustomClassCombo
+            and NP.widgets.HasCustomClassCombo() then
+            -- Ascension custom-class stack resources (Fellfury, souls, embers,
+            -- ...) live as player auras; refresh the combo strip in live time.
+            -- Native combo points keep using UNIT_COMBO_POINTS instead.
+            E.QueueMass(CB.OnUpdateCombo)
+        end
         if unit == "target" or unit == "mouseover" or unit == "focus" then
             local refreshedGUID = NP.auras.DebuffRuntime.UpdateAuraCacheFromUnit(unit)
             local owner
