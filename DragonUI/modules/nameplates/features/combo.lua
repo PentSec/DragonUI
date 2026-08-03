@@ -19,6 +19,11 @@ local C = NP.const
 --   segSpacing   : horizontal gap between segments.
 --   knownSpellID : optional; if set, segments only render when this spell is
 --                  known (gates talents like Ranger 802036 or Prophet 4053).
+--   Reaper extra states (optional; all or none):
+--     shardSpellID : aura holding partial fill of the NEXT free soul slot.
+--     shard1Atlas / shard2Atlas : atlas for 1 / 2+ shards on that slot.
+--     infusedSpellID : aura active when every soul is full.
+--     infusedAtlas   : fill recolor used while infused.
 --   iconW/iconH  : optional host backing size (defaults derived from segSize).
 local CLASS_STACKS = {
     DEMONHUNTER = { -- "Felsworm" in-game; native token is DEMONHUNTER.
@@ -30,12 +35,18 @@ local CLASS_STACKS = {
         segSpacing = 2,
     },
     REAPER = {
-        spellID    = 500363, -- Soul shards (stacks); see Ascension_ReaperResource.lua.
-        source     = "buff",
-        emptyAtlas = "ReaperSoulBG",
-        fillAtlas  = "ReaperSoulFull",
-        segSize    = 32,
-        segSpacing = 2,
+        spellID       = 500363, -- Soul shards (stacks); see Ascension_ReaperResource.lua.
+        source        = "buff",
+        maxStacks     = 3,
+        emptyAtlas    = "ReaperSoulBG",
+        fillAtlas     = "ReaperSoulFull",
+        shardSpellID  = 805077, -- partial fill progress toward next soul.
+        shard1Atlas   = "ReaperSoul1Shard",
+        shard2Atlas   = "ReaperSoul2Shards",
+        infusedSpellID = 803031, -- recolor once all souls are full.
+        infusedAtlas  = "ReaperSoulInfused",
+        segSize       = 32,
+        segSpacing    = 2,
     },
     PYROMANCER = {
         spellID    = 807533, -- Embers (debuff on the player).
@@ -325,7 +336,25 @@ function NP.widgets.SyncComboPoints(plateData)
     end
 
     local kind, maxStacks, cur, entry = GetComboRender()
-    if kind == "none" or cur <= 0 or maxStacks <= 0 then
+
+    -- Reaper-style extra state, resolved up front: a shard-only fill (0 souls
+    -- but shards > 0) must still render, and the infused recolor triggers once
+    -- every soul is full (cur >= maxStacks) or the infused aura is present.
+    local shards = 0
+    local infused = false
+    if kind == "class" and entry then
+        if entry.shardSpellID then
+            shards = AuraStacks(entry.shardSpellID, entry.source)
+        end
+        if entry.infusedSpellID then
+            infused = AuraStacks(entry.infusedSpellID, entry.source) > 0
+        end
+        if not infused and entry.infusedAtlas and maxStacks > 0 and cur >= maxStacks then
+            infused = true
+        end
+    end
+
+    if kind == "none" or maxStacks <= 0 or (cur <= 0 and shards <= 0) then
         if host then host:Hide() end
         if NP.widgets and NP.widgets.ReflowTopOverlays then
             NP.widgets.ReflowTopOverlays(plateData)
@@ -357,7 +386,19 @@ function NP.widgets.SyncComboPoints(plateData)
             if seg then
                 seg.bg:SetVertexColor(1, 1, 1, 1)
                 if i <= pts then
-                    ApplySegmentAtlas(seg, entry.fillAtlas)
+                    -- Filled soul: ReaperSoulFull, or ReaperSoulInfused once all full.
+                    if infused and entry.infusedAtlas then
+                        ApplySegmentAtlas(seg, entry.infusedAtlas)
+                    else
+                        ApplySegmentAtlas(seg, entry.fillAtlas)
+                    end
+                elseif i == pts + 1 and shards > 0 and entry.shard1Atlas then
+                    -- Next free slot shows the partial fill: 1 or 2 shards.
+                    if shards >= 2 and entry.shard2Atlas then
+                        ApplySegmentAtlas(seg, entry.shard2Atlas)
+                    else
+                        ApplySegmentAtlas(seg, entry.shard1Atlas)
+                    end
                 else
                     ApplySegmentAtlas(seg, entry.emptyAtlas)
                 end
