@@ -2402,7 +2402,7 @@ function addon:IsItemUnusableForTint(link, bag, slot)
     if itemID and cacheable then
         unusableTintCache[itemID] = unusable
     end
-    return unusable
+    return unusable, not cacheable -- true if uncertain (data not fully loaded yet)
 end
 
 function addon:RefreshUnusableItemTints()

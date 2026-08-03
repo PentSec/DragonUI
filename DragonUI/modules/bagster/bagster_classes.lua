@@ -366,7 +366,21 @@ do
             if self:IsCached() then
                 bag, slot = nil, nil
             end
-            if addon:IsItemUnusableForTint(link, bag, slot) then
+            local unusable, uncertain = addon:IsItemUnusableForTint(link, bag, slot)
+            -- Item/tooltip data not loaded yet: retry a few times instead of a stale/wrong tint
+            if uncertain then
+                self._dragonuiTintRetries = (self._dragonuiTintRetries or 0) + 1
+                if self._dragonuiTintRetries <= 3 and not self._dragonuiTintRetryScheduled then
+                    self._dragonuiTintRetryScheduled = true
+                    addon:After(0.5, function()
+                        self._dragonuiTintRetryScheduled = false
+                        self:UpdateSlotColor()
+                    end)
+                end
+            else
+                self._dragonuiTintRetries = nil
+            end
+            if unusable then
                 SetItemButtonTextureVertexColor(self, 0.9, 0, 0)
                 local nt = self:GetNormalTexture()
                 if nt then nt:SetVertexColor(1, 1, 1) end
@@ -477,9 +491,14 @@ do
     end
 
     function ItemSlot:UpdateItemLevel(link)
-        if addon.UpdateItemLevelSlot then
-            addon.UpdateItemLevelSlot(self, link, nil, self:IsBank() and "bank" or "bags")
+        if not addon.UpdateItemLevelSlot then return end
+
+        -- Only trust bag/slot for live (non-cached) items
+        local bag, slot
+        if link and not self:IsCached() then
+            bag, slot = self:GetBag(), self:GetID()
         end
+        addon.UpdateItemLevelSlot(self, link, nil, self:IsBank() and "bank" or "bags", bag, slot)
     end
 
     -- nil per-instance so Update() can't re-trigger OnEnter and clear bank tooltips
