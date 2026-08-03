@@ -1347,8 +1347,90 @@ local function BuildIconsSubTab(scroll)
         label = LO["Show Combo Points"],
         desc = LO["Show combo points on the current target nameplate."],
         dbPath = DB .. ".showComboPoints",
-        callback = RefreshNameplates,
+        callback = RebuildIconsSubTab,
     })
+
+    -- Combo Points sub-section: appears only when Show Combo Points is enabled,
+    -- so its controls are gated by IsComboDisabled below. Native (Rogue/Druid)
+    -- path keeps its single combo-<points> icon; the per-row slider only affects
+    -- custom-class stack resources (Reaper/Demonhunter/Ranger/...).
+    local function IsComboDisabled()
+        return not C:GetDBValue(DB .. ".showComboPoints")
+    end
+
+    -- Fixed upper bound covers every class stack resource (maxStacks <= 5 today);
+    -- the engine clamps perRow to the active class's count at render time, so a
+    -- value above the class max simply renders as a single row.
+    local COMBO_PER_ROW_MAX = 10
+
+    if (Panel and Panel.indexing) or C:GetDBValue(DB .. ".showComboPoints") then
+        local comboSection = C:AddSection(scroll, LO["Combo Points"])
+
+        C:AddDropdown(comboSection, {
+            label = LO["Anchor Position"],
+            desc = LO["Choose where the combo widget is anchored on the target nameplate health bar."],
+            dbPath = DB .. ".comboAnchor",
+            values = {
+                TOP = LO["Top"],
+                BOTTOM = LO["Bottom"],
+                LEFT = LO["Left"],
+                RIGHT = LO["Right"],
+            },
+            width = 220,
+            disabled = IsComboDisabled,
+            callback = RefreshNameplates,
+        })
+
+        C:AddSlider(comboSection, {
+            label = LO["Scale"],
+            desc = LO["Scale of the combo widget (0.5 - 2.0)."],
+            dbPath = DB .. ".comboScale",
+            min = 0.5, max = 2.0, step = 0.05,
+            width = 200,
+            disabled = IsComboDisabled,
+            callback = RefreshNameplates,
+        })
+
+        C:AddSlider(comboSection, {
+            label = LO["Offset X"],
+            desc = LO["Horizontal offset from the chosen anchor point. Negative moves left, positive moves right."],
+            dbPath = DB .. ".comboOffsetX",
+            min = -200, max = 200, step = 1,
+            width = 200,
+            disabled = IsComboDisabled,
+            callback = RefreshNameplates,
+        })
+
+        C:AddSlider(comboSection, {
+            label = LO["Offset Y"],
+            desc = LO["Vertical offset from the chosen anchor point. Negative moves down, positive moves up."],
+            dbPath = DB .. ".comboOffsetY",
+            min = -200, max = 200, step = 1,
+            width = 200,
+            disabled = IsComboDisabled,
+            callback = RefreshNameplates,
+        })
+
+        C:AddSlider(comboSection, {
+            label = LO["Combos Per Row"],
+            desc = LO["Maximum combo segments per row on custom-class resources (Reaper, Demonhunter, Ranger, ...). Rogue and Druid use a single combined icon and are not affected. Wrap to a second row when exceeded."],
+            -- DB 0 means "auto": as many as the class needs, all in one row.
+            -- Map it to the slider max so the widget displays that state; the
+            -- engine clamps perRow to the active class's count at render time.
+            getFunc = function()
+                local v = C:GetDBValue(DB .. ".comboPerRow")
+                if not v or v <= 0 then return COMBO_PER_ROW_MAX end
+                return v
+            end,
+            setFunc = function(v)
+                C:SetDBValue(DB .. ".comboPerRow", v)
+            end,
+            min = 1, max = COMBO_PER_ROW_MAX, step = 1,
+            width = 200,
+            disabled = IsComboDisabled,
+            callback = RefreshNameplates,
+        })
+    end
 
     local function IsTotemIconsDisabled()
         return not C:GetDBValue(DB .. ".showTotemIcons")

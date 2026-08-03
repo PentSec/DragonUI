@@ -1022,6 +1022,11 @@ local defaults = {
                 showEliteIcon = true, -- show elite/rare dragon icon on nameplates
                 eliteIconStyle = "dragon", -- "dragon" | "star" (star uses *-icon-old textures)
                 showComboPoints = false, -- show combo points on target nameplate
+                comboAnchor = "TOP", -- "TOP" | "BOTTOM" | "LEFT" | "RIGHT" relative to target health bar
+                comboOffsetX = 0, -- horizontal offset from the anchor point (screen-space: positive = right)
+                comboOffsetY = 0, -- vertical offset from the anchor point (screen-space: positive = up); 0 keeps the historical gap
+                comboScale = 1.0, -- scale multiplier applied to the combo widget host
+                comboPerRow = 0, -- max segments per row on the custom-class path; 0 (or >= class max) renders all in a single row
                 questIcons = { -- quest objective icons on nameplates (kill/loot); stock: target/mouseover/focus only, awesome_wotlk: all plates
                     enabled = true,
                     nameResolution = true, -- token-less: match plate name to active objectives (kill: addon-free, loot: quest-addon DB)

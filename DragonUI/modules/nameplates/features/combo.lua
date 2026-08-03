@@ -293,44 +293,106 @@ local function ApplyOverlayAtlas(tex, atlasName)
     tex:SetAtlas(atlasName, true)
 end
 
+-- Resolve the combo widget's anchor point against the target health bar and
+-- return the final SetPoint arguments, already folded with the player's
+-- screen-space X/Y offsets.
+-- Returns: (hostPoint, hpPoint, baseOffsetX, baseOffsetY)
+--   hostPoint = the point on the host frame that touches the health bar.
+--   hpPoint   = the corresponding point on the health bar.
+-- The offsets always push the widget AWAY from the bar edge:
+--   TOP    -> host BOTTOM on hp TOP,    default +gap up    (historical layout)
+--   BOTTOM -> host TOP    on hp BOTTOM, default -gap down
+--   LEFT   -> host RIGHT  on hp LEFT,   default -gap left
+--   RIGHT  -> host LEFT   on hp RIGHT,  default +gap right
+-- Slider semantics stay screen-space for every anchor: positive X = right,
+-- positive Y = up. At 0/0 the widget keeps the historical gap so untouched
+-- profiles render byte-identical to before this change.
+local function ResolveComboAnchor(cfg, kind)
+    local anchor = (cfg and cfg.comboAnchor) or "TOP"
+    local defaultY = (kind == "native") and 3 or (C.COMBO_CLASS_OFFSET_Y or 6)
+    local offX = tonumber(cfg and cfg.comboOffsetX) or 0
+    local offY = tonumber(cfg and cfg.comboOffsetY) or 0
+    if anchor == "BOTTOM" then
+        return "TOP", "BOTTOM", offX, -(defaultY + offY)
+    elseif anchor == "LEFT" then
+        return "RIGHT", "LEFT", -(defaultY + offX), offY
+    elseif anchor == "RIGHT" then
+        return "LEFT", "RIGHT", defaultY + offX, offY
+    end
+    -- TOP (default): widget sits above the health bar.
+    return "BOTTOM", "TOP", offX, defaultY + offY
+end
+
+-- Apply anchor, offset, and scale to the host frame using the player's combo
+-- config. Both the native and class paths share this so the options panel
+-- drives them uniformly.
+local function ApplyComboPlacement(host, hp, cfg, kind)
+    local hostPoint, hpPoint, baseX, baseY = ResolveComboAnchor(cfg, kind)
+    host:ClearAllPoints()
+    host:SetPoint(hostPoint, hp, hpPoint, baseX, baseY)
+    local scale = tonumber(cfg and cfg.comboScale)
+    if scale and scale > 0 then
+        host:SetScale(scale)
+    else
+        host:SetScale(1.0)
+    end
+end
+
 -- Lay out the widget. Native combo keeps the original single 64x32 icon;
--- custom-class resources lay out N square segments centered on the host.
+-- custom-class resources lay out N square segments, wrapping into multiple
+-- rows when the player caps `comboPerRow` below maxStacks.
 function NP.widgets.LayoutComboWidget(plateData)
     local host = plateData._comboHost
     local hp = plateData.minaHp
     local plate = plateData.plate
     if not host or not hp or not plate then return false end
+    local cfg = NP.config.GetCfg()
     local kind, maxStacks, _cur, entry = GetComboRender()
     if kind == "none" then return false end
 
     if kind == "native" then
         host:SetSize(C.COMBO_ICON_W or 64, C.COMBO_ICON_H or 32)
-        host:ClearAllPoints()
-        host:SetPoint("BOTTOM", hp, "TOP", 0, 3)
+        ApplyComboPlacement(host, hp, cfg, "native")
         return true
     end
 
     local segSize = (entry and entry.segSize) or 16
     local spacing = (entry and entry.segSpacing) or 2
-    -- Ensure the right N segments exist; refresh geometry.
     local count = tonumber(maxStacks) or NATIVE_MAX
-    local totalW = count * segSize + math.max(0, count - 1) * spacing
-    host:SetSize(totalW, segSize)
+    -- comboPerRow <= 0 (or unset) means "as many as the class needs" -> a single
+    -- row. A cap >= count also collapses to one row; anything below wraps across
+    -- ceil(count / cap) rows. count is always >= 1 here (SyncComboPoints guards
+    -- maxStacks <= 0 before laying out), so the division is safe.
+    local perRow = tonumber(cfg and cfg.comboPerRow) or 0
+    if perRow < 0 then perRow = 0 end
+    if perRow == 0 or perRow >= count then
+        perRow = count
+    end
 
+    local rows = math.ceil(count / perRow)
+    local rowW = perRow * segSize + math.max(0, perRow - 1) * spacing
+    local totalH = rows * segSize + math.max(0, rows - 1) * spacing
+    host:SetSize(rowW, totalH)
+
+    -- Lay out square segments row-by-row, centered on the host horizontally
+    -- and stacked vertically. Row 0 is the top row so the widget grows
+    -- downward when the player wraps (matches anchor TOP sitting above the hp).
     for i = 1, count do
+        local row = math.floor((i - 1) / perRow) -- 0-based row index
+        local col = (i - 1) % perRow             -- 0-based column within row
         local seg = AcquireSegment(host, i)
         seg:SetSize(segSize, segSize)
         seg:ClearAllPoints()
-        local xOffset = (i - 1) * (segSize + spacing) - (totalW - segSize) / 2
-        seg:SetPoint("CENTER", host, "CENTER", xOffset, 0)
+        local xOffset = col * (segSize + spacing) - (rowW - segSize) / 2
+        local yOffset = -row * (segSize + spacing) + (totalH - segSize) / 2
+        seg:SetPoint("CENTER", host, "CENTER", xOffset, yOffset)
     end
     -- Trim leftover segments if max shrank.
     for i = count + 1, #host.segments do
         host.segments[i]:Hide()
     end
 
-    host:ClearAllPoints()
-    host:SetPoint("BOTTOM", hp, "TOP", 0, C.COMBO_CLASS_OFFSET_Y or 6)
+    ApplyComboPlacement(host, hp, cfg, "class")
     return true
 end
 
