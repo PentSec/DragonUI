@@ -27,12 +27,13 @@ local C = NP.const
 --   iconW/iconH  : optional host backing size (defaults derived from segSize).
 local CLASS_STACKS = {
     DEMONHUNTER = { -- "Felsworm" in-game; native token is DEMONHUNTER.
-        spellID    = 800058, -- Fellfury
-        source     = "buff",
-        emptyAtlas = "DemonHunterSegmentBg",
-        fillAtlas  = "DemonHunterSegmentFill",
-        segSize    = 16,
-        segSpacing = 2,
+        spellID     = 800058, -- Fellfury
+        source      = "buff",
+        overlayFill = true, -- keep empty bg visible, draw fill on top.
+        emptyAtlas  = "DemonHunterSegmentBg",
+        fillAtlas   = "DemonHunterSegmentFill",
+        segSize     = 16,
+        segSpacing  = 2,
     },
     REAPER = {
         spellID       = 500363, -- Soul shards (stacks); see Ascension_ReaperResource.lua.
