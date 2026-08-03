@@ -60,6 +60,7 @@ local CLASS_STACKS = {
         spellID      = 804329, -- Ranger combo points.
         source       = "buff",
         knownSpellID = 802036, -- only when the combo talent is known.
+        overlayFill  = true,   -- keep empty bg visible, draw fill on top.
         emptyAtlas   = "RangerBarSegmentBg",
         fillAtlas    = "RangerBarSegmentFill",
         segSize      = 13,
@@ -261,6 +262,12 @@ local function AcquireSegment(host, i)
     local bg = seg:CreateTexture(nil, "ARTWORK")
     bg:SetAllPoints(seg)
     seg.bg = bg
+    -- Overlay fill used by templates whose Background must stay visible while
+    -- the Fill draws on top (e.g. RangerCombo).
+    local fill = seg:CreateTexture(nil, "OVERLAY")
+    fill:SetAllPoints(seg)
+    fill:Hide()
+    seg.fill = fill
     host.segments[i] = seg
     return seg
 end
@@ -274,6 +281,15 @@ local function ApplySegmentAtlas(seg, atlasName)
         return
     end
     seg.bg:SetAtlas(atlasName, true)
+end
+
+local function ApplyOverlayAtlas(tex, atlasName)
+    if not tex or not atlasName then return end
+    if _G.AtlasUtil and _G.AtlasUtil.AtlasExists and not _G.AtlasUtil:AtlasExists(atlasName) then
+        tex:SetTexture(0, 0, 0, 0)
+        return
+    end
+    tex:SetAtlas(atlasName, true)
 end
 
 -- Lay out the widget. Native combo keeps the original single 64x32 icon;
@@ -385,7 +401,17 @@ function NP.widgets.SyncComboPoints(plateData)
             local seg = host.segments[i]
             if seg then
                 seg.bg:SetVertexColor(1, 1, 1, 1)
-                if i <= pts then
+                if entry.overlayFill then
+                    -- Background always visible; Fill draws on top for filled slots.
+                    ApplySegmentAtlas(seg, entry.emptyAtlas)
+                    if i <= pts then
+                        seg.fill:SetVertexColor(1, 1, 1, 1)
+                        ApplyOverlayAtlas(seg.fill, entry.fillAtlas)
+                        seg.fill:Show()
+                    else
+                        seg.fill:Hide()
+                    end
+                elseif i <= pts then
                     -- Filled soul: ReaperSoulFull, or ReaperSoulInfused once all full.
                     if infused and entry.infusedAtlas then
                         ApplySegmentAtlas(seg, entry.infusedAtlas)
