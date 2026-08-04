@@ -268,6 +268,9 @@ local function UpdateDebuffAnchorDetached(self, debuffName, index, numBuffs, anc
 end
 
 -- Hide target buffs whose name starts with "Keeper's" when the option is enabled.
+-- After hiding, re-anchors the remaining visible buffs so they reflow into the gap left by
+-- the hidden one (Blizzard anchors them sequentially to the previous slot, so hiding an
+-- inner slot leaves a gap). Only re-anchors; does not touch SetWidth/Height or overall layout.
 local function FilterKeepersAuras(frame)
     if not frame or not frame.unit or not UnitExists(frame.unit) then
         return
@@ -282,6 +285,9 @@ local function FilterKeepersAuras(frame)
     end
     local unit = frame.unit
     local selfName = frame:GetName()
+
+    -- Track which slots Blizzard left shown and hide the Keeper's ones.
+    local hasHidden = false
     for i = 1, MAX_TARGET_BUFFS do
         local buff = _G[selfName .. "Buff" .. i]
         if not buff then break end
@@ -289,7 +295,46 @@ local function FilterKeepersAuras(frame)
             local name = UnitBuff(unit, i)
             if name and strsub(name, 1, 8) == "Keeper's" then
                 buff:Hide()
+                hasHidden = true
             end
+        end
+    end
+    if not hasHidden then
+        return
+    end
+
+    -- If a custom/detached layout is active, it already reflows via its own hook; skip here.
+    local detached = ShouldUseDetachedAuraLayout(frame)
+    local buffSize, debuffSize = GetCustomAuraSizes()
+    if detached or buffSize then
+        return
+    end
+
+    -- Re-anchor visible buffs so they slide into the gap left by hidden Keeper's auras.
+    -- Only same-row continuations (TOPLEFT relative to the previous slot's TOPRIGHT,
+    -- sharing that slot's top edge) are moved; new rows keep Blizzard's anchoring so
+    -- multi-row layouts stay intact. Each moved buff chains to the last visible buff
+    -- (never the hidden slot), and a leading gap snaps to the buffs container start.
+    local lastVisible = nil
+    for i = 1, MAX_TARGET_BUFFS do
+        local buff = _G[selfName .. "Buff" .. i]
+        if not buff then break end
+        if buff:IsShown() then
+            local prevSlot = _G[selfName .. "Buff" .. (i - 1)]
+            if prevSlot and not prevSlot:IsShown() then
+                local point, relTo, relPoint = buff:GetPoint(1)
+                local sameRow = point == "TOPLEFT" and relTo == prevSlot and relPoint == "TOPRIGHT"
+                    and (not lastVisible or math.abs(buff:GetTop() - lastVisible:GetTop()) < 2)
+                if sameRow then
+                    buff:ClearAllPoints()
+                    if lastVisible then
+                        buff:SetPoint("TOPLEFT", lastVisible, "TOPRIGHT", 0, 0)
+                    else
+                        buff:SetPoint("TOPLEFT", self.buffs, "TOPLEFT", 0, 0)
+                    end
+                end
+            end
+            lastVisible = buff
         end
     end
 end
