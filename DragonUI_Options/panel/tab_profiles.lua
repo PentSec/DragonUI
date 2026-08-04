@@ -198,9 +198,9 @@ local function GetProfileIEFrame()
     return f
 end
 
-local function ShowProfileExportFrame(exportString)
+local function ShowProfileExportFrame(exportString, titleOverride)
     local f = GetProfileIEFrame()
-    f.title:SetText(LO["Export Profile"] or "Export Profile")
+    f.title:SetText(titleOverride or (LO["Export Profile"] or "Export Profile"))
     f.editBox:SetText(exportString)
     f.editBox:SetScript("OnTextChanged", function(self)
         self:SetText(exportString) -- prevent editing
@@ -232,6 +232,24 @@ local function DoImportProfile(data, name)
 
     local db = addon.db
     if not db then return end
+
+    -- Snapshot any existing position presets in the DESTINATION profile so
+    -- they are not lost when the imported payload omits them. The preset
+    -- store lives at db.profile.positionPresets and is only meaningful when
+    -- the destination already had presets the user wants to keep.
+    local existingPositionPresets
+    if db.profiles and db.profiles[name] and db.profiles[name].positionPresets then
+        existingPositionPresets = addon.DeepCopy(db.profiles[name].positionPresets)
+    end
+
+    -- If the imported data does NOT include positionPresets, but the
+    -- destination profile had some, preserve them by injecting them into
+    -- the payload BEFORE it is written. This keeps the user's saved frame
+    -- layouts even when importing a "config-only" profile string.
+    if data.positionPresets == nil and existingPositionPresets then
+        data = addon.DeepCopy(data)
+        data.positionPresets = existingPositionPresets
+    end
 
     db:SetProfile(name)
     db:ResetProfile()
@@ -423,6 +441,50 @@ local function ShowProfileImportFrame()
         f:Hide()
         -- Ask for a profile name
         ShowProfileImportNameFrame(data)
+    end)
+    f.btn2Text:SetText(LO["Cancel"] or "Cancel")
+    f.btn2:SetScript("OnClick", function() f:Hide() end)
+    f:Show()
+    f.editBox:SetFocus()
+end
+
+-- ============================================================================
+-- PRESET IMPORT FRAME (reuses the profile IE frame visual style but routes
+-- the payload through PositionPresets:ImportFromString + the preset name
+-- popup already defined in position_presets.lua).
+-- ============================================================================
+
+local function ShowPresetImportFrame()
+    local PP = addon.PositionPresets
+    if not PP then
+        print("|cFFFF4444[DragonUI]|r " .. (LO["Position presets not available."] or "Position presets not available."))
+        return
+    end
+
+    local f = GetProfileIEFrame()
+    f.title:SetText(LO["Import Position Preset"] or "Import Position Preset")
+    f.editBox:SetText("")
+    f.editBox:SetScript("OnTextChanged", nil) -- allow editing
+    f.btn1Text:SetText(LO["Import"] or "Import")
+    f.btn1:SetScript("OnClick", function()
+        local text = strtrim(f.editBox:GetText())
+        if text == "" then return end
+        local data, errType = PP:ImportFromString(text)
+        if not data then
+            local msg = LO["Invalid position preset string."] or "Invalid position preset string."
+            if errType == "header" then
+                msg = LO["Not a valid DragonUI position preset string."] or "Not a valid DragonUI position preset string."
+            end
+            print("|cFFFF4444[DragonUI]|r " .. msg)
+            return
+        end
+        f:Hide()
+        -- Delegate to the preset-name popup already registered in
+        -- position_presets.lua (DRAGONUI_POSITION_PRESET_IMPORT_NAME).
+        local dialog = StaticPopup_Show("DRAGONUI_POSITION_PRESET_IMPORT_NAME")
+        if dialog then
+            dialog.data = data
+        end
     end)
     f.btn2Text:SetText(LO["Cancel"] or "Cancel")
     f.btn2:SetScript("OnClick", function() f:Hide() end)
@@ -699,6 +761,122 @@ local function BuildProfilesTab(scroll)
         desc = LO["Import a profile from a text string shared by another user."],
         callback = function()
             ShowProfileImportFrame()
+        end,
+    })
+
+    C:AddSpacer(manager)
+
+    -- ====================================================================
+    -- POSITION PRESETS — save/load/edit-mode frame layouts only.
+    -- A profile holds everything (colours, scales, modules + position
+    -- presets). A position preset only holds where the frames live on
+    -- screen. This section lets the user import a preset string directly
+    -- from the Profiles tab without opening Edit Mode.
+    -- ====================================================================
+    local presetSection = C:AddSection(scroll, LO["Position Presets"] or "Position Presets")
+
+    C:AddDescription(presetSection, LO["Import a preset from a text string shared by another player."] or "Import a preset from a text string shared by another player.")
+
+    -- Build preset list for the dropdown (refreshed every render)
+    local function GetPresetList()
+        local PP = addon.PositionPresets
+        if not PP then return {} end
+        local list = {}
+        for _, name in ipairs(PP:GetSortedNames()) do
+            list[name] = name
+        end
+        return list
+    end
+
+    -- Auto-select the first available preset so the action buttons work
+    -- immediately instead of silently doing nothing when no row is picked.
+    local presetList = GetPresetList()
+    local selectedPreset
+    for name in pairs(presetList) do
+        selectedPreset = name
+        break
+    end
+
+    local presetDropdown = C:AddDropdown(presetSection, {
+        label = LO["Position Preset"] or "Position Preset",
+        getFunc = function() return selectedPreset end,
+        setFunc = function(val) selectedPreset = val end,
+        values = presetList,
+    })
+    if selectedPreset and presetDropdown and presetDropdown.SetValue then
+        presetDropdown:SetValue(selectedPreset)
+    end
+
+    -- Shared guard for the action buttons: visible feedback instead of a
+    -- silent no-op when there is nothing to act on.
+    local function RequireSelectedPreset()
+        if selectedPreset then return true end
+        print("|cFFFF4444[DragonUI]|r " .. (LO["No position presets saved yet. Save one in Edit Mode (/dragonui edit) first."] or "No position presets saved yet. Save one in Edit Mode (/dragonui edit) first."))
+        return false
+    end
+
+    local presetRow = C:AddRow(presetSection)
+
+    C:AddButton(presetRow, {
+        label = LO["Load"] or "Load",
+        width = 100,
+        desc = LO["Load position preset '%s'? This will overwrite your current element positions."],
+        callback = function()
+            if not RequireSelectedPreset() then return end
+            local dialog = StaticPopup_Show("DRAGONUI_POSITION_PRESET_LOAD", selectedPreset)
+            if dialog then
+                dialog.data = selectedPreset
+            end
+        end,
+    })
+
+    C:AddButton(presetRow, {
+        label = LO["Delete"] or "Delete",
+        width = 100,
+        desc = LO["Delete position preset '%s'? This cannot be undone."],
+        callback = function()
+            if not RequireSelectedPreset() then return end
+            local dialog = StaticPopup_Show("DRAGONUI_POSITION_PRESET_DELETE", selectedPreset)
+            if dialog then
+                dialog.data = selectedPreset
+            end
+        end,
+    })
+
+    local presetExportBtn
+    presetExportBtn = C:AddButton(presetRow, {
+        label = LO["Export Preset"] or "Export Preset",
+        width = 140,
+        desc = LO["Export your current profile as a text string."],
+        callback = function()
+            if not RequireSelectedPreset() then return end
+            local PP = addon.PositionPresets
+            if not PP then return end
+
+            presetExportBtn:SetDisabled(true)
+            presetExportBtn:SetText(LO["Exporting..."] or "Exporting...")
+
+            C_Timer.After(0.1, function()
+                local exportStr = PP:ExportToString(selectedPreset)
+                if exportStr then
+                    -- Reuse the existing profile export frame (dark popup) but
+                    -- with a preset-specific title.
+                    ShowProfileExportFrame(exportStr, LO["Export Position Preset"] or "Export Position Preset")
+                else
+                    print("|cFFFF4444[DragonUI]|r " .. (LO["Failed to export position preset."] or "Failed to export position preset."))
+                end
+                presetExportBtn:SetDisabled(false)
+                presetExportBtn:SetText(LO["Export Preset"] or "Export Preset")
+            end)
+        end,
+    })
+
+    C:AddButton(presetRow, {
+        label = LO["Import Preset"] or "Import Preset",
+        width = 140,
+        desc = LO["Import a preset from a text string shared by another player."] or "Import a preset from a text string shared by another player.",
+        callback = function()
+            ShowPresetImportFrame()
         end,
     })
 

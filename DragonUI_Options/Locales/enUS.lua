@@ -1327,9 +1327,17 @@ L["Presets kept."] = true
 L["Position presets kept."] = true
 
 -- PRESET IMPORT / EXPORT
+L["Position Presets"] = true
+L["Position Preset"] = true
 L["Export Preset"] = true
 L["Import Preset"] = true
 L["Import a preset from a text string shared by another player."] = true
+L["Export Position Preset"] = true
+L["Import Position Preset"] = true
+L["No position presets saved yet. Save one in Edit Mode (/dragonui edit) first."] = true
+L["Failed to export position preset."] = true
+L["Invalid position preset string."] = true
+L["Not a valid DragonUI position preset string."] = true
 L["Import"] = true
 L["Select All"] = true
 L["Close"] = true
