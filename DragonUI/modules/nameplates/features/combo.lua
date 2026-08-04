@@ -24,6 +24,12 @@ local C = NP.const
 --     shard1Atlas / shard2Atlas : atlas for 1 / 2+ shards on that slot.
 --     infusedSpellID : aura active when every soul is full.
 --     infusedAtlas   : fill recolor used while infused.
+--   Tinker scaled fill (optional; replaces shard/empty rendering): the resource
+--   aura holds every stack and each segment represents `stackScale` of them:
+--     stackScale    : stacks per full segment (full segments = cur / scale).
+--     partialPrefix : atlas base; the next free slot draws "<prefix><diff>"
+--                     where diff = cur % scale (e.g. ScrapFill1..9). Unspent
+--                     slots have no background and stay hidden.
 --   iconW/iconH  : optional host backing size (defaults derived from segSize).
 local CLASS_STACKS = {
     DEMONHUNTER = { -- "Felsworm" in-game; native token is DEMONHUNTER.
@@ -83,6 +89,17 @@ local CLASS_STACKS = {
         fillAtlas  = "KoXBarSegmentFill",
         segSize    = 22,
         segSpacing = 2,
+    },
+    TINKER = { -- Scrap resource; each segment holds 10 scrap stacks.
+        spellID       = 801816, -- Scrap.
+        source        = "buff",
+        knownSpellID  = 4051, -- C_CharacterAdvancement.IsKnownID gating.
+        maxStacks     = 10,   -- fallback when GetSpellMaxStack is unavailable.
+        stackScale    = 10,   -- one segment per 10 stacks.
+        fillAtlas     = "ScrapFill10",
+        partialPrefix = "ScrapFill", -- ScrapFill1..9 for the partial slot.
+        segSize       = 7,
+        segSpacing    = 2,
     },
 }
 
@@ -166,7 +183,10 @@ local function ResolveComboProvider()
     if entry.knownSpellID and not IsSpellKnown(entry.knownSpellID) then
         return "none", 0, 0
     end
-    local maxStacks = GetSpellMaxStacks(entry.spellID, nil) or entry.maxStacks
+    local maxStacks = GetSpellMaxStacks(entry.spellID, nil)
+    if entry.stackScale and maxStacks then
+        maxStacks = math.floor(maxStacks / entry.stackScale)
+    end
     if not maxStacks or maxStacks <= 0 then maxStacks = entry.maxStacks or NATIVE_MAX end
     if not maxStacks or maxStacks <= 0 then return "none", 0, 0 end
     local cur = AuraStacks(entry.spellID, entry.source)
@@ -464,7 +484,23 @@ function NP.widgets.SyncComboPoints(plateData)
             local seg = host.segments[i]
             if seg then
                 seg.bg:SetVertexColor(1, 1, 1, 1)
-                if entry.overlayFill then
+                if entry.stackScale then
+                    -- Tinker-style scaled resource: each segment is stackScale
+                    -- stacks. Full slots draw fillAtlas, the next free slot
+                    -- draws a partial "<prefix><diff>" fill, and unspent slots
+                    -- stay hidden (the template has no empty background).
+                    local full = math.floor(cur / entry.stackScale)
+                    local diff = cur % entry.stackScale
+                    if i <= full then
+                        ApplySegmentAtlas(seg, entry.fillAtlas)
+                        seg:Show()
+                    elseif i == full + 1 and diff > 0 and entry.partialPrefix then
+                        ApplySegmentAtlas(seg, entry.partialPrefix .. diff)
+                        seg:Show()
+                    else
+                        seg:Hide()
+                    end
+                elseif entry.overlayFill then
                     -- Background always visible; Fill draws on top for filled slots.
                     ApplySegmentAtlas(seg, entry.emptyAtlas)
                     if i <= pts then
