@@ -9,7 +9,7 @@
  - Keep color codes |cff...|r outside of L[] strings
 ]]
 
-local L = LibStub("AceLocale-3.0"):NewLocale("DragonUI_Options", "frFR")
+local L = LibStub("AceLocale-3.0-DragonUI"):NewLocale("DragonUI_Options", "frFR")
 if not L then return end
 
 L["Collector"] = "Collecteur"
@@ -815,6 +815,9 @@ L["Switch micro menu icons between colored and grayscale style."] = "Basculer le
 L["About"] = "À propos"
 L["Bringing the retail WoW look to 3.3.5a, inspired by Dragonflight UI."] = "Apporter l'apparence de WoW retail à la 3.3.5a, inspiré par Dragonflight UI."
 L["Created and maintained by Neticsoul, with community contributions."] = "Créé et maintenu par Neticsoul, avec des contributions de la communauté."
+L["Language"] = "Langue"
+L["Choose the language used by the DragonUI interface."] = "Choisissez la langue utilisée par l'interface de DragonUI."
+L["Follow the client language"] = "Suivre la langue du client"
 L["GitHub (select and Ctrl+C to copy):"] = "GitHub (sélectionnez et Ctrl+C pour copier) :"
 L["Error:"] = "Erreur :"
 L["Error: DragonUI addon not found!"] = "Erreur : addon DragonUI introuvable !"
