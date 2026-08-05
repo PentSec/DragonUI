@@ -558,6 +558,14 @@ local function DarkenMinimapBorders(tint)
         DarkenTexture(minimapFrame.Circle, tint)
     end
 
+    -- DragonUI square border (MinimapModule.borderFrame.border) — shown instead of
+    -- Minimap.Circle when minimap.square_border is enabled; darkens with the same
+    -- tint so square and rounded borders match in dark mode.
+    local minimapModule = addon.MinimapModule
+    if minimapModule and minimapModule.borderFrame and minimapModule.borderFrame.border then
+        DarkenTexture(minimapModule.borderFrame.border, tint)
+    end
+
     -- Original Blizzard border (may be hidden but darken for safety)
     local border = _G["MinimapBorder"]
     if border then DarkenTexture(border, tint) end

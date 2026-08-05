@@ -185,6 +185,13 @@ local function BuildMinimapTab(scroll)
         end,
     })
 
+    C:AddToggle(basic, {
+        label = LO["Square Minimap"],
+        desc = LO["Use a square minimap with a square border instead of the round DragonUI border."],
+        dbPath = "minimap.square_border",
+        callback = RefreshMinimap,
+    })
+
     local fadeToggle  -- forward reference for disabled-state refresh
 
     C:AddToggle(basic, {

@@ -397,13 +397,25 @@ local function GetMinimapScale()
     return s
 end
 
+-- Square minimap border offset: nudge the collector button 10px left / 3px up
+-- only while the square border is active; native rounded mode keeps the default
+-- placement. Screen px are converted to the map's local units so the nudge looks
+-- identical at any minimap scale.
+local function GetSquareButtonOffset()
+    if not (deps.GetSquareBorderActive and deps.GetSquareBorderActive()) then
+        return 0, 0
+    end
+    return -10, 3
+end
+
 local function PositionByAngle(btn, angle)
     if not btn or not Minimap then return end
     local n = NormalizeAngle(angle)
     local r = GetOrbitRadius(btn)
     local rad = mathrad(n)
+    local dx, dy = GetSquareButtonOffset()
     btn:ClearAllPoints()
-    btn:SetPoint("CENTER", Minimap, "CENTER", mathcos(rad) * r, mathsin(rad) * r)
+    btn:SetPoint("CENTER", Minimap, "CENTER", mathcos(rad) * r + dx, mathsin(rad) * r + dy)
     btn.DragonUI_Angle = n
 end
 
@@ -1241,8 +1253,9 @@ local function ApplyClassicStyle(btn)
     btn.DragonUI_DragMoved = false
     btn:SetSize(21, 21)
     btn:SetScale(1)
+    local dx, dy = GetSquareButtonOffset()
     btn:ClearAllPoints()
-    btn:SetPoint("RIGHT", Minimap, "LEFT", 16.5, -2)
+    btn:SetPoint("RIGHT", Minimap, "LEFT", 16.5 + dx, -2 + dy)
 
     if btn.icon then
         btn.icon:ClearAllPoints()
