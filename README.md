@@ -5,6 +5,10 @@
 
 [![](https://dcbadge.limes.pink/api/server/https://discord.gg/uVsEaAUGcx)](https://discord.gg/uVsEaAUGcx)
 
+<a href="https://www.paypal.me/Jeffreysfu/1">
+  <img src="https://svgl.app/library/paypal-wordmark.svg" alt="paypal" width="200" />
+</a>
+
 | Method | Link |
 |--------|------|
 | **Latest stable release** | [Download](https://github.com/PentSec/DragonUI/releases/latest/download/DragonUI.zip) |
