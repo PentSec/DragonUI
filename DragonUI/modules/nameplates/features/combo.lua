@@ -31,6 +31,9 @@ local C = NP.const
 --                     where diff = cur % scale (e.g. ScrapFill1..9). Unspent
 --                     slots have no background and stay hidden.
 --   iconW/iconH  : optional host backing size (defaults derived from segSize).
+--   scale        : optional per-class render scale multiplier for the whole
+--                  widget (multiplies the player's global comboScale); handy
+--                  for resources whose segments are tiny (e.g. Tinker 7px).
 local CLASS_STACKS = {
     DEMONHUNTER = { -- "Felsworm" in-game; native token is DEMONHUNTER.
         spellID     = 800058, -- Fellfury
@@ -93,13 +96,13 @@ local CLASS_STACKS = {
     TINKER = { -- Scrap resource; each segment holds 10 scrap stacks.
         spellID       = 801816, -- Scrap.
         source        = "buff",
-        knownSpellID  = 4051, -- C_CharacterAdvancement.IsKnownID gating.
         maxStacks     = 10,   -- fallback when GetSpellMaxStack is unavailable.
         stackScale    = 10,   -- one segment per 10 stacks.
         fillAtlas     = "ScrapFill10",
         partialPrefix = "ScrapFill", -- ScrapFill1..9 for the partial slot.
         segSize       = 7,
         segSpacing    = 2,
+        scale         = 2, -- 7px segments are tiny; render the widget at 2x.
     },
 }
 
@@ -126,7 +129,9 @@ local function GetPlayerCustomClass()
         return _G.C_Player and _G.C_Player.GetClass and _G.C_Player:GetClass()
     end)
     if not ok or type(token) ~= "string" or token == "" then return nil end
-    return token
+    -- C_Player:GetClass() case varies by client build (e.g. "tinker" vs
+    -- "TINKER"); normalize so callers can rely on the CLASS_STACKS casing.
+    return token:upper()
 end
 
 local function AuraStacks(spellID, source)
@@ -346,16 +351,18 @@ end
 -- Apply anchor, offset, and scale to the host frame using the player's combo
 -- config. Both the native and class paths share this so the options panel
 -- drives them uniformly.
-local function ApplyComboPlacement(host, hp, cfg, kind)
+local function ApplyComboPlacement(host, hp, cfg, kind, entry)
     local hostPoint, hpPoint, baseX, baseY = ResolveComboAnchor(cfg, kind)
     host:ClearAllPoints()
     host:SetPoint(hostPoint, hp, hpPoint, baseX, baseY)
     local scale = tonumber(cfg and cfg.comboScale)
-    if scale and scale > 0 then
-        host:SetScale(scale)
-    else
-        host:SetScale(1.0)
+    if not scale or scale <= 0 then scale = 1.0 end
+    -- Per-class extra scale (e.g. Tinker's 7px segments are tiny); multiplies
+    -- the player's global comboScale so both compose.
+    if entry and entry.scale then
+        scale = scale * (tonumber(entry.scale) or 1)
     end
+    host:SetScale(scale)
 end
 
 -- Lay out the widget. Native combo keeps the original single 64x32 icon;
@@ -372,7 +379,7 @@ function NP.widgets.LayoutComboWidget(plateData)
 
     if kind == "native" then
         host:SetSize(C.COMBO_ICON_W or 64, C.COMBO_ICON_H or 32)
-        ApplyComboPlacement(host, hp, cfg, "native")
+        ApplyComboPlacement(host, hp, cfg, "native", nil)
         return true
     end
 
@@ -412,7 +419,7 @@ function NP.widgets.LayoutComboWidget(plateData)
         host.segments[i]:Hide()
     end
 
-    ApplyComboPlacement(host, hp, cfg, "class")
+    ApplyComboPlacement(host, hp, cfg, "class", entry)
     return true
 end
 
