@@ -63,25 +63,15 @@ local original_BuffButton_SetPoint = {}
 local buffFramePositionLocked = false
 
 -- ============================================================================
--- HELPER: Anchor VanityBuffs in the buff chain (Ascension custom frame)
+-- NOTE: VanityBuffs positioning (Ascension custom frame)
 -- VanityBuffs is a global frame injected by Ascension (not part of stock
--- 3.3.5a FrameXML), so every access is nil-guarded and no-ops in vanilla.
--- Chain: ConsolidatedBuffs → VanityBuffs → TemporaryEnchantFrame → BuffButton1
--- VanityBuffs anchors FROM ConsolidatedBuffs (anchoring to TempEnchantFrame
--- would create a circular chain), matching the layout pattern used everywhere
--- else in this module (frame-relative, never absolute UIParent coordinates).
+-- 3.3.5a FrameXML).  It SELF-POSITIONS via its OnShow/OnHide handlers
+-- (ConsolidatedBuffs_OnShow/OnHide and VanityBuffs_OnShow/OnHide in the
+-- server FrameXML).  DragonUI must NEVER call ClearAllPoints/SetPoint on
+-- VanityBuffs — doing so triggers a visible reflow of VanityBuffsContainer
+-- children and fights Ascension on every UNIT_AURA tick, which is the root
+-- cause of the vanity-buff flickering.
 -- ============================================================================
-local function AnchorVanityBuffs()
-    if not VanityBuffs or not ConsolidatedBuffs then return end
-    VanityBuffs:ClearAllPoints()
-    if ConsolidatedBuffs:IsShown() and (BuffFrame.numConsolidated or 0) > 0 then
-        -- CB visible: VanityBuffs sits to CB's LEFT
-        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-    else
-        -- CB hidden: VanityBuffs at CB's position (same spot as BuffFrame TOPRIGHT)
-        VanityBuffs:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
-    end
-end
 
 -- Check if buff frame is at default position (not moved by editor)
 -- Uses a saved flag instead of coordinate comparison to avoid stale profile values
@@ -268,8 +258,15 @@ local function CollectSortedBuffButtons()
         -- If we touch them here, ReanchorBuffButtons fights Ascension every
         -- UNIT_AURA tick for the same button's parent/anchor -> visible flicker
         -- where the buff jumps out of the vanity container into the buff row
-        -- and back. Match the consolidated-skip pattern exactly.
-        if button and button:IsShown() and not button.consolidated and not button.vanity then
+        -- and back.
+        -- IMPORTANT: check BOTH the flag AND the parent. Ascension clears
+        -- buff.vanity = nil at the TOP of AuraButton_Update before re-assigning
+        -- it; during that transient window the flag is nil but the button is
+        -- still parented to VanityBuffsContainer. Checking the parent catches
+        -- that race.
+        local isVanityOwned = button and (button.vanity
+            or (VanityBuffsContainer and button:GetParent() == VanityBuffsContainer))
+        if button and button:IsShown() and not button.consolidated and not isVanityOwned then
             count = count + 1
             local entry = sortedBuffPool[count]
             if not entry then
@@ -1203,18 +1200,18 @@ function BuffFrameModule:Enable()
         -- When weapon enchants are separated, TemporaryEnchantFrame is managed
         -- by the weapon enchant system — do NOT re-anchor it to ConsolidatedBuffs.
         if weaponEnchantsAreSeparated then return end
-        -- Respect Ascension's chain: if VanityBuffs is active, TEF must
-        -- follow VanityBuffs (not CB), matching VanityBuffs_OnShow in the
-        -- Ascension reference (see _ref-/vanitybuff/BuffFrame.lua l.726).
-        -- Otherwise we'll fight Ascension's layout every time
-        -- UIParent_ManageFramePositions fires, causing icon wobble.
-        if TemporaryEnchantFrame then
+        -- When VanityBuffs is active, Ascension's VanityBuffs_OnShow already
+        -- positions TEF to VanityBuffs TOPLEFT (ref line 726). Re-anchoring
+        -- TEF here would call ClearAllPoints which triggers a reflow visible
+        -- as flickering. Let Ascension own the TEF anchor when vanity is up.
+        if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+            return
+        end
+        if TemporaryEnchantFrame and cb then
             TemporaryEnchantFrame:ClearAllPoints()
-            if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
-                TemporaryEnchantFrame:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0)
-            elseif cb and cb:IsShown() then
+            if cb:IsShown() then
                 TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", -6, 0)
-            elseif cb then
+            else
                 TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPRIGHT", 0, 0)
             end
         end
@@ -1486,8 +1483,8 @@ function BuffFrameModule:Enable()
         BuffFrameModule._hookedBuffAnchors = true
         -- Re-entrancy guard for our own hook (Blizzard sometimes calls
         -- BuffFrame_UpdateAllBuffAnchors from within ConsolidatedBuffs
-        -- OnShow/OnHide, which our AnchorVanityBuffs/RestoreConsolidatedBuffsAnchor
-        -- calls can re-trigger, causing visible "searching" flicker).
+        -- OnShow/OnHide, which our RestoreConsolidatedBuffsAnchor calls
+        -- can re-trigger, causing visible "searching" flicker).
         local _inUpdateAllBuffAnchors = false
 
         -- Cached anchor signatures per frame. SetPoint/ClearAllPoints on an
@@ -1536,7 +1533,11 @@ function BuffFrameModule:Enable()
             --    VanityBuffs (the regular chain), idempotent via _applyAnchor.
             if weaponEnchantsAreSeparated then
                 AnchorWeaponEnchantsToFrame()
-            else
+            elseif not (VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0) then
+                -- Only re-anchor TEF when VanityBuffs is NOT shown.
+                -- When VanityBuffs IS shown, Ascension's VanityBuffs_OnShow
+                -- already positioned TEF to VanityBuffs:TOPLEFT. Touching
+                -- TEF here would fight that anchor every tick → flicker.
                 local pt, rf, rp, x, y = _desiredTempEnchantAnchor()
                 if pt then
                     _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
