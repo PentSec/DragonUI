@@ -22,7 +22,6 @@ if not L then return end
 L["DragonUI"] = true
 L["Use the tabs on the left to configure modules, action bars, unit frames, minimap, and more."] = true
 L["Editor Mode"] = true
-L["KeyBind Mode"] = true
 L["Exit Editor Mode"] = true
 L["KeyBind Mode Active"] = true
 L["Move UI Elements"] = true
@@ -76,20 +75,14 @@ L["General"] = true
 L["Modules"] = true
 L["Action Bars"] = true
 L["Additional Bars"] = true
-L["Cast Bars"] = true
-L["Enhancements"] = true
-L["Micro Menu"] = true
 L["Minimap"] = true
 L["Profiles"] = true
-L["Quest Tracker"] = true
 L["Unit Frames"] = true
 L["XP & Rep Bars"] = true
 L["Chat"] = true
 L["BNet Toast"] = true
 L["Bags"] = true
 L["Appearance"] = true
-L["Left Side Tabs"] = true
-L["Place category filter tabs on the left side of the bag frame instead of the right."] = true
 
 -- ============================================================================
 -- MODULES TAB
@@ -118,16 +111,12 @@ L["Dragonflight-styled player unit frame"] = true
 L["Dragonflight-styled boss target frames"] = true
 
 -- Toggle labels
-L["Player Castbar"] = true
-L["Target Castbar"] = true
-L["Focus Castbar"] = true
 L["Action Bars System"] = true
 L["Micro Menu & Bags"] = true
 L["Cooldown Timers"] = true
 L["Minimap System"] = true
 L["Buff Frame System"] = true
 L["Dark Mode"] = true
-L["Range Indicator"] = true
 L["Item Quality Borders"] = true
 L["Enable Enhanced Tooltips"] = true
 L["KeyBind Mode"] = true
@@ -156,7 +145,6 @@ L["Separate Weapon Enchants"] = true
 L["Detach weapon enchant icons (poisons, sharpening stones, etc.) from the buff bar into their own independently moveable frame. Position it freely using Editor Mode."] = true
 
 -- Auras tab
-L["Auras"] = true
 L["Show Toggle Button"] = true
 L["Show a collapse/expand button next to the buff icons."] = true
 L["Weapon Enchants"] = true
@@ -172,8 +160,6 @@ L["When enabled, a 'Weapon Enchants' mover appears in Editor Mode that you can d
 L["Positions"] = true
 L["Player Buffs & Debuffs"] = true
 L["Layout settings for the player buff and debuff bar. These do not affect target or focus auras."] = true
-L["Buffs"] = true
-L["Debuffs"] = true
 L["Buff Order"] = true
 L["Default (Blizzard)"] = true
 L["How to sort player buff icons on the buff bar."] = true
@@ -376,7 +362,6 @@ L["Class-Colored Border"] = true
 L["Color the tooltip border by the unit's class (players) or reaction (NPCs)."] = true
 L["Class-Colored Name"] = true
 L["Color the unit name text in the tooltip by class color (players only)."] = true
-L["Target of Target"] = true
 L["Add a 'Targeting: <name>' line showing who the unit is targeting."] = true
 L["Add a 'Targeting: <name>' line to the tooltip showing who the unit is targeting."] = true
 L["Styled Health Bar"] = true
@@ -388,7 +373,6 @@ L["Show Aura Source"] = true
 L["Show the caster's name (class-colored) and spell ID on buff and debuff tooltips."] = true
 
 -- Chat Mods
-L["Chat Mods"] = true
 L["Enable Chat Mods"] = true
 L["Enables or disables Chat Mods."] = true
 L["Editbox Position"] = true
@@ -422,7 +406,6 @@ L["For a smoother, more polished chat experience, check out CleanerChat-WotLK â€
 L["Download (select and Ctrl+C to copy):"] = true
 
 -- Bagster
-L["Bagster"] = true
 L["Enable Bagster"] = true
 L["All-in-one bag replacement with item filtering, search, quality indicators, and bank integration."] = true
 L["Bagster Settings"] = true
@@ -508,7 +491,6 @@ L["Bank"] = true
 L["Choose which category tabs appear on the bag frame. Changes require closing and reopening bags to take effect."] = true
 L["Choose which category tabs appear on the inventory bag frame."] = true
 L["Choose which category tabs appear on the bank frame."] = true
-L["Display"] = true
 L["Gold Display"] = true
 L["Text Only"] = true
 L["Gold Icons"] = true
@@ -528,8 +510,6 @@ L["Show the rarity filter dots at the bottom of the bag frame."] = true
 -- Advanced modules - Fallback display names
 L["Main Bars"] = true
 L["Vehicle"] = true
-L["Stance Bar"] = true
-L["Pet Bar"] = true
 L["Multicast"] = true
 L["Buttons"] = true
 L["Hide Blizzard Elements"] = true
@@ -639,7 +619,6 @@ L["Minimum duration for text triggering"] = true
 L["Minimum duration for cooldown text to appear."] = true
 L["Text Color"] = true
 L["Cooldown Text Color"] = true
-L["Font Size"] = true
 L["Size of cooldown text."] = true
 
 -- Colors
@@ -685,10 +664,6 @@ L["Columns"] = true
 L["Buttons Shown"] = true
 L["Change Button Order"] = true
 L["Button Order"] = true
-L["Top Left"] = true
-L["Bottom Left"] = true
-L["Top Right"] = true
-L["Bottom Right"] = true
 L["Quick Presets"] = true
 L["Apply layout presets to multiple bars at once."] = true
 L["Both 1x12"] = true
@@ -738,7 +713,6 @@ L["Fade the stance bar until you hover over it."] = true
 L["Fade the stance bar until you enter combat."] = true
 L["Fade the pet bar until you hover over it."] = true
 L["Fade the pet bar until you enter combat."] = true
-L["Show Empty Slots"] = true
 L["Show the button frame on pet slots with no ability assigned."] = true
 L["Fade the totem bar until you hover over it."] = true
 L["Fade the totem bar until you enter combat."] = true
@@ -1009,7 +983,6 @@ L["Enable Animated Border"] = true
 L["Enable Minimap Decorations"] = true
 L["Animated Effects"] = true
 L["Rotate preset layers when the selected preset includes animation."] = true
-L["Opacity"] = true
 L["Hide DragonUI Border"] = true
 
 -- Time & Calendar
@@ -1057,7 +1030,6 @@ L["Center"] = true
 L["Horizontal position offset"] = true
 L["Vertical position offset"] = true
 L["Reset quest tracker to default position"] = true
-L["Font Size"] = true
 L["Font size for quest tracker text"] = true
 
 -- ============================================================================
@@ -1111,7 +1083,6 @@ L["Current Value Only (2345)"] = true
 L["Formatted Current (2.3k)"] = true
 L["Percentage Only (75%)"] = true
 L["Percentage + Current (75% | 2.3k)"] = true
-L["Percentage + Current/Max"] = true
 
 -- Health/Mana text
 L["Always Show Health Text"] = true
@@ -1252,7 +1223,6 @@ L["A UI reload is required to apply this change."] = true
 
 -- Size & Scale
 L["Size & Scale"] = true
-L["Bar Height"] = true
 L["Height of the XP and Reputation bars (in pixels)."] = true
 L["Width of the XP and Reputation bars (in pixels)."] = true
 L["Experience Bar Scale"] = true
@@ -1415,7 +1385,6 @@ L["Totems"] = true
 L["Offset X"] = true
 L["Offset Y"] = true
 L["Show Level in Name"] = true
-L["Side arrows on the targeted nameplate."] = true
 L["Bar Size"] = true
 L["Bar Width"] = true
 L["Width of the nameplate health bar."] = true

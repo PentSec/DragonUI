@@ -667,7 +667,7 @@ local function BuildAurasTab(scroll)
         callback = function()
             ResetAuraTimerSettings()
             RefreshAuraUI()
-            print("|cFF00FF00[DragonUI]|r " .. LO["Aura timer settings reset."])
+            addon:Print(LO["Aura timer settings reset."])
         end,
     })
 
@@ -915,7 +915,7 @@ local function BuildAurasTab(scroll)
         callback = function()
             ResetAuraIconSettings()
             RefreshAuraUI()
-            print("|cFF00FF00[DragonUI]|r " .. LO["Aura icon customization settings reset."])
+            addon:Print(LO["Aura icon customization settings reset."])
         end,
     })
 
@@ -934,7 +934,7 @@ local function BuildAurasTab(scroll)
             if addon.BuffFrameModule then
                 addon.BuffFrameModule:ResetBuffFramePosition()
             end
-            print("|cFF00FF00[DragonUI]|r " .. LO["Buff frame position reset."])
+            addon:Print(LO["Buff frame position reset."])
         end,
     })
 
@@ -952,7 +952,7 @@ local function BuildAurasTab(scroll)
             if addon.BuffFrameModule then
                 addon.BuffFrameModule:UpdateWeaponEnchantPosition()
             end
-            print("|cFF00FF00[DragonUI]|r " .. LO["Weapon enchant position reset."])
+            addon:Print(LO["Weapon enchant position reset."])
         end,
     })
 
@@ -975,7 +975,7 @@ local function BuildAurasTab(scroll)
             if addon.BuffFrameModule then
                 addon.BuffFrameModule:ResetDebuffPosition()
             end
-            print("|cFF00FF00[DragonUI]|r " .. LO["Debuff position reset."])
+            addon:Print(LO["Debuff position reset."])
             Panel:SelectTab("auras")
         end,
     })

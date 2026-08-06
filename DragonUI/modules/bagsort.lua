@@ -351,6 +351,40 @@ local function RefreshAllLockMarkers()
     end
 end
 
+local function HasLockedSlots()
+    local locks = GetLockedSlotsTable()
+    return locks ~= nil and next(locks) ~= nil
+end
+
+local BAGSTER_FRAME_COUNT = 3
+local BAGNON_SLOT_FRAMES = { "inventory", "bank" }
+
+-- Markers only render on visible slot buttons, and each button re-syncs its own marker on OnShow.
+local function IsAnyBagUIVisible()
+    if BankFrame and BankFrame:IsShown() then
+        return true
+    end
+    for i = 1, NUM_CONTAINER_FRAMES do
+        local frame = _G["ContainerFrame" .. i]
+        if frame and frame:IsShown() then
+            return true
+        end
+    end
+    for i = 1, BAGSTER_FRAME_COUNT do
+        local frame = _G["DragonUI_BagsterFrame" .. i]
+        if frame and frame:IsShown() then
+            return true
+        end
+    end
+    for _, frameType in ipairs(BAGNON_SLOT_FRAMES) do
+        local frame = GetBagnonFrame(frameType)
+        if frame and frame.IsShown and frame:IsShown() then
+            return true
+        end
+    end
+    return false
+end
+
 local function ToggleSlotLockByBagSlot(bag, slot)
     local newState = not IsSlotLocked(bag, slot)
     SetSlotLocked(bag, slot, newState)
@@ -796,8 +830,12 @@ local function InstallAltClickHooks()
         if elapsed < 0.4 then return end
         elapsed = 0
         InstallBagnonIntegrationHooks()
+        -- Closed bags show no marker and create no slot button, so there is nothing to find.
+        if not IsAnyBagUIVisible() then return end
         HookKnownSlotButtons()
-        RefreshAllLockMarkers()
+        if HasLockedSlots() then
+            RefreshAllLockMarkers()
+        end
     end)
 end
 
@@ -1395,8 +1433,6 @@ local function SortBankBags()
         DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00cc66=== %d MOVES ===|r", #moves))
         for i = #moves, 1, -1 do
             local s, t = decode_move(moves[i])
-            local sid = bag_ids[s] or 0
-            local tid = bag_ids[t] or 0
             DEFAULT_CHAT_FRAME:AddMessage(string.format("  move: [%d]->  [%d]", s, t))
         end
     end
@@ -1731,7 +1767,6 @@ local function AttachBagsterButtons(frame, sortRef, clearRef, sellScrapRef, tran
     local frameName = frame:GetName()
     local searchBox = _G[frameName .. "Search"]
     local bagToggle = _G[frameName .. "BagToggle"]
-    local resetBtn = _G[frameName .. "Reset"]
 
     local sortBtn = sortRef or CreateSortButton(sortBtnName, frame, sortFunc, tooltipText, 0.55)
     local clearBtn = clearRef or CreateClearLocksButton(clearBtnName, frame, 0.55)
