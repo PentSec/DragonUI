@@ -1592,6 +1592,29 @@ function BuffFrameModule:Enable()
                 end
             end
 
+            -- 3.5) Re-anchor VanityBuffs children inside their container.
+            --    Ascension's BuffFrame_UpdateAllBuffAnchors reparents each
+            --    vanity-marked button into VanityBuffsContainer but does NOT
+            --    apply a new SetPoint — the old anchor from the previous
+            --    buff ("TOPRIGHT", BuffButtonN-1, "TOPLEFT") stays put. The
+            --    actual container layout only runs in
+            --    VanityBuffs_UpdateAllAnchors, which is called by Ascension
+            --    ONLY when VanityBuffsTooltip is shown (on-hover). Until then,
+            --    the button sits with stale anchors pointing at a sibling
+            --    rather than the container, so the next UNIT_AURA tick that
+            --    reparents/reflows it makes it visibly jump — the flicker.
+            --    Calling VanityBuffs_UpdateAllAnchors() here runs the container
+            --    layout every aura tick and pins the buttons in place. The
+            --    function only touches children of VanityBuffsContainer and is
+            --    safe to invoke repeatedly (Blizzard does it the same way on
+            --    every ConsolidatedBuffs_OnUpdate exit-time pass).
+            --    Skip when there are no vanity buffs or the container is gone
+            --    (vanilla 3.3.5a).
+            if VanityBuffsContainer and (BuffFrame.numVanity or 0) > 0
+               and VanityBuffs_UpdateAllAnchors then
+                VanityBuffs_UpdateAllAnchors()
+            end
+
             -- 4) Debuffs follow the latest buff / consolidated layout.
             FixDebuffPositions()
             BuffFrameModule:UpdateLayoutPreview()
