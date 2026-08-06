@@ -405,7 +405,7 @@ local function GetSquareButtonOffset()
     if not (deps.GetSquareBorderActive and deps.GetSquareBorderActive()) then
         return 0, 0
     end
-    return -10, 3
+    return -11, 3
 end
 
 local function PositionByAngle(btn, angle)

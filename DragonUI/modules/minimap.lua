@@ -1046,7 +1046,12 @@ local function ReplaceBlizzardFrame(frame)
 end -- End of ReplaceBlizzardFrame function
 
 local function CreateMinimapBorderFrame(width, height)
-    local minimapBorderFrame = CreateFrame('Frame', UIParent)
+    -- The original signature was CreateFrame('Frame', UIParent), which passed UIParent as
+    -- the global `name` (not the parent). That left the border frame orphaned: without an
+    -- explicit parent it never inherits UIParent's effective scale, so the client's UI Scale
+    -- slider (useUiScale) leaves the square border visually frozen while the rest of the
+    -- UI rescales. Pass UIParent as the third argument to actually parent it.
+    local minimapBorderFrame = CreateFrame('Frame', nil, UIParent)
     minimapBorderFrame:SetSize(width, height)
     minimapBorderFrame._duiHeavyUpdateElapsed = 0
     minimapBorderFrame._duiRotationElapsed = 0
@@ -1123,7 +1128,7 @@ local SQUARE_BORDER_HOLE_FRACTION = 454 / 512
 -- Small visual margin so the border ring sits flush around the map instead of
 -- clipping it. Expressed as a multiplier on the ideal hole size; tuning here
 -- (not via an absolute pixel trim) keeps the result invariant to cluster/UI scale.
-local SQUARE_BORDER_FIT = 0.75
+local SQUARE_BORDER_FIT = 1.05
 local SQUARE_MAP_SHRINK = 11
 
 -- Size the square border frame so its inner hole exactly matches the minimap
@@ -2641,7 +2646,11 @@ function MinimapModule:InitializeMinimapSystem()
 
     if not isHybridMode then
         self.borderFrame = CreateMinimapBorderFrame(232, 232)
-        self.borderFrame:SetPoint("CENTER", MinimapBorder, "CENTER", 0, -2)
+        -- Anchor to Minimap, not MinimapBorder: MinimapBorder keeps a fijo local-pixel
+        -- size that doesn't re-scale with the client's uiScale slider, leaving the
+        -- square border visually frozen while the rest of the UI resizes on reload.
+        self.borderFrame:ClearAllPoints()
+        self.borderFrame:SetPoint("CENTER", Minimap, "CENTER", -1, 3)
     end
 
     RemoveBlizzardFrames()
