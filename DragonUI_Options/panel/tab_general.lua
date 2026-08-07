@@ -81,6 +81,54 @@ local function BuildGeneralTab(scroll)
     C:AddSpacer(scroll)
 
     -- ====================================================================
+    -- LANGUAGE
+    -- ====================================================================
+    local language = C:AddSection(scroll, LO["Language"])
+
+    C:AddDescription(language, LO["Choose the language used by the DragonUI interface."])
+
+    local localeNames = {
+        enUS = "English",
+        esES = "Español",
+        esMX = "Español (México)",
+        ptBR = "Português",
+        deDE = "Deutsch",
+        frFR = "Français",
+        ruRU = "Русский",
+        zhCN = "简体中文",
+        zhTW = "繁體中文",
+        koKR = "한국어",
+    }
+
+    -- Hide languages the client font cannot draw; their names would already show as "?" here.
+    local localeValues = { auto = LO["Follow the client language"] }
+    for code, name in pairs(localeNames) do
+        if not addon.CanRenderLocale or addon.CanRenderLocale(code) then
+            localeValues[code] = name
+        end
+    end
+
+    C:AddDropdown(language, {
+        label = LO["Language"],
+        desc  = LO["Choose the language used by the DragonUI interface."],
+        values = localeValues,
+        getFunc = function()
+            return (addon.db and addon.db.global and addon.db.global.locale) or "auto"
+        end,
+        setFunc = function(value)
+            if addon.db and addon.db.global then
+                addon.db.global.locale = value
+            end
+        end,
+        callback = function()
+            StaticPopup_Show("DRAGONUI_RELOAD_UI")
+        end,
+        width = 200,
+    })
+
+    C:AddSpacer(scroll)
+
+    -- ====================================================================
     -- QUICK ACCESS
     -- ====================================================================
     local actions = C:AddSection(scroll, LO["Quick Actions"])
