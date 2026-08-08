@@ -961,7 +961,24 @@ local function GetXpBarHeight(styleOverride)
     end
 end
 
+-- Realm max level, resolved like Blizzard's ReputationFrame does:
+-- MAX_PLAYER_LEVEL_TABLE[GetAccountExpansionLevel()] (0->Vanilla/60,
+-- 1->TBC/70, 2->WotLK/80). Custom servers keep reporting a non-zero UnitXPMax
+-- at the cap, so the level check is what actually hides the bar.
+local XP_MAX_LEVEL_TABLE = { [0] = 60, [1] = 70, [2] = 80 }
+
+local function GetRealmMaxLevel()
+    local maxLevel = MAX_PLAYER_LEVEL
+    if not maxLevel or maxLevel <= 0 then
+        maxLevel = XP_MAX_LEVEL_TABLE[GetAccountExpansionLevel()] or 80
+    end
+    return maxLevel
+end
+
 local function IsXpBarVisible()
+    local level = UnitLevel("player")
+    if level and level >= GetRealmMaxLevel() then return false end
+    if IsXPUserDisabled and IsXPUserDisabled() then return false end
     local maxXP = UnitXPMax("player")
     if not maxXP or maxXP <= 0 then return false end
     local currXP = UnitXP("player") or 0
