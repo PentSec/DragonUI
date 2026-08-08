@@ -147,6 +147,10 @@ L["Detach weapon enchant icons (poisons, sharpening stones, etc.) from the buff 
 -- Auras tab
 L["Show Toggle Button"] = true
 L["Show a collapse/expand button next to the buff icons."] = true
+L["Vanity Buffs"] = true
+L["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."] = true
+L["Hide Vanity Buffs"] = true
+L["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."] = true
 L["Weapon Enchants"] = true
 L["Weapon enchant icons include rogue poisons, sharpening stones, wizard oils, and similar temporary weapon enhancements."] = true
 L["Aura Borders"] = true

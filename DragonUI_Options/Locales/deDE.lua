@@ -142,6 +142,10 @@ L["Detach weapon enchant icons (poisons, sharpening stones, etc.) from the buff 
 L["Auras"] = "Auren"
 L["Show Toggle Button"] = "Zeige wechsel Knopf"
 L["Show a collapse/expand button next to the buff icons."] = "Zeige eine Schaltfläche zum Ein- und Ausblenden neben den Buff-Symbolen an."
+L["Vanity Buffs"] = true
+L["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."] = true
+L["Hide Vanity Buffs"] = true
+L["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."] = true
 L["Weapon Enchants"] = "Waffenverzauberungen"
 L["Weapon enchant icons include rogue poisons, sharpening stones, wizard oils, and similar temporary weapon enhancements."] = "Zu den Symbolen für Waffenverzauberungen gehören Schurken-Gifte, Schleifsteine, Zaubereröle und ähnliche vorübergehende Waffenverbesserungen."
 L["When enabled, a 'Weapon Enchants' mover appears in Editor Mode that you can drag to any position on screen."] = "Wenn diese Option aktiviert ist, erscheint im Editor-Modus ein „Waffenverzauberungen”-Mover, den Sie an eine beliebige Position auf dem Bildschirm ziehen können."

@@ -152,6 +152,10 @@ L["Detach weapon enchant icons (poisons, sharpening stones, etc.) from the buff 
 L["Auras"] = "버프/디버프"
 L["Show Toggle Button"] = "전환 버튼 표시"
 L["Show a collapse/expand button next to the buff icons."] = "버프 아이콘 옆에 축소/확장 버튼을 표시합니다."
+L["Vanity Buffs"] = true
+L["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."] = true
+L["Hide Vanity Buffs"] = true
+L["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."] = true
 L["Weapon Enchants"] = "무기 강화 효과"
 L["Weapon enchant icons include rogue poisons, sharpening stones, wizard oils, and similar temporary weapon enhancements."] = "무기 강화 아이콘 구성: 도적의 독, 숫돌, 마법사 오일 및 기타 일시적 무기 강화 효과"
 L["When enabled, a 'Weapon Enchants' mover appears in Editor Mode that you can drag to any position on screen."] = "활성화 시 편집 모드에 '무기 강화 효과' 이동 핸들 표시 및 자유로운 위치 이동 가능"

@@ -836,6 +836,10 @@ L["Enable DragonUI minimap enhancements including custom styling, positioning, t
 L["Enable DragonUI buff frame with custom styling, positioning, and toggle button functionality. When disabled, uses default Blizzard buff frame appearance and positioning."] = "Activer le cadre des améliorations de DragonUI avec style personnalisé, positionnement et bouton de bascule. Si désactivé, utilise l'apparence et le positionnement du cadre d'améliorations Blizzard par défaut."
 L["Show Toggle Button"] = "Afficher le bouton de bascule"
 L["Show a collapse/expand button next to the buff icons."] = "Afficher un bouton de réduction/agrandissement à côté des icônes d'améliorations."
+L["Vanity Buffs"] = true
+L["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."] = true
+L["Hide Vanity Buffs"] = true
+L["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."] = true
 L["Aura Borders"] = "Bordures d'auras"
 L["Enable Aura Borders"] = "Activer les bordures d'auras"
 L["Show modern borders around buff and debuff icons."] = "Afficher des bordures modernes autour des icônes d'améliorations et d'affaiblissements."
@@ -1687,6 +1691,10 @@ L["Enable DragonUI minimap enhancements including custom styling, positioning, t
 L["Enable DragonUI buff frame with custom styling, positioning, and toggle button functionality. When disabled, uses default Blizzard buff frame appearance and positioning."] = "Active la fenêtre des buffs de DragonUI avec style, positionnement et bouton de bascule personnalisés. Si désactivée, l'apparence et le placement Blizzard par défaut sont utilisés."
 L["Show Toggle Button"] = "Afficher le bouton de bascule"
 L["Show a collapse/expand button next to the buff icons."] = "Affiche un bouton de repli/déploiement à côté des icônes de buff."
+L["Vanity Buffs"] = true
+L["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."] = true
+L["Hide Vanity Buffs"] = true
+L["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."] = true
 L["Aura Borders"] = "Bordures d'aura"
 L["Enable Aura Borders"] = "Activer les bordures d'aura"
 L["Show modern borders around buff and debuff icons."] = "Affiche des bordures modernes autour des icônes de buff et d'affaiblissement."

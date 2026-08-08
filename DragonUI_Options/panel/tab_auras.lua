@@ -302,6 +302,27 @@ local function BuildAurasTab(scroll)
     C:AddDescription(weaponSection,
         "|cff888888" .. LO["When enabled, a 'Weapon Enchants' mover appears in Editor Mode that you can drag to any position on screen."] .. "|r")
 
+    C:AddSpacer(weaponSection)
+
+    -- ====================================================================
+    -- VANITY BUFFS (Ascension)
+    -- ====================================================================
+    local vanitySection = C:AddSection(scroll, LO["Vanity Buffs"])
+
+    C:AddDescription(vanitySection,
+        LO["Vanity buffs are cosmetic auras consolidated by Ascension (mounts, toys, transmog effects). The consolidated container is provided by the Ascension_VanityCollection addon."])
+
+    C:AddToggle(vanitySection, {
+        label = LO["Hide Vanity Buffs"],
+        desc = LO["Hide the Ascension vanity-buff consolidated container and its contained auras from the buff frame. Existing buff order and positioning are preserved."],
+        dbPath = "buffs.hide_vanity_buffs",
+        callback = function()
+            if addon.BuffFrameModule and addon.BuffFrameModule.RefreshVanityBuffsVisibility then
+                addon.BuffFrameModule:RefreshVanityBuffsVisibility()
+            end
+        end,
+    })
+
     C:AddSpacer(scroll)
     local playerAuraSection = C:AddSection(scroll, LO["Player Buffs & Debuffs"])
 

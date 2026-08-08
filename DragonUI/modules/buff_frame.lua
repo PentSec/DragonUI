@@ -88,6 +88,14 @@ local function IsWeaponEnchantSeparationEnabled()
         and addon.db.profile.buffs.separate_weapon_enchants
 end
 
+-- Check if vanity buffs should be hidden from the buff frame and container.
+-- When true, vanity-marked auras (identified by C_VanityCollection.IsConsolidatedVanityBuff)
+-- are hidden from the regular buff row AND the VanityBuffs container is kept hidden.
+local function IsVanityBuffsHidden()
+    return addon.db and addon.db.profile and addon.db.profile.buffs
+        and addon.db.profile.buffs.hide_vanity_buffs == true
+end
+
 -- Check if weapon enchant frame is at its default position
 local function IsWeaponEnchantAtDefaultPosition()
     if not addon.db or not addon.db.profile or not addon.db.profile.widgets
@@ -1615,6 +1623,62 @@ function BuffFrameModule:Enable()
                 VanityBuffs_UpdateAllAnchors()
             end
 
+            -- 3.6) When "Hide Vanity Buffs" is on, Blizzard's anchor code ran
+            --    before this hook may have left the first BuffButton anchored
+            --    to a now-hidden VanityBuffs if the numVanity=0 reset raced
+            --    with Ascension's computation. Re-anchor that first button to
+            --    ConsolidatedBuffs the same way Ascension does in
+            --    BuffFrame_UpdateAllBuffAnchors (BuffFrame.lua l.370-379):
+            --      numConsolidated > 0  -> TOPRIGHT, ConsolidatedBuffs.TOPLEFT, -5, 0
+            --      numConsolidated == 0 -> TOPRIGHT, ConsolidatedBuffs.TOPRIGHT, 0, 0
+            --    Picking the wrong branch leaves a residual gap (the slot
+            --    VanityBuffs used to occupy) or overlaps the first buff onto
+            --    the consolidated icon. Idempotent via _applyAnchor.
+            if IsVanityBuffsHidden() and not weaponEnchantsAreSeparated
+               and ConsolidatedBuffs then
+                local firstButton
+                for i = 1, BUFF_ACTUAL_DISPLAY or 32 do
+                    local btn = _G["BuffButton" .. i]
+                    if not btn then break end
+                    if btn:IsShown() and not btn.vanity then
+                        firstButton = btn
+                        break
+                    end
+                end
+                if firstButton then
+                    -- Mirror Ascension's BuffFrame_UpdateAllBuffAnchors branch
+                    -- chain (BuffFrame.lua l.370-379) with numVanity forced to 0,
+                    -- since the VanityBuffs container is hidden while the option
+                    -- is on:
+                    --   numEnchants > 0     -> TemporaryEnchantFrame.TOPLEFT, -5
+                    --   numConsolidated > 0 -> ConsolidatedBuffs.TOPLEFT, -5
+                    --   otherwise           -> ConsolidatedBuffs.TOPRIGHT, 0
+                    local relFrame, relPoint, offsetX
+                    if (BuffFrame.numEnchants or 0) > 0 then
+                        relFrame, relPoint, offsetX = TemporaryEnchantFrame, "TOPLEFT", -5
+                    elseif (BuffFrame.numConsolidated or 0) > 0 then
+                        relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPLEFT", -5
+                    else
+                        relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPRIGHT", 0
+                    end
+                    -- The _anchorCache is UNSAFE here: Ascension's
+                    -- VanityBuffs_OnHide (BuffFrame.lua l.744-749) re-runs the
+                    -- anchor pass with numVanity still > 0 (our Show hook zeroes
+                    -- it only after Hide() returns) and re-anchors the first buff
+                    -- to the hidden VanityBuffs. That changes the ACTUAL anchor
+                    -- without changing our desired signature, so a cache hit
+                    -- would skip the fix and leave the gap. Compare the real
+                    -- anchor instead and force the re-anchor only on drift.
+                    local _, actRelFrame, actRelPoint, actX = firstButton:GetPoint()
+                    if actRelFrame ~= relFrame
+                       or actRelPoint ~= relPoint
+                       or actX ~= offsetX then
+                        _applyAnchor(firstButton, "firstBuffVanityHidden",
+                            "TOPRIGHT", relFrame, relPoint, offsetX, 0)
+                    end
+                end
+            end
+
             -- 4) Debuffs follow the latest buff / consolidated layout.
             FixDebuffPositions()
             BuffFrameModule:UpdateLayoutPreview()
@@ -1639,6 +1703,16 @@ function BuffFrameModule:Enable()
             local button = _G[buttonName .. index]
             if not button then return end
             if buttonName == "BuffButton" then
+                -- Hide vanity buffs from the buff row when the option is on.
+                -- Ascension marks buffs with .vanity = true inside AuraButton_Update
+                -- (see _ref-/vanitybuff/BuffFrame.lua l.237-258) using
+                -- C_VanityCollection.IsConsolidatedVanityBuff(spellID) and the
+                -- "consolidateVanityBuffs" cvar. We hide the button here after
+                -- Ascension's pass so the vanity flag is already set, and keep
+                -- the VanityBuffs container hidden via the OnShow hook below.
+                if IsVanityBuffsHidden() and button.vanity then
+                    button:Hide()
+                end
                 SetAuraScale(button, GetBuffScale())
                 if weaponEnchantsAreSeparated then
                     LockBuffButtonAwayFromTempEnchants(button, index)
@@ -1646,6 +1720,35 @@ function BuffFrameModule:Enable()
             elseif buttonName == "DebuffButton" then
                 SetAuraScale(button, GetDebuffScale())
             end
+        end)
+    end
+
+    -- Keep the Ascension VanityBuffs container hidden while the option is on.
+    -- Ascension's BuffFrame_Update shows VanityBuffs whenever numVanity > 0;
+    -- hooking Show lets us suppress it every time it tries to appear.
+    -- CRITICAL: Ascension calls VanityBuffs:Show() at l.108-109 of
+    -- BuffFrame.lua BEFORE it calls BuffFrame_UpdateAllBuffAnchors() at l.115.
+    -- Blizzard's BuffFrame_UpdateAllBuffAnchors uses BuffFrame.numVanity to
+    -- decide where the first non-vanity buff anchors ( VanityBuffs.TOPLEFT ).
+    -- If we only Hide() the container, numVanity stays > 0 and the first buff
+    -- is still anchored to the now-hidden VanityBuffs, leaving an empty gap.
+    -- So in addition to Hide(), we zero BuffFrame.numVanity here. This runs
+    -- synchronously inside the Ascension BuffFrame_Update flow, BEFORE
+    -- BuffFrame_UpdateAllBuffAnchors runs, so the anchor chain skips the
+    -- VanityBuffs link entirely and the buff row starts flush against
+    -- ConsolidatedBuffs. While the option stays on, numVanity is kept at 0
+    -- so the value the next BuffFrame_Update computes (always > 0 when there
+    -- are vanity spells) is overridden again. Disabling the option lets
+    -- Ascension's native value flow through untouched.
+    if not BuffFrameModule._hookedVanityBuffsShow and VanityBuffs then
+        BuffFrameModule._hookedVanityBuffsShow = true
+        hooksecurefunc(VanityBuffs, "Show", function()
+            if not buffFramePositionLocked or not IsVanityBuffsHidden() then return end
+            VanityBuffs:Hide()
+            -- Force numVanity to 0 so BuffFrame_UpdateAllBuffAnchors (which
+            -- runs right after this Show) skips the VanityBuffs anchor branch
+            -- and the first buff hugs ConsolidatedBuffs instead.
+            BuffFrame.numVanity = 0
         end)
     end
 
@@ -1858,5 +1961,38 @@ end)
 function addon:RefreshBuffFrame()
     if BuffFrameModule and addon.db.profile.buffs.enabled then
         BuffFrameModule:UpdatePosition()
+    end
+end
+
+-- Runtime toggle for the "Hide Vanity Buffs" option: forces a buff layout refresh
+-- so the VanityBuffs container and any in-flight vanity buttons react immediately
+-- without requiring a UI reload.
+function BuffFrameModule:RefreshVanityBuffsVisibility()
+    if not buffFramePositionLocked then return end
+    if IsVanityBuffsHidden() and VanityBuffs and VanityBuffs:IsShown() then
+        VanityBuffs:Hide()
+    end
+    -- When the option is enabled, strip any chrome the auraborders module applied
+    -- to the VanityBuffs container. Without this the border stays visible on
+    -- screen after the container itself is hidden (duiHost is a sibling frame
+    -- and Survives VanityBuffs:Hide unless somebody explicitly restores it).
+    -- Conversely, when the option is disabled, re-apply the borders. The
+    -- auraborders module already hooks BuffFrame_Update and will restyle on the
+    -- next aura tick, but restoring now makes the toggle feel instant.
+    if VanityBuffs and addon.RestoreAuraBordersSystem and addon.ApplyAuraBordersSystem then
+        local hideVanity = IsVanityBuffsHidden()
+        if hideVanity and (VanityBuffs.duiFrame or VanityBuffs.duiHost) then
+            addon.RestoreAuraBordersSystem()
+            addon.ApplyAuraBordersSystem()
+        elseif not hideVanity and (VanityBuffs.duiFrame or VanityBuffs.duiHost) then
+            addon.ApplyAuraBordersSystem()
+        end
+    end
+    -- Re-run Blizzard's aura update so any already-marked vanity buttons get
+    -- re-shown/hidden per the new option state. AuraButton_Update will re-flag
+    -- them on the next pass; the BuffFrame_UpdateAllBuffAnchors hook re-syncs
+    -- the container layout.
+    if BuffFrame_Update then
+        BuffFrame_Update()
     end
 end

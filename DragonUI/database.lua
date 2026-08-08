@@ -584,6 +584,7 @@ local defaults = {
             show_toggle_button = true,
             buffs_hidden = false,
             separate_weapon_enchants = false,
+            hide_vanity_buffs = false,
             buff_horizontal_gap = 0,
             debuff_horizontal_gap = 0,
             buff_scale = 1,
