@@ -1123,15 +1123,33 @@ function BuffFrameModule:Enable()
     -- Without this lock, Blizzard re-anchors CB on ticket open/close, pulling
     -- the entire buff chain to the wrong position even though dragonUIBuffFrame
     -- (and the toggle button) stay put.
+    --
+    -- VANITY EXCEPTION: while VanityBuffs is shown (Ascension active),
+    -- ConsolidatedBuffs is being actively re-anchored by Ascension's own
+    -- handlers (ConsolidatedBuffs_OnShow/OnHide, VanityBuffs_OnShow/OnHide in
+    -- _ref-/vanitybuff/BuffFrame.lua). Forcing it back to dragonUIBuffFrame
+    -- during those re-anchors caused the visible "container hops" flicker —
+    -- each UNIT_AURA tick, Ascension pinned CB somewhere, our override pinned
+    -- it back, then Ascension pinned it again. Letting CB own itself while
+    -- vanity is up: CB → VanityBuffs chain still ends up on dragonUIBuffFrame
+    -- transitively (because we already pin CB to dragonUIBuffFrame at init),
+    -- so the on-screen position is correct without the per-tick fight.
     ConsolidatedBuffs.ClearAllPoints = function(self)
         if not buffFramePositionLocked or not dragonUIBuffFrame then
             return original_CB_ClearAllPoints(self)
         end
+        if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+            return original_CB_ClearAllPoints(self)
+        end
         -- Noop when locked
     end
-    
+
     ConsolidatedBuffs.SetPoint = function(self, ...)
         if not buffFramePositionLocked or not dragonUIBuffFrame then
+            return original_CB_SetPoint(self, ...)
+        end
+        if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+            -- Ascension owns CB's anchor right now — pass through unmodified.
             return original_CB_SetPoint(self, ...)
         end
         original_CB_ClearAllPoints(self)
@@ -1612,6 +1630,26 @@ function BuffFrameModule:Enable()
             --    (vanilla 3.3.5a).
             if VanityBuffsContainer and (BuffFrame.numVanity or 0) > 0
                and VanityBuffs_UpdateAllAnchors then
+                -- ROOT CAUSE FIX (vanity flicker): VanityBuffs_OnUpdate pops
+                -- buttons out of the container when their exitTime expires
+                -- (see _ref-/vanitybuff/BuffFrame.lua l.700-710) WITHOUT
+                -- calling BuffFrame_UpdateAllBuffAnchors afterwards in some
+                -- paths. The popped buttons end up parented to BuffFrame with
+                -- a stale SetPoint, then the next UNIT_AURA tick reparents
+                -- them back into VanityBuffsContainer — visible flicker
+                -- (buff leaves container, enters, leaves, enters).
+                --
+                -- Reparent any BuffButton currently marked vanity (or whose
+                -- parent is the container) back into VanityBuffsContainer if
+                -- Ascension popped it. Cheaper than running the full
+                -- VanityBuffs_UpdateAllAnchors grid pass on every tick: we
+                -- only touch buttons whose parent is wrong.
+                for i = 1, (BUFF_MAX_DISPLAY or 40) do
+                    local b = _G["BuffButton" .. i]
+                    if b and b.vanity and b:GetParent() ~= VanityBuffsContainer then
+                        b:SetParent(VanityBuffsContainer)
+                    end
+                end
                 VanityBuffs_UpdateAllAnchors()
             end
 
