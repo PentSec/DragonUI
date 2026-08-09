@@ -575,6 +575,10 @@ L["Level %d"] = true
 L["Version Check"] = true
 L["Broadcast and detect addon version updates across group members"] = true
 
+-- Performance Warmup Module
+L["UI Warmup"] = true
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = true
+
 -- Quest nameplate icons wizard (Questie coexistence)
 L["Quest Icons on Nameplates"] = true
 L["Which quest icons do you want on your nameplates?"] = true

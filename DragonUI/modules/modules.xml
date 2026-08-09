@@ -106,6 +106,9 @@
     <!-- Version Check module (cross-player version broadcast) -->
     <Script file="versioncheck.lua"/>
 
+    <!-- Performance Warmup module (pre-loads panels to avoid first-use freezes) -->
+    <Script file="performance_warmup.lua"/>
+
     <!-- Talent Inspector module (CoA talent tree viewer in inspect) -->
     <Script file="inspector.lua"/>
 

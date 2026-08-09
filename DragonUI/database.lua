@@ -820,6 +820,9 @@ local defaults = {
             noop = {
                 enabled = true -- Hide default Blizzard UI elements to allow DragonUI replacements
             },
+            performance_warmup = {
+                enabled = true -- Pre-load select panels on login to avoid first-use freezes
+            },
             playerPrimaryStat = {
                 enabled = true -- Primary stat icon movability widget
             },
