@@ -860,16 +860,44 @@ end
 -- the buff row roots off ConsolidatedBuffs (or VanityBuffs when shown) so it
 -- stays put on dragonUIBuffFrame instead of following the weapon frame.
 local function DesiredSeparatedBuffAnchor()
-    if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
+    -- A hidden VanityBuffs must NEVER be the row root: when Hide Vanity Buffs
+    -- is on, Blizzard still anchors the first buff to it (BuffFrame.lua l.373-374)
+    -- during the numVanity race, which reopens the 36px gap. Skip it entirely.
+    if not IsVanityBuffsHidden()
+       and VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
         return "TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0
     end
     if ConsolidatedBuffs then
         if ConsolidatedBuffs:IsShown() then
-            return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
+            -- Same flush offset (0) treatment as the non-separated chain: with
+            -- VanityBuffs hidden, CB.TOPLEFT is the row root, no -6 spacing.
+            local offset = IsVanityBuffsHidden() and 0 or -6
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", offset, 0
         end
-        return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+        return "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0
     end
     return nil
+end
+
+-- Desired anchor for the first non-consolidated BuffButton when "Hide Vanity
+-- Buffs" is on. Dispatches by mode: separated enchants root the row off
+-- dragonUIBuffFrame/CB (never TEF, which lives on the weapon frame); the
+-- regular chain mirrors Ascension's BuffFrame_UpdateAllBuffAnchors branch
+-- chain (BuffFrame.lua l.370-379) with numVanity forced to 0, and skips the
+-- hidden CB so no 36px phantom-slot gap opens against our frame.
+local function DesiredFirstBuffAnchor()
+    if weaponEnchantsAreSeparated then
+        return DesiredSeparatedBuffAnchor()
+    end
+    local relFrame, relPoint, offsetX
+    if (BuffFrame.numEnchants or 0) > 0 then
+        relFrame, relPoint, offsetX = TemporaryEnchantFrame, "TOPLEFT", -5
+    elseif (BuffFrame.numConsolidated or 0) > 0 then
+        relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPLEFT", -5
+    else
+        relFrame, relPoint, offsetX = dragonUIBuffFrame, "TOPRIGHT", 0
+    end
+    return "TOPRIGHT", relFrame, relPoint, offsetX, 0
 end
 
 -- Does this SetPoint reference point at TemporaryEnchantFrame? Blizzard passes
@@ -1682,14 +1710,14 @@ function BuffFrameModule:Enable()
             -- 3.6) When "Hide Vanity Buffs" is on, Blizzard's anchor code ran
             --    before this hook may have left the first BuffButton anchored
             --    to a now-hidden VanityBuffs if the numVanity=0 reset raced
-            --    with Ascension's computation. Re-anchor that first button to
-            --    ConsolidatedBuffs the same way Ascension does in
-            --    BuffFrame_UpdateAllBuffAnchors (BuffFrame.lua l.370-379):
-            --      numConsolidated > 0  -> TOPRIGHT, ConsolidatedBuffs.TOPLEFT, -5, 0
-            --      numConsolidated == 0 -> TOPRIGHT, ConsolidatedBuffs.TOPRIGHT, 0, 0
-            --    Picking the wrong branch leaves a residual gap (the slot
-            --    VanityBuffs used to occupy) or overlaps the first buff onto
-            --    the consolidated icon. Idempotent via _applyAnchor.
+            --    with Ascension's computation. Re-anchor that first button the
+            --    way Ascension does in BuffFrame_UpdateAllBuffAnchors
+            --    (BuffFrame.lua l.370-379), dispatched by mode via
+            --    DesiredFirstBuffAnchor. Runs for BOTH the regular chain and
+            --    separated weapon enchants: without the separated branch the
+            --    row would root off the hidden VanityBuffs (or follow TEF onto
+            --    the weapon frame) and reopen the 36px gap. Idempotent via
+            --    _applyAnchor.
             --
             --    When ConsolidatedBuffs is HIDDEN (numConsolidated == 0) its
             --    anchor math still consumes 36px at dragonUIBuffFrame.TOPRIGHT,
@@ -1697,8 +1725,7 @@ function BuffFrameModule:Enable()
             --    a visible 36px gap between the buff row and our frame. Pin to
             --    dragonUIBuffFrame.TOPRIGHT directly instead so the chain stays
             --    flush against our frame when CB is hidden.
-            if IsVanityBuffsHidden() and not weaponEnchantsAreSeparated
-               and ConsolidatedBuffs then
+            if IsVanityBuffsHidden() and ConsolidatedBuffs then
                 local firstButton
                 for i = 1, BUFF_ACTUAL_DISPLAY or 32 do
                     local btn = _G["BuffButton" .. i]
@@ -1709,37 +1736,16 @@ function BuffFrameModule:Enable()
                     end
                 end
                 if firstButton then
-                    -- Mirror Ascension's BuffFrame_UpdateAllBuffAnchors branch
-                    -- chain (BuffFrame.lua l.370-379) with numVanity forced to 0,
-                    -- since the VanityBuffs container is hidden while the option
-                    -- is on:
-                    --   numEnchants > 0     -> TemporaryEnchantFrame.TOPLEFT, -5
-                    --   numConsolidated > 0 -> ConsolidatedBuffs.TOPLEFT, -5
-                    --   otherwise           -> dragonUIBuffFrame.TOPRIGHT, 0
-                    --                         (skip the hidden CB to avoid a
-                    --                         36px phantom-slot gap)
-                    local relFrame, relPoint, offsetX
-                    if (BuffFrame.numEnchants or 0) > 0 then
-                        relFrame, relPoint, offsetX = TemporaryEnchantFrame, "TOPLEFT", -5
-                    elseif (BuffFrame.numConsolidated or 0) > 0 then
-                        relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPLEFT", -5
-                    else
-                        relFrame, relPoint, offsetX = dragonUIBuffFrame, "TOPRIGHT", 0
-                    end
-                    -- Ascension's VanityBuffs_OnHide (BuffFrame.lua l.744-749)
-                    -- re-runs the anchor pass with numVanity still > 0 (our Show
-                    -- hook zeroes it only after Hide() returns) and re-anchors
-                    -- the first buff to the hidden VanityBuffs. The real
-                    -- GetPoint() check below is a fast-path; _applyAnchor re-checks
-                    -- the frame's real anchor against the desired one, so a stale
-                    -- cache hit can no longer skip the corrective re-anchor and
-                    -- leave the gap.
-                    local _, actRelFrame, actRelPoint, actX = firstButton:GetPoint()
-                    if actRelFrame ~= relFrame
-                       or actRelPoint ~= relPoint
-                       or actX ~= offsetX then
-                        _applyAnchor(firstButton, "firstBuffVanityHidden",
-                            "TOPRIGHT", relFrame, relPoint, offsetX, 0)
+                    local pt, rf, rp, x, y = DesiredFirstBuffAnchor()
+                    if pt then
+                        -- Ascension's VanityBuffs_OnHide (BuffFrame.lua l.744-749)
+                        -- re-runs the anchor pass with numVanity still > 0 (our
+                        -- Show hook zeroes it only after Hide() returns) and
+                        -- re-anchors the first buff to the hidden VanityBuffs.
+                        -- _applyAnchor re-checks the frame's real anchor against
+                        -- the desired one, so a stale cache hit can no longer
+                        -- skip the corrective re-anchor and leave the gap.
+                        _applyAnchor(firstButton, "firstBuffVanityHidden", pt, rf, rp, x, y)
                     end
                 end
             end
