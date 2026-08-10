@@ -1114,6 +1114,13 @@ local defaults = {
                 enabled = true, -- Color item borders by quality in bags, character panel, bank, merchant
                 min_quality = 2 -- Minimum quality to show (2 = Uncommon/green)
             },
+            characterpanel = {
+                enabled = true, -- Retail-style reskin of the Blizzard character window
+                class_portrait = true, -- Class icon in the portrait instead of the player's face
+                class_level_text = true, -- Class-colored "Level X Race Class" line
+                dark_background = false, -- Tint the panel's stone grounds down; the cog toggles it
+                grey_model_backdrop = true, -- Desaturate and dim the race backdrop behind the model
+            },
             itemlevel = {
                 enabled = true, -- Show item level on gear icons
                 font_size = 12,
@@ -1224,6 +1231,9 @@ local defaults = {
                 borderStyle = "standard", -- "standard", "thin", "none"
                 scale = 1.0,
             },
+            collections = {
+                enabled = true, -- Dedicated Pets & Mounts window opened from the micro menu
+            }
         },
 
         -- LAYOUT PRESETS (user-saved UI snapshots within this profile)
