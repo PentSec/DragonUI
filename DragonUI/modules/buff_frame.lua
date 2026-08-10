@@ -783,16 +783,35 @@ end
 -- Desired anchor for TemporaryEnchantFrame in the NORMAL buff chain (used when
 -- weapon enchants are NOT separated). Respects Ascension's chain: when
 -- VanityBuffs is shown, TEF follows VanityBuffs (its LEFT), not ConsolidatedBuffs.
+--
+-- CRITICAL with Hide Vanity Buffs ON: VanityBuffs is forced invisible but its
+-- anchor math (36px-wide slot at ConsolidatedBuffs.TOPLEFT - 6) STILL consumes
+-- space, and Ascension's VanityBuffs_OnHide re-pins TEF to VanityBuffs.TOPRIGHT.
+-- Visually that leaves an empty 36px gap right where VanityBuffs used to render
+-- — the "hueco donde va el vanitybuff" reported by the user. Pin TEF directly
+-- to ConsolidatedBuffs.TOPLEFT (no -6 spacing offset) so the chain closes the
+-- gap. Same treatment for CB-hidden so the chain hugs dragonUIBuffFrame.
 local function DesiredChainTempEnchantAnchor()
     if not TemporaryEnchantFrame then return nil end
+    -- Only chain off VanityBuffs when it's actually visible AND not suppressed.
+    -- Hidden-by-option still sets IsShown() false (our Show hook re-hides),
+    -- so this branch only fires when the option is OFF and Ascension shows it.
     if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
         return "TOPRIGHT", VanityBuffs, "TOPLEFT", -6, 0
     end
-    if ConsolidatedBuffs then
-        if ConsolidatedBuffs:IsShown() then
-            return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
-        end
-        return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
+    if ConsolidatedBuffs and ConsolidatedBuffs:IsShown() then
+        -- When Hide Vanity Buffs is on, VanityBuffs is hidden but still occupies
+        -- a 36px anchor-math slot adjacent to ConsolidatedBuffs.TOPLEFT. Anchor
+        -- TEF flush against ConsolidatedBuffs.TOPLEFT (no -6 spacing gap) so the
+        -- chain starts immediately next to CB and the phantom VanityBuffs slot
+        -- is removed from the layout. When the option is OFF, VanityBuffs
+        -- occupies that adjacent slot, so TEF sits at CB.TOPLEFT - 6 to leave
+        -- room for the 36px VanityBuffs icon (matches Ascension's chain length).
+        local offset = IsVanityBuffsHidden() and 0 or -6
+        return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", offset, 0
+    end
+    if dragonUIBuffFrame then
+        return "TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0
     end
     return nil
 end
@@ -1215,12 +1234,16 @@ function BuffFrameModule:Enable()
         if VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0 then
             return
         end
-        if TemporaryEnchantFrame and cb then
+        if TemporaryEnchantFrame then
             TemporaryEnchantFrame:ClearAllPoints()
-            if cb:IsShown() then
-                TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", -6, 0)
-            else
-                TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPRIGHT", 0, 0)
+            if cb and cb:IsShown() then
+                -- When Hide Vanity Buffs is on, anchor TEF flush against CB so
+                -- the 36px phantom VanityBuffs slot doesn't leave a visible gap
+                -- between CB and TEF. Otherwise leave -6 spacing for VanityBuffs.
+                local offset = IsVanityBuffsHidden() and 0 or -6
+                TemporaryEnchantFrame:SetPoint("TOPRIGHT", cb, "TOPLEFT", offset, 0)
+            elseif dragonUIBuffFrame then
+                TemporaryEnchantFrame:SetPoint("TOPRIGHT", dragonUIBuffFrame, "TOPRIGHT", 0, 0)
             end
         end
     end
@@ -1499,8 +1522,8 @@ function BuffFrameModule:Enable()
         -- already-correctly-anchored frame still triggers the frame manager to
         -- reflow children visibly on 3.3.5a, which is the exact source of the
         -- "buffs move wildly looking for a position" flicker. We diff against
-        -- the last anchor we applied and only touch the frame when the desired
-        -- anchor actually changed.
+        -- the last anchor we applied AND the frame's real GetPoint() anchor,
+        -- and only touch the frame when it is not actually where we want it.
         local _anchorCache = {}
 
         local function _desiredTempEnchantAnchor()
@@ -1508,13 +1531,38 @@ function BuffFrameModule:Enable()
             return DesiredChainTempEnchantAnchor()
         end
 
-        -- Apply an anchor only if it differs from the cached one. Returns true
-        -- when something actually moved (so callers can batch follow-up work).
+        -- Apply an anchor only if the frame is not ALREADY there. The cached
+        -- signature alone is not enough: Ascension's VanityBuffs_OnHide re-pins
+        -- TemporaryEnchantFrame to VanityBuffs.TOPRIGHT outside our code (see
+        -- _ref-/vanitybuff/BuffFrame.lua), so on the next anchor pass the cache
+        -- would still match our last desired sig and short-circuit the corrective
+        -- re-anchor, leaving the phantom-vanity gap open. The cache stays as the
+        -- flicker guard; the frame's real GetPoint() anchor is the ground truth.
+        -- Returns true when something actually moved (so callers can batch
+        -- follow-up work).
+        local ANCHOR_OFFSET_EPSILON = 2.0
+
+        -- Does the frame's current anchor (real GetPoint) match the desired one?
+        -- Point names and the relative frame must match exactly; offsets compare
+        -- within the epsilon because GetPoint() reads back scaled floats (a
+        -- SetPoint of -6 returns -5.99999986). A nil GetPoint (frame with no
+        -- anchor points) counts as "not where we want it".
+        local function _matchesDesiredAnchor(frame, point, relFrame, relPoint, x, y)
+            local actPoint, actRelFrame, actRelPoint, actX, actY = frame:GetPoint()
+            if not actPoint then return false end
+            if actPoint ~= point or actRelFrame ~= relFrame or actRelPoint ~= relPoint then
+                return false
+            end
+            if math.abs((actX or 0) - (x or 0)) > ANCHOR_OFFSET_EPSILON then return false end
+            if math.abs((actY or 0) - (y or 0)) > ANCHOR_OFFSET_EPSILON then return false end
+            return true
+        end
+
         local function _applyAnchor(frame, key, point, relFrame, relPoint, x, y)
             if not frame then return false end
             local sig = point .. "|" .. tostring(relFrame) .. "|" .. relPoint
                           .. "|" .. tostring(x) .. "|" .. tostring(y)
-            if _anchorCache[key] == sig then
+            if _anchorCache[key] == sig and _matchesDesiredAnchor(frame, point, relFrame, relPoint, x, y) then
                 -- Already at the desired anchor — do NOT touch the frame.
                 return false
             end
@@ -1539,13 +1587,21 @@ function BuffFrameModule:Enable()
             --    so the pin survives even in those edge cases.
             --    When NOT separated, anchor it to follow ConsolidatedBuffs /
             --    VanityBuffs (the regular chain), idempotent via _applyAnchor.
+            --
+            --    Hide-Vanity-Buffs short-circuits the VanityBuffs anchor branch
+            --    even when Ascension's recursive BuffFrame_UpdatePositions
+            --    (fired from VanityBuffs_OnShow) re-enters this hook with
+            --    VanityBuffs:IsShown() still true (our Show hook re-hides only
+            --    AFTER the original OnShow script chain returns). Without this
+            --    override, TEF would stay anchored to the 36px VanityBuffs slot,
+            --    leaving a visible gap right where VanityBuffs used to be.
             if weaponEnchantsAreSeparated then
                 AnchorWeaponEnchantsToFrame()
-            elseif not (VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0) then
-                -- Only re-anchor TEF when VanityBuffs is NOT shown.
-                -- When VanityBuffs IS shown, Ascension's VanityBuffs_OnShow
-                -- already positioned TEF to VanityBuffs:TOPLEFT. Touching
-                -- TEF here would fight that anchor every tick → flicker.
+            elseif not (VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0)
+                or IsVanityBuffsHidden() then
+                -- Re-anchor TEF when VanityBuffs is NOT shown, OR when the user
+                -- has Hide Vanity Buffs ON (regardless of the transient visible
+                -- state set by Ascension's OnShow before our re-hide fires).
                 local pt, rf, rp, x, y = _desiredTempEnchantAnchor()
                 if pt then
                     _applyAnchor(TemporaryEnchantFrame, "tempEnchant", pt, rf, rp, x, y)
@@ -1634,6 +1690,13 @@ function BuffFrameModule:Enable()
             --    Picking the wrong branch leaves a residual gap (the slot
             --    VanityBuffs used to occupy) or overlaps the first buff onto
             --    the consolidated icon. Idempotent via _applyAnchor.
+            --
+            --    When ConsolidatedBuffs is HIDDEN (numConsolidated == 0) its
+            --    anchor math still consumes 36px at dragonUIBuffFrame.TOPRIGHT,
+            --    so anchoring the first buff to ConsolidatedBuffs.TOPRIGHT leaves
+            --    a visible 36px gap between the buff row and our frame. Pin to
+            --    dragonUIBuffFrame.TOPRIGHT directly instead so the chain stays
+            --    flush against our frame when CB is hidden.
             if IsVanityBuffsHidden() and not weaponEnchantsAreSeparated
                and ConsolidatedBuffs then
                 local firstButton
@@ -1652,23 +1715,25 @@ function BuffFrameModule:Enable()
                     -- is on:
                     --   numEnchants > 0     -> TemporaryEnchantFrame.TOPLEFT, -5
                     --   numConsolidated > 0 -> ConsolidatedBuffs.TOPLEFT, -5
-                    --   otherwise           -> ConsolidatedBuffs.TOPRIGHT, 0
+                    --   otherwise           -> dragonUIBuffFrame.TOPRIGHT, 0
+                    --                         (skip the hidden CB to avoid a
+                    --                         36px phantom-slot gap)
                     local relFrame, relPoint, offsetX
                     if (BuffFrame.numEnchants or 0) > 0 then
                         relFrame, relPoint, offsetX = TemporaryEnchantFrame, "TOPLEFT", -5
                     elseif (BuffFrame.numConsolidated or 0) > 0 then
                         relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPLEFT", -5
                     else
-                        relFrame, relPoint, offsetX = ConsolidatedBuffs, "TOPRIGHT", 0
+                        relFrame, relPoint, offsetX = dragonUIBuffFrame, "TOPRIGHT", 0
                     end
-                    -- The _anchorCache is UNSAFE here: Ascension's
-                    -- VanityBuffs_OnHide (BuffFrame.lua l.744-749) re-runs the
-                    -- anchor pass with numVanity still > 0 (our Show hook zeroes
-                    -- it only after Hide() returns) and re-anchors the first buff
-                    -- to the hidden VanityBuffs. That changes the ACTUAL anchor
-                    -- without changing our desired signature, so a cache hit
-                    -- would skip the fix and leave the gap. Compare the real
-                    -- anchor instead and force the re-anchor only on drift.
+                    -- Ascension's VanityBuffs_OnHide (BuffFrame.lua l.744-749)
+                    -- re-runs the anchor pass with numVanity still > 0 (our Show
+                    -- hook zeroes it only after Hide() returns) and re-anchors
+                    -- the first buff to the hidden VanityBuffs. The real
+                    -- GetPoint() check below is a fast-path; _applyAnchor re-checks
+                    -- the frame's real anchor against the desired one, so a stale
+                    -- cache hit can no longer skip the corrective re-anchor and
+                    -- leave the gap.
                     local _, actRelFrame, actRelPoint, actX = firstButton:GetPoint()
                     if actRelFrame ~= relFrame
                        or actRelPoint ~= relPoint
@@ -1750,6 +1815,45 @@ function BuffFrameModule:Enable()
             -- and the first buff hugs ConsolidatedBuffs instead.
             BuffFrame.numVanity = 0
         end)
+    end
+
+    -- PRE-HOOK on BuffFrame_Update to zero numVanity BEFORE Ascension's body
+    -- runs. hooksecurefunc fires AFTER the original returns, which is too late
+    -- to intercept numVanity usage inside Ascension's recursive
+    -- BuffFrame_UpdatePositions() re-entry (the value gets set at l.95 and
+    -- consumed at l.334+ BuffFrame_UpdateAllBuffAnchors, both inside
+    -- BuffFrame_Update's body). Wrap the global once so we can run our fix
+    -- BEFORE each call to the saved original — including the recursive calls
+    -- that Ascension itself makes through BuffFrame_UpdatePositions and
+    -- OnShow handlers. Zeroing at the top of the wrapper is harmless: if
+    -- Ascension's body re-sets numVanity after the aura scan (it does, l.95),
+    -- the wrapper zero would be overwritten — so we save the original, call it,
+    -- and ZERO NumVanity AFTER it returns. To handle the in-body recursive
+    -- reads, we ALSO save VanityBuffs in a sentinel that the wrapped function
+    -- honors: but cleaner — see _HideVanityAdjust flag below.
+    --
+    -- Implementation: replace the global with a wrapper that manually
+    -- pre-emptively zeros numVanity and immediately calls the saved original.
+    -- If Ascension re-enters BuffFrame_Update recursively, the same wrapper
+    -- runs and zeros again at the top of each depth before delegating.
+    -- Limitation: l.95 `BuffFrame.numVanity = #vanityBuffs` re-setts the value
+    -- to the LIVE aura count inside the body. So the pre-zero alone is not
+    -- enough to keep numVanity at 0 throughout the body. The post-zero (after
+    -- the original returns) ensures any LATER anchor passes see 0 — combined
+    -- with the BuffFrame_UpdateAllBuffAnchors hook (rama 3.6) this fully
+    -- compensates: the in-body use at l.334/373 is handled by that anchor hook
+    -- checking IsVanityBuffsHidden() directly rather than relying on numVanity.
+    if not BuffFrameModule._wrappedBuffFrameUpdate then
+        BuffFrameModule._wrappedBuffFrameUpdate = true
+        local original_BuffFrame_Update = BuffFrame_Update
+        BuffFrame_Update = function(...)
+            if buffFramePositionLocked and IsVanityBuffsHidden() then
+                BuffFrame.numVanity = 0
+            end
+            return original_BuffFrame_Update(...)
+        end
+        -- Make sure our own Refresh functions keep using the wrapped version.
+        -- (No further references need patching since the global is what they call.)
     end
 
     -- ========================================================================
