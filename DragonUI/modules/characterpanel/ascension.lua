@@ -164,6 +164,19 @@ local function addGround(host, key, topInset)
     return bg
 end
 
+-- Solid dark-brown ground for the pane-rimmed content areas (#100c08). The list panes and the
+-- interior sheets used to wear parchment or rock; the rimmed panels now read as one flat field.
+local PANE_FILL = { r = 0.062745, g = 0.047059, b = 0.031373 }
+local function addFill(host)
+    local bg = host._duiFill
+    if bg then return bg end
+    bg = host:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture(PANE_FILL.r, PANE_FILL.g, PANE_FILL.b)
+    bg:SetAllPoints(host)
+    host._duiFill = own(bg)
+    return bg
+end
+
 -- The rim's textures land on the host frame; tag the ones DrawPaneBorder adds so restore hides
 -- them with the rest of the art we created. Snapshot first so swept Blizzard textures never match.
 local function addPaneBorder(host)
@@ -259,7 +272,7 @@ local function buildChrome()
     if right then
         hideNineSlice(right)
         sweep(right)
-        addGround(right, "_duiBg")
+        addFill(right)
         addPaneBorder(right)
     end
 
@@ -275,6 +288,7 @@ local function buildChrome()
     }
     for _, panel in ipairs(panels) do
         sweepPanel(panel)
+        addFill(panel)
         addPaneBorder(panel)
     end
 
@@ -291,15 +305,27 @@ local function buildChrome()
             sweep(frame)
         end
     end
-    -- Rock ground plus the retail pane rim frame the whole tab content, the sidebar's mirror.
+    -- Dark fill plus the retail pane rim frame the whole tab content, the sidebar's mirror.
     if pd then
-        addGround(pd, "_duiBg")
+        addFill(pd)
         addPaneBorder(pd)
     end
     -- Sweeping the model frame took its viewport backdrop with it; the shared builder repaints
-    -- the same per-race backdrop (grey toggle included) the vanilla paperdoll wears.
+    -- the same per-race backdrop (grey toggle included) the vanilla paperdoll wears, and the pane
+    -- rim frames it like every other content pane.
     if model and CP.BuildModelBackdrop then
         CP.BuildModelBackdrop(model)
+        addPaneBorder(model)
+    end
+
+    -- The pets tab's companion viewport wears retail's MountJournal sheet; the companion list
+    -- beside it already gets the shared pane treatment, so the 3D pane matches with the same dark
+    -- fill and rim (its Overlay shadow keeps the title readable).
+    local companionModel = _G.AscensionPetPaperDollPanelCompanionTabCompanionModel
+    if companionModel then
+        sweep(companionModel)
+        addFill(companionModel)
+        addPaneBorder(companionModel)
     end
 end
 
