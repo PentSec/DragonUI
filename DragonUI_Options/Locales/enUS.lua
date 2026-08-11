@@ -889,6 +889,8 @@ L["Configure how DragonUI notifies you when friends come online or go offline."]
 L["Enable BNet Toast"] = true
 L["Display Battle.net friend online/offline notifications via toast popup and/or chat messages."] = true
 L["Notification Type"] = true
+L["Guild Notifications"] = true
+L["Show notifications for guild members coming online or going offline. Turn off to only receive friend notifications."] = true
 L["Show Toast Popup"] = true
 L["Display the Battle.net toast frame when a friend comes online or goes offline."] = true
 L["Show Chat Notification"] = true

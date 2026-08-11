@@ -1165,6 +1165,7 @@ local defaults = {
                 enabled = true, -- Friend online/offline notifications with Battle.net toasts
                 show_toast = true, -- Show the BNToastFrame popup when friends come online/go offline
                 show_chat = true, -- Show a chat notification for friend online/offline events
+                guild_notify = true, -- Show notifications for guild members online/offline (set false to only receive friend notifications)
                 scale = 1.0, -- Scale of the BNet toast frame
                 x_position = -270, -- Horizontal position from screen center
                 y_offset = 270, -- Vertical offset

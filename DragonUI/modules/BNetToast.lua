@@ -22,6 +22,8 @@ local GetFriendInfo = GetFriendInfo
 local GetNumFriends = GetNumFriends
 local PlaySound = PlaySound
 local strmatch = string.match
+local GetNumGuildMembers = GetNumGuildMembers
+local GetGuildRosterInfo = GetGuildRosterInfo
 
 -- Patterns to extract friend name from system messages
 local pattern1 = ERR_FRIEND_ONLINE_SS:gsub("%%s", "(%.+)"):gsub("%[", "%%["):gsub("%]","%%]")
@@ -101,6 +103,41 @@ local function FindFriendInfo(friendName)
             return name, nil, nil, level, class, area, connected
         end
     end
+end
+
+-- ============================================================================
+-- GUILD ROSTER LOOKUP
+-- ============================================================================
+
+--- Cache of guild member names for fast O(1) lookup.
+--- Rebuilt on GUILD_ROSTER_UPDATE. Without this cache, every CHAT_MSG_SYSTEM
+--- would loop through GetGuildRosterInfo (potentially hundreds of members).
+local guildRosterCache = nil
+
+local function BuildGuildRosterCache()
+    guildRosterCache = {}
+    local num = GetNumGuildMembers()
+    for i = 1, num do
+        local name = GetGuildRosterInfo(i)
+        if name then
+            -- Strip realm suffix "-Realm" for cross-realm matching if present
+            local shortName = strmatch(name, "^([^%-]+)")
+            if shortName then
+                guildRosterCache[shortName] = true
+            end
+            guildRosterCache[name] = true
+        end
+    end
+end
+
+--- Check if a friend name corresponds to a guild member.
+--- Returns true if the name is found in the guild roster cache.
+--- If the roster is not cached yet (nil), returns false (don't suppress).
+local function IsGuildMember(friendName)
+    if not guildRosterCache then return false end
+    local clean = GetCleanName(friendName)
+    if not clean then return false end
+    return guildRosterCache[clean] == true
 end
 
 -- ============================================================================
@@ -240,12 +277,23 @@ end
 local eventFrame
 
 local function OnSystemMessage(self, event, arg1, ...)
+    -- GUILD_ROSTER_UPDATE: rebuild the cache so IsGuildMember stays accurate.
+    -- arg1 is non-nil when the roster update is "clamped" (full refresh).
+    if event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
+        BuildGuildRosterCache()
+        return
+    end
+
     local config = GetModuleConfig()
     if not config then return end
 
     -- Friend came online
     local name = arg1:gmatch(pattern1)()
     if name then
+        -- Guild filter: if guild_notify is OFF and this name is a guild member, suppress
+        if config.guild_notify == false and IsGuildMember(name) then
+            return
+        end
         if config.show_toast ~= false then
             BNToastFrame_AddToast(1, name)
         end
@@ -258,6 +306,9 @@ local function OnSystemMessage(self, event, arg1, ...)
     -- Friend went offline
     name = arg1:gmatch(pattern2)()
     if name then
+        if config.guild_notify == false and IsGuildMember(name) then
+            return
+        end
         if config.show_toast ~= false then
             BNToastFrame_AddToast(2, name)
         end
@@ -332,6 +383,15 @@ local function ApplyBNetToast()
         eventFrame:SetScript("OnEvent", OnSystemMessage)
     end
     eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+
+    -- 4b. Register GUILD_ROSTER_UPDATE to keep guild member cache fresh.
+    -- Required to filter guild notifications when guild_notify is OFF.
+    -- Also built once at apply time; GUILD_ROSTER_UPDATE refreshes it.
+    if not guildRosterCache then
+        BuildGuildRosterCache()
+    end
+    eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
+    eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
 
     -- 5. Add chat filter to suppress default system messages
     if not BNetToastModule.hooks.chatFilter then
@@ -549,7 +609,12 @@ local function RestoreBNetToast()
     -- 5. Unregister event
     if eventFrame then
         eventFrame:UnregisterEvent("CHAT_MSG_SYSTEM")
+        eventFrame:UnregisterEvent("GUILD_ROSTER_UPDATE")
+        eventFrame:UnregisterEvent("PLAYER_GUILD_UPDATE")
     end
+
+    -- 5b. Clear guild roster cache
+    guildRosterCache = nil
 
     -- 6. Remove chat filter
     if BNetToastModule.hooks.chatFilter then

@@ -1666,6 +1666,8 @@ L["Configure how DragonUI notifies you when friends come online or go offline."]
 L["Enable BNet Toast"] = "BNet 알림 활성화"
 L["Display Battle.net friend online/offline notifications via toast popup and/or chat messages."] = "Battle.net 친구의 접속/접속 종료 알림을 팝업 및/또는 대화 메시지로 표시합니다."
 L["Notification Type"] = "알림 유형"
+L["Guild Notifications"] = "길드 알림"
+L["Show notifications for guild members coming online or going offline. Turn off to only receive friend notifications."] = "길드원이 접속하거나 접속을 종료할 때 알림을 표시합니다. 끄면 친구 알림만 받습니다."
 L["Show Toast Popup"] = "팝업 알림 표시"
 L["Display the Battle.net toast frame when a friend comes online or goes offline."] = "친구가 접속하거나 접속을 종료할 때 Battle.net 알림 프레임을 표시합니다."
 L["Show Chat Notification"] = "대화 알림 표시"

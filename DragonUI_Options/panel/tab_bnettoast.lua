@@ -70,6 +70,17 @@ local function BuildBNetToastTab(scroll)
     local typeSection = C:AddSection(scroll, (LO["Notification Type"] or "Notification Type"))
 
     C:AddToggle(typeSection, {
+        label = LO["Guild Notifications"] or "Guild Notifications",
+        desc = LO["Show notifications for guild members coming online or going offline. Turn off to only receive friend notifications."] or "Show notifications for guild members coming online or going offline. Turn off to only receive friend notifications.",
+        getFunc = function() return GetModuleField("bnettoast", "guild_notify") ~= false end,
+        setFunc = function(val)
+            EnsureModuleTable("bnettoast").guild_notify = val
+        end,
+        disabled = function() return not IsEnabled("bnettoast") end,
+        requiresReload = false,
+    })
+
+    C:AddToggle(typeSection, {
         label = LO["Show Toast Popup"],
         desc = LO["Display the Battle.net toast frame when a friend comes online or goes offline."],
         getFunc = function() return GetModuleField("bnettoast", "show_toast") ~= false end,
