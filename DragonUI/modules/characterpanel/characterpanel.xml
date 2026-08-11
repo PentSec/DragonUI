@@ -5,6 +5,8 @@
 	<!-- insets before chrome: the interior background anchors to CharacterFrame.Inset. -->
 	<Script file="insets.lua"/>
 	<Script file="chrome.lua"/>
+	<!-- after chrome.lua: the Ascension skin reuses its close-button helper; runs only on Ascension. -->
+	<Script file="ascension.lua"/>
 	<!-- after chrome.lua: the cog toggles the body background it owns. -->
 	<Script file="settingscog.lua"/>
 	<Script file="tabs.lua"/>

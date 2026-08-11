@@ -42,17 +42,21 @@ local function resizeModel()
     model:SetPoint("TOPLEFT", cf.Inset, "TOPLEFT", 48, -6)
 end
 
+-- The backdrop grid is retail's 212x245 / 231x320 split; keeping the ratios lets the same art
+-- scale to any model viewport (Ascension's) while staying continuous across the seams.
+local X_SPLIT, Y_SPLIT = 212 / 231, 245 / 320
+
 -- Cropped to the viewport: 245 + 75 = 320, the model's exact height. Retail runs the bottom pair
 -- their full 128, which made the strip under the model depend on that overhang drawing.
 local BOTTOM_CROP = 75 / 128
 local QUARTERS = {
-    { key = "TopLeft", suffix = 1, w = 212, h = 245, tc = { 0.171875, 1, 0.0392156862745098, 1 },
+    { key = "TopLeft", suffix = 1, tc = { 0.171875, 1, 0.0392156862745098, 1 },
       point = "TOPLEFT", rel = "TOPLEFT" },
-    { key = "TopRight", suffix = 2, w = 19, h = 245, tc = { 0, 0.296875, 0.0392156862745098, 1 },
+    { key = "TopRight", suffix = 2, tc = { 0, 0.296875, 0.0392156862745098, 1 },
       point = "TOPLEFT", rel = "TOPRIGHT" },
-    { key = "BotLeft", suffix = 3, w = 212, h = 75, tc = { 0.171875, 1, 0, BOTTOM_CROP },
+    { key = "BotLeft", suffix = 3, tc = { 0.171875, 1, 0, BOTTOM_CROP },
       point = "TOPLEFT", rel = "BOTTOMLEFT" },
-    { key = "BotRight", suffix = 4, w = 19, h = 75, tc = { 0, 0.296875, 0, BOTTOM_CROP },
+    { key = "BotRight", suffix = 4, tc = { 0, 0.296875, 0, BOTTOM_CROP },
       point = "TOPLEFT", rel = "BOTTOMRIGHT" },
 }
 
@@ -62,16 +66,28 @@ local function overlayAlpha()
     return RACE_OVERLAY_ALPHA[raceKey()] or OVERLAY_ALPHA_DEFAULT
 end
 
-local function buildBackground()
-    local model = _G.CharacterModelFrame
+local function buildRaceBackdrop(model)
     if not model or model._duiRaceBg then return end
     model._duiRaceBg = {}
+
+    local w, h = model:GetWidth() or 0, model:GetHeight() or 0
+    if w == 0 then w = MODEL_W end
+    if h == 0 then h = MODEL_H end
+    local qw, qh = math.floor(w * X_SPLIT + 0.5), math.floor(h * Y_SPLIT + 0.5)
 
     local topLeft
     for _, q in ipairs(QUARTERS) do
         local tex = model:CreateTexture(nil, "BACKGROUND")
-        tex:SetSize(q.w, q.h)
         tex:SetTexCoord(unpack(q.tc))
+        local pw, ph = qw, qh
+        if q.key == "TopRight" then
+            pw = w - qw
+        elseif q.key == "BotLeft" then
+            ph = h - qh
+        elseif q.key == "BotRight" then
+            pw, ph = w - qw, h - qh
+        end
+        tex:SetSize(pw, ph)
         if q.key == "TopLeft" then
             tex:SetPoint(q.point, model, q.rel, 0, 0)
             topLeft = tex
@@ -90,8 +106,8 @@ local function buildBackground()
     model._duiRaceBgOverlay = overlay
 end
 
-local function applyRaceBackground()
-    local model = _G.CharacterModelFrame
+local function applyRaceBackground(model)
+    model = model or _G.CharacterModelFrame
     if not model or not model._duiRaceBg then return end
 
     -- Read plainly, never as `~= false`: Config() falls back to an empty table before the database
@@ -109,10 +125,15 @@ end
 
 CP.ApplyModelBackdrop = applyRaceBackground
 
+-- Shared with the Ascension skin, which builds the same backdrop on its own model viewport.
+function CP.BuildModelBackdrop(model)
+    buildRaceBackdrop(model)
+    applyRaceBackground(model)
+end
+
 local function build()
     resizeModel()
-    buildBackground()
-    applyRaceBackground()
+    CP.BuildModelBackdrop(_G.CharacterModelFrame)
 end
 
 CP.RefreshRaceBackground = applyRaceBackground

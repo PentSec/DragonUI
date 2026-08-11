@@ -99,6 +99,7 @@ if isAscensionServer then
         _G.QuestLogMicroButton,
         _G.SocialsMicroButton,
         _G.LFDMicroButton,
+        _G.CollectionsMicroButton,
         _G.PathToAscensionMicroButton,
         _G.ChallengesMicroButton,
         _G.MainMenuMicroButton,
@@ -188,6 +189,10 @@ if isAscensionServer then
     MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422}
     MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109}
     MicromenuAtlas["UI-HUD-MicroMenu-PathToAscension-Up"] = {0.129883, 0.192383, 0.166016, 0.326172}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Disabled"] = {0.0654297, 0.12793, 0.658203, 0.818359}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109}
+    MicromenuAtlas["UI-HUD-MicroMenu-Collections-Up"] = {0.129883, 0.192383, 0.166016, 0.326172}
 else
     MicromenuAtlas["UI-HUD-MicroMenu-Collections-Disabled"] = {0.0654297, 0.12793, 0.658203, 0.818359}
     MicromenuAtlas["UI-HUD-MicroMenu-Collections-Down"] = {0.0654297, 0.12793, 0.822266, 0.982422}
@@ -434,6 +439,7 @@ local function GetAtlasKey(buttonName)
             questlog = "UI-HUD-MicroMenu-Questlog",
             socials = "UI-HUD-MicroMenu-GuildCommunities",
             lfd = "UI-HUD-MicroMenu-Groupfinder",
+            collections = "UI-HUD-MicroMenu-Collections",
             pathtoascension = "UI-HUD-MicroMenu-PathToAscension",
             challenges = "UI-HUD-MicroMenu-Challenges",
             mainmenu = "UI-HUD-MicroMenu-Shop",
@@ -2022,7 +2028,7 @@ local function setupMicroButtons(xOffset)
             if button.SetEnabled and wasEnabled then
                 button:SetEnabled(true)
             end
-            if wasVisible then
+            if wasVisible or buttonName == "Collections" then
                 button:Show()
             end
 
