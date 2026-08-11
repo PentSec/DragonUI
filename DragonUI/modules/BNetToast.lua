@@ -22,8 +22,6 @@ local GetFriendInfo = GetFriendInfo
 local GetNumFriends = GetNumFriends
 local PlaySound = PlaySound
 local strmatch = string.match
-local GetNumGuildMembers = GetNumGuildMembers
-local GetGuildRosterInfo = GetGuildRosterInfo
 
 -- Patterns to extract friend name from system messages
 local pattern1 = ERR_FRIEND_ONLINE_SS:gsub("%%s", "(%.+)"):gsub("%[", "%%["):gsub("%]","%%]")
@@ -106,38 +104,36 @@ local function FindFriendInfo(friendName)
 end
 
 -- ============================================================================
--- GUILD ROSTER LOOKUP
+-- FRIEND LIST LOOKUP
 -- ============================================================================
 
---- Cache of guild member names for fast O(1) lookup.
---- Rebuilt on GUILD_ROSTER_UPDATE. Without this cache, every CHAT_MSG_SYSTEM
---- would loop through GetGuildRosterInfo (potentially hundreds of members).
-local guildRosterCache = nil
+--- Cache of friend names for O(1) lookup. Built on FRIENDLIST_UPDATE.
+---
+--- On Ascension the guild roster only ever contains members currently online
+--- (a live snapshot), so it cannot be used to reliably detect guild members.
+--- However, guild member online/offline broadcasts arrive as CHAT_MSG_SYSTEM
+--- messages for people who are NOT in the friend list. The friend list is the
+--- authoritative "real friends" set, so with guild_notify OFF we show a
+--- notification ONLY when the name is in the friend list — everything else is
+--- a guild broadcast and gets suppressed.
+local friendNameCache = nil
 
-local function BuildGuildRosterCache()
-    guildRosterCache = {}
-    local num = GetNumGuildMembers()
+local function BuildFriendNameCache()
+    friendNameCache = {}
+    local num = GetNumFriends()
     for i = 1, num do
-        local name = GetGuildRosterInfo(i)
+        local name = GetFriendInfo(i)
         if name then
-            -- Strip realm suffix "-Realm" for cross-realm matching if present
-            local shortName = strmatch(name, "^([^%-]+)")
-            if shortName then
-                guildRosterCache[shortName] = true
-            end
-            guildRosterCache[name] = true
+            friendNameCache[name] = true
         end
     end
 end
 
---- Check if a friend name corresponds to a guild member.
---- Returns true if the name is found in the guild roster cache.
---- If the roster is not cached yet (nil), returns false (don't suppress).
-local function IsGuildMember(friendName)
-    if not guildRosterCache then return false end
+local function IsFriend(friendName)
+    if not friendNameCache then return false end
     local clean = GetCleanName(friendName)
     if not clean then return false end
-    return guildRosterCache[clean] == true
+    return friendNameCache[clean] == true
 end
 
 -- ============================================================================
@@ -277,10 +273,9 @@ end
 local eventFrame
 
 local function OnSystemMessage(self, event, arg1, ...)
-    -- GUILD_ROSTER_UPDATE: rebuild the cache so IsGuildMember stays accurate.
-    -- arg1 is non-nil when the roster update is "clamped" (full refresh).
-    if event == "GUILD_ROSTER_UPDATE" or event == "PLAYER_GUILD_UPDATE" then
-        BuildGuildRosterCache()
+    -- FRIENDLIST_UPDATE: rebuild the friend name cache.
+    if event == "FRIENDLIST_UPDATE" then
+        BuildFriendNameCache()
         return
     end
 
@@ -290,8 +285,9 @@ local function OnSystemMessage(self, event, arg1, ...)
     -- Friend came online
     local name = arg1:gmatch(pattern1)()
     if name then
-        -- Guild filter: if guild_notify is OFF and this name is a guild member, suppress
-        if config.guild_notify == false and IsGuildMember(name) then
+        -- Guild filter: with guild_notify OFF, show ONLY friends. On Ascension
+        -- every other "X has come online" is a guild broadcast.
+        if config.guild_notify == false and not IsFriend(name) then
             return
         end
         if config.show_toast ~= false then
@@ -306,7 +302,7 @@ local function OnSystemMessage(self, event, arg1, ...)
     -- Friend went offline
     name = arg1:gmatch(pattern2)()
     if name then
-        if config.guild_notify == false and IsGuildMember(name) then
+        if config.guild_notify == false and not IsFriend(name) then
             return
         end
         if config.show_toast ~= false then
@@ -377,21 +373,18 @@ local function ApplyBNetToast()
     BNToastFrameClickFrame:RegisterForClicks("AnyUp", "AnyDown")
     BNToastFrameClickFrame:SetScript("OnClick", OnToastClick)
 
-    -- 4. Create event frame for CHAT_MSG_SYSTEM
+    -- 4. Create event frame for CHAT_MSG_SYSTEM + FRIENDLIST_UPDATE
     if not eventFrame then
         eventFrame = CreateFrame("Frame")
         eventFrame:SetScript("OnEvent", OnSystemMessage)
     end
     eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 
-    -- 4b. Register GUILD_ROSTER_UPDATE to keep guild member cache fresh.
-    -- Required to filter guild notifications when guild_notify is OFF.
-    -- Also built once at apply time; GUILD_ROSTER_UPDATE refreshes it.
-    if not guildRosterCache then
-        BuildGuildRosterCache()
-    end
-    eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
-    eventFrame:RegisterEvent("PLAYER_GUILD_UPDATE")
+    -- 4b. Friend list cache for guild_notify filtering. The friend list is the
+    -- authoritative "real friends" set on Ascension (guild broadcasts come for
+    -- names that are NOT in the friend list).
+    BuildFriendNameCache()
+    eventFrame:RegisterEvent("FRIENDLIST_UPDATE")
 
     -- 5. Add chat filter to suppress default system messages
     if not BNetToastModule.hooks.chatFilter then
@@ -609,12 +602,11 @@ local function RestoreBNetToast()
     -- 5. Unregister event
     if eventFrame then
         eventFrame:UnregisterEvent("CHAT_MSG_SYSTEM")
-        eventFrame:UnregisterEvent("GUILD_ROSTER_UPDATE")
-        eventFrame:UnregisterEvent("PLAYER_GUILD_UPDATE")
+        eventFrame:UnregisterEvent("FRIENDLIST_UPDATE")
     end
 
-    -- 5b. Clear guild roster cache
-    guildRosterCache = nil
+    -- 5b. Clear caches
+    friendNameCache = nil
 
     -- 6. Remove chat filter
     if BNetToastModule.hooks.chatFilter then
