@@ -165,6 +165,12 @@ ticker:SetScript("OnUpdate", function(self, elapsed)
             return
         end
 
+        -- Dead/ghost: no HP warnings (no way to be low HP while dead)
+        if UnitIsDeadOrGhost("player") then
+            StopWarning()
+            return
+        end
+
         if GetHPPercent() <= db.threshold then
             StartWarning()
         else
