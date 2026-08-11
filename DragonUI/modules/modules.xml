@@ -41,6 +41,7 @@
     <!-- UnitFrames -->
     <Include file="unitframes\unitframes.xml"/>
     <Script file="hp_low_alert.lua"/>
+    <Script file="compactframes.lua"/>
 
     <!-- Cast Bar module -->
     <Script file="castbar.lua"/>

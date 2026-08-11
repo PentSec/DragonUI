@@ -458,6 +458,8 @@ L["Buttons"] = "Кнопки"
 L["Action button styling and enhancements"] = "Стилизация и улучшения кнопок действий"
 L["Dark Mode"] = "Тёмный режим"
 L["Darken UI borders and chrome"] = "Затемнение рамок и элементов интерфейса"
+L["Compact Frames"] = "Компактные рамки"
+L["Flat retail-style health bars on compact party/raid frames"] = "Плоские полосы здоровья в стиле ретейла на компактных рамках группы и рейда"
 L["Item Quality"] = "Качество предметов"
 L["Color item borders by quality in bags, character panel, bank, and merchant"] = "Окрашивание рамок предметов по качеству в сумках, окне персонажа, банке и у торговца"
 -- Item Level

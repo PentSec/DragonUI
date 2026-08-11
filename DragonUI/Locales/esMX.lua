@@ -457,6 +457,8 @@ L["Buttons"] = "Botones"
 L["Action button styling and enhancements"] = "Estilo y mejoras de botones de acción"
 L["Dark Mode"] = "Modo Oscuro"
 L["Darken UI borders and chrome"] = "Oscurecer bordes y elementos de la interfaz"
+L["Compact Frames"] = "Marcos Compactos"
+L["Flat retail-style health bars on compact party/raid frames"] = "Barras de vida planas estilo retail en los marcos compactos de grupo y banda"
 L["Item Quality"] = "Calidad de Objeto"
 L["Color item borders by quality in bags, character panel, bank, and merchant"] = "Colorear los bordes de objetos por calidad en bolsas, personaje, banco y mercader"
 -- Item Level

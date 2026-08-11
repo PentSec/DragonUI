@@ -600,6 +600,7 @@ local MODULE_LIFECYCLE_OVERRIDES = {
         loadOnce = true,
     },
     cooldowns = { refresh = "RefreshCooldowns", loadOnce = true },
+    compactframes = { loadOnce = true },
     darkmode = { apply = "ApplyDarkMode", restore = "RestoreDarkMode", loadOnce = true },
     itemquality = {
         apply = "ApplyItemQualitySystem",
@@ -1342,6 +1343,15 @@ function addon:ApplyDatabaseMigrations()
     local extrabar1 = additional and rawget(additional, "extrabar1")
     if extrabar1 then
         extrabar1.slots = nil
+    end
+
+    -- New modules ship with new default configs. Fill any module keys that are
+    -- missing from an existing profile (modules added after the profile was
+    -- created) so they adopt their defaults instead of reading as disabled.
+    -- ApplyMissingDefaults only fills missing keys, never overwrites user values.
+    local mods = rawget(profile, "modules")
+    if mods and self.defaults.profile.modules then
+        ApplyMissingDefaults(self.defaults.profile.modules, mods)
     end
 
     local global = self.db.global

@@ -472,6 +472,8 @@ L["Target & Focus Aura Customization"] = "目标和焦点光环自定义"
 L["Customize target/focus aura icons and timers."] = "自定义目标和焦点光环的图标与计时文字。"
 L["Dark Mode"] = "暗色模式"
 L["Darken UI borders and chrome"] = "加深界面边框与装饰"
+L["Compact Frames"] = "紧凑框架"
+L["Flat retail-style health bars on compact party/raid frames"] = "在紧凑的小队与团队框架上使用类似正式服的血量条"
 L["Item Quality"] = "物品品质"
 L["Color item borders by quality in bags, character panel, bank, and merchant"] = "在背包、角色面板、银行和商人界面中按品质为物品边框着色"
 -- Item Level

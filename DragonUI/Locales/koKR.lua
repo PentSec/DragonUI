@@ -468,6 +468,8 @@ L["Buttons"] = "ë²„íŠ¼"
 L["Action button styling and enhancements"] = "행동 단축바 버튼 외형과 개선 기능"
 L["Dark Mode"] = "다크 모드"
 L["Darken UI borders and chrome"] = "UI 테두리와 외곽을 어둡게"
+L["Compact Frames"] = "간편 프레임"
+L["Flat retail-style health bars on compact party/raid frames"] = "간편 파티/공격대 프레임에 리테일 스타일의 평면 체력 바 사용"
 L["Item Quality"] = "아이템 등급"
 L["Color item borders by quality in bags, character panel, bank, and merchant"] = "가방·캐릭터 창·은행·상인에서 아이템 테두리를 등급 색으로 표시"
 -- Item Level

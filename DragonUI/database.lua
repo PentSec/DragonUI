@@ -1130,6 +1130,9 @@ local defaults = {
                 -- stats_collapsed / stats_order are written by the panel itself, never defaulted:
                 -- an empty default table would be shared by every profile that has not set one.
             },
+            compactframes = {
+                enabled = true, -- Flat retail-style health bars on compact party/raid frames
+            },
             itemlevel = {
                 enabled = true, -- Show item level on gear icons
                 font_size = 12,

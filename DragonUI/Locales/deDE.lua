@@ -458,6 +458,8 @@ L["Buttons"] = "Schaltflächen"
 L["Action button styling and enhancements"] = "Aktionsknopf-Styling und Verbesserungen"
 L["Dark Mode"] = "Dunkelmodus"
 L["Darken UI borders and chrome"] = "UI-Rahmen und Zierrat abdunkeln"
+L["Compact Frames"] = "Kompakte Rahmen"
+L["Flat retail-style health bars on compact party/raid frames"] = "Flache Gesundheitsbalken im Retail-Stil für kompakte Gruppen- und Raid-Rahmen"
 L["Item Quality"] = "Gegenstandsqualität"
 L["Color item borders by quality in bags, character panel, bank, and merchant"] = "Gegenstandsrahmen in Taschen, Charakterfenster, Bank und beim Händler nach Qualität einfärben"
 -- Item Level
