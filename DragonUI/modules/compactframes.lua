@@ -89,31 +89,40 @@ local function CaptureOriginal(frame)
         end
     end
 
+    -- The wrap replaces the bar's color method; capture the original so restore
+    -- can put it back (otherwise the wrap stays and stops dimming when applied=false).
+    if frame.healthBar and frame.healthBar.SetStatusBarColor then
+        state.healthSetColor = frame.healthBar.SetStatusBarColor
+    end
+    if frame.powerBar and frame.powerBar.SetStatusBarColor then
+        state.powerSetColor = frame.powerBar.SetStatusBarColor
+    end
+
     CompactFramesModule.originalStates[frame] = state
 end
 
--- Mute whatever color the client last set on a bar. Called from the global color
--- hooks (every update, instantly) and from flattening (covers bars that were
--- colored before the module applied).
-local function ApplyColorDim(bar)
-    if not bar or not bar.GetStatusBarColor or not bar.SetStatusBarColor then return end
+-- Wrap a status bar's color setter so every future color update (health change,
+-- class color, aggro) is muted from the value the client passes in. Instance
+-- level, so only our bars are affected. Also dims the color that was set BEFORE
+-- the wrap existed (one-time, via the original method so it does not recurse),
+-- so a frame already colored on apply goes dim immediately without waiting for
+-- the next client update.
+local function DimStatusBar(bar, multiplier)
+    if not bar or not bar.SetStatusBarColor or bar._duiColorWrapped then return end
+    bar._duiColorWrapped = true
+    local orig = bar.SetStatusBarColor
+    bar.SetStatusBarColor = function(self, r, g, b, a)
+        if CompactFramesModule.applied then
+            orig(self, (r or 1) * multiplier, (g or 1) * multiplier, (b or 1) * multiplier, a)
+        else
+            orig(self, r, g, b, a)
+        end
+    end
+    -- One-time dim of the pre-existing color (set before the wrap existed).
     local r, g, b = bar:GetStatusBarColor()
-    if not r or not g or not b then return end
-    bar:SetStatusBarColor(r * COLOR_MULTIPLIER, g * COLOR_MULTIPLIER, b * COLOR_MULTIPLIER)
-end
-
--- The client recolors the bars through these FrameXML entry points; hooking them
--- means every update is muted the moment it happens, and the hooks survive the
--- client rebuilding frames (an instance wrap would be lost with the frame).
-local function HookColorUpdates()
-    pcall(hooksecurefunc, "CompactUnitFrame_UpdateHealthColor", function(frame)
-        if not CompactFramesModule.applied then return end
-        ApplyColorDim(frame and frame.healthBar)
-    end)
-    pcall(hooksecurefunc, "CompactUnitFrame_UpdatePowerColor", function(frame)
-        if not CompactFramesModule.applied then return end
-        ApplyColorDim(frame and frame.powerBar)
-    end)
+    if r and g and b then
+        orig(bar, r * multiplier, g * multiplier, b * multiplier)
+    end
 end
 
 -- Flatten one compact unit frame's bars (HP always; power if present).
@@ -130,12 +139,12 @@ local function FlattenFrame(frame)
 
     if frame.healthBar and frame.healthBar.SetStatusBarTexture then
         frame.healthBar:SetStatusBarTexture(FLAT_FILL)
-        ApplyColorDim(frame.healthBar)
+        DimStatusBar(frame.healthBar, COLOR_MULTIPLIER)
     end
 
     if frame.powerBar and frame.powerBar.SetStatusBarTexture then
         frame.powerBar:SetStatusBarTexture(FLAT_FILL)
-        ApplyColorDim(frame.powerBar)
+        DimStatusBar(frame.powerBar, COLOR_MULTIPLIER)
         if frame.powerBar.background and frame.powerBar.background.SetTexture then
             frame.powerBar.background:SetTexture(FLAT_BG)
             frame.powerBar.background:SetTexCoord(0, 1, 0, 1)
@@ -247,10 +256,6 @@ local function SetupHooks()
         end)
     end
 
-    -- Mute the class/health colors at the source: every color update is dimmed
-    -- the instant the client applies it, whatever frames exist now or later.
-    HookColorUpdates()
-
     -- Keep the global-name hooks too: harmless, and catch any direct calls to
     -- the setup functions outside the SetUpFrame path.
     pcall(hooksecurefunc, "DefaultCompactUnitFrameSetup", function(frame)
@@ -292,6 +297,14 @@ local function RestoreCompactFramesSystem()
         end
         if state.powerBackground then
             RestoreTextureInfo(frame.powerBar and frame.powerBar.background, state.powerBackground)
+        end
+        if state.healthSetColor and frame.healthBar then
+            frame.healthBar.SetStatusBarColor = state.healthSetColor
+            frame.healthBar._duiColorWrapped = nil
+        end
+        if state.powerSetColor and frame.powerBar then
+            frame.powerBar.SetStatusBarColor = state.powerSetColor
+            frame.powerBar._duiColorWrapped = nil
         end
     end
     CompactFramesModule.originalStates = {}
