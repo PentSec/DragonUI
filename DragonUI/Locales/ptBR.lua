@@ -167,6 +167,10 @@ L["Retail-style skin for Blizzard bag windows"] = "Visual estilo Retail para as 
 L["Version Check"] = "Verificação de versão"
 L["Broadcast and detect addon version updates across group members"] = "Detecta atualizações de versão do addon entre membros do grupo transmitindo e recebendo a versão"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "Pré-aquecimento da UI"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "Pré-carrega painéis selecionados da Blizzard no login para evitar travamentos no primeiro uso durante o jogo."
+
 -- Aura labels
 L["Auras"] = "Auras"
 -- Nameplate addon compatibility popup

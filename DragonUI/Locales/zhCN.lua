@@ -551,6 +551,10 @@ L["Level %d"] = "Level %d"
 L["Version Check"] = "版本检查"
 L["Broadcast and detect addon version updates across group members"] = "检测队伍成员间插件版本更新，通过广播和接收版本信息"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "界面预热"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "登录时预加载选定的暴雪面板，以避免游戏中首次使用时的卡顿。"
+
 -- BNet Toast Module
 L["BNet Toast"] = "BNet 提醒"
 L["Friend online/offline notifications with Battle.net toasts and chat messages"] = "好友上线/下线的战网提醒和聊天通知"

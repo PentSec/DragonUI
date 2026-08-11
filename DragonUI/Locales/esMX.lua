@@ -523,6 +523,10 @@ L["Copy Text"] = "Copiar texto"
 L["Version Check"] = "Control de Versión"
 L["Broadcast and detect addon version updates across group members"] = "Detecta actualizaciones del addon entre miembros del grupo enviando y recibiendo la versión"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "Precalentamiento de la UI"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "Precarga paneles seleccionados de Blizzard al iniciar sesión para evitar congelamientos en el primer uso durante el juego."
+
 -- Level Up Enhance Module
 L["Level Up Enhance"] = "Mejora de Subida de Nivel"
 L["Enhanced level-up notification with animated frame"] = "Notificación mejorada de subida de nivel con marco animado"

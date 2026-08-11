@@ -523,6 +523,10 @@ L["Copy Text"] = "Copiar texto"
 L["Version Check"] = "Control de Versión"
 L["Broadcast and detect addon version updates across group members"] = "Detecta actualizaciones del addon entre miembros del grupo enviando y recibiendo la versión"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "Precalentamiento de la UI"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "Precarga paneles seleccionados de Blizzard al iniciar sesión para evitar congelamientos en el primer uso durante el juego."
+
 -- BNet Toast Module
 L["BNet Toast"] = "Aviso BNet"
 L["Friend online/offline notifications with Battle.net toasts and chat messages"] = "Notificaciones de amigos en línea/desconectados con toasts y mensajes de Battle.net"

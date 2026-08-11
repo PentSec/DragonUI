@@ -163,6 +163,10 @@ L["Retail-style skin for Blizzard bag windows"] = "暴雪背包視窗的正式�
 L["Version Check"] = "版本檢查"
 L["Broadcast and detect addon version updates across group members"] = "檢測隊伍成員間插件版本更新，通過廣播和接收版本資訊"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "介面預熱"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "登入時預載選定的暴雪面板，以避免遊戲中首次使用時的卡頓。"
+
 -- Aura labels
 L["Auras"] = "光環"
 -- Nameplate addon compatibility popup

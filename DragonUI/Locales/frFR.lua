@@ -158,6 +158,10 @@ L["Level %d"] = "Level %d"
 -- Version Check Module
 L["Version Check"] = "Vérification de version"
 L["Broadcast and detect addon version updates across group members"] = "Détecte les mises à jour de l'addon entre les membres du groupe en envoyant et recevant la version"
+
+-- Performance Warmup Module
+L["UI Warmup"] = "Préchauffage de l'UI"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "Précharge certains panneaux Blizzard à la connexion pour éviter des gelées lors de la première utilisation en jeu."
 L["Bag Skin"] = "Apparence des sacs"
 L["Retail-style skin for Blizzard bag windows"] = "Apparence Retail pour les fenêtres de sacs Blizzard"
 

@@ -528,6 +528,10 @@ L["Copy Text"] = "í…ìŠ¤íŠ¸ ë³µì‚¬"
 L["Version Check"] = "버전 확인"
 L["Broadcast and detect addon version updates across group members"] = "그룹원 간 애드온 버전 업데이트를 감지하고 방송합니다"
 
+-- Performance Warmup Module
+L["UI Warmup"] = "UI 예열"
+L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "로그인 시 선택한 블리자드 패널을 미리 불러와 게임 중 첫 사용 시 멈춤 현상을 방지합니다."
+
 -- Level Up Enhance Module
 L["Level Up Enhance"] = "Level Up Enhance"
 L["Enhanced level-up notification with animated frame"] = "Enhanced level-up notification with animated frame"
