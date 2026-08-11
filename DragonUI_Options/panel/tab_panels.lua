@@ -72,118 +72,118 @@ local function BuildCharacterSubTab(scroll)
         requiresReload = true,
     })
 
-    C:AddToggle(cpSection, {
-        label = LO["Class Portrait"],
-        desc = LO["Show your class icon in the portrait instead of your character's face."],
-        getFunc = function()
-            return GetModuleField("characterpanel", "class_portrait") ~= false
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").class_portrait = val
-            if addon.CharacterPanel and addon.CharacterPanel.UpdatePortrait then
-                addon.CharacterPanel.UpdatePortrait()
-            end
-        end,
-        disabled = function() return not IsEnabled("characterpanel") end,
-        requiresReload = false,
-    })
+    -- C:AddToggle(cpSection, {
+    --     label = LO["Class Portrait"],
+    --     desc = LO["Show your class icon in the portrait instead of your character's face."],
+    --     getFunc = function()
+    --         return GetModuleField("characterpanel", "class_portrait") ~= false
+    --     end,
+    --     setFunc = function(val)
+    --         EnsureModuleTable("characterpanel").class_portrait = val
+    --         if addon.CharacterPanel and addon.CharacterPanel.UpdatePortrait then
+    --             addon.CharacterPanel.UpdatePortrait()
+    --         end
+    --     end,
+    --     disabled = function() return not IsEnabled("characterpanel") end,
+    --     requiresReload = false,
+    -- })
 
-    C:AddToggle(cpSection, {
-        label = LO["Class-Colored Level Text"],
-        desc = LO["Color the class name in the \"Level X Race Class\" line."],
-        getFunc = function()
-            return GetModuleField("characterpanel", "class_level_text") ~= false
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").class_level_text = val
-            if addon.CharacterPanel and addon.CharacterPanel.RefreshLevelText then
-                addon.CharacterPanel.RefreshLevelText()
-            end
-        end,
-        disabled = function() return not IsEnabled("characterpanel") end,
-        requiresReload = true,
-    })
+    -- C:AddToggle(cpSection, {
+    --     label = LO["Class-Colored Level Text"],
+    --     desc = LO["Color the class name in the \"Level X Race Class\" line."],
+    --     getFunc = function()
+    --         return GetModuleField("characterpanel", "class_level_text") ~= false
+    --     end,
+    --     setFunc = function(val)
+    --         EnsureModuleTable("characterpanel").class_level_text = val
+    --         if addon.CharacterPanel and addon.CharacterPanel.RefreshLevelText then
+    --             addon.CharacterPanel.RefreshLevelText()
+    --         end
+    --     end,
+    --     disabled = function() return not IsEnabled("characterpanel") end,
+    --     requiresReload = true,
+    -- })
 
-    C:AddToggle(cpSection, {
-        label = LO["Hide Model Controls"],
-        desc = LO["Hide the rotate, zoom and reset buttons over the character model."],
-        getFunc = function()
-            return GetModuleField("characterpanel", "hide_model_controls") == true
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").hide_model_controls = val
-            -- Rebuilt so the sub-option below picks up its new disabled state.
-            Panel:SelectTab("panels")
-        end,
-        callback = function()
-            local CP = addon.CharacterPanel
-            if CP and CP.RefreshModelControls then CP.RefreshModelControls() end
-        end,
-        disabled = function() return not IsEnabled("characterpanel") end,
-        requiresReload = false,
-    })
+    -- C:AddToggle(cpSection, {
+    --     label = LO["Hide Model Controls"],
+    --     desc = LO["Hide the rotate, zoom and reset buttons over the character model."],
+    --     getFunc = function()
+    --         return GetModuleField("characterpanel", "hide_model_controls") == true
+    --     end,
+    --     setFunc = function(val)
+    --         EnsureModuleTable("characterpanel").hide_model_controls = val
+    --         -- Rebuilt so the sub-option below picks up its new disabled state.
+    --         Panel:SelectTab("panels")
+    --     end,
+    --     callback = function()
+    --         local CP = addon.CharacterPanel
+    --         if CP and CP.RefreshModelControls then CP.RefreshModelControls() end
+    --     end,
+    --     disabled = function() return not IsEnabled("characterpanel") end,
+    --     requiresReload = false,
+    -- })
 
-    C:AddToggle(cpSection, {
-        label = LO["Keep the Reset Button"],
-        desc = LO["Leave the reset button on its own while the rest of the model controls stay hidden."],
-        indent = 18,
-        getFunc = function()
-            return GetModuleField("characterpanel", "model_controls_reset_only") == true
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").model_controls_reset_only = val
-        end,
-        callback = function()
-            local CP = addon.CharacterPanel
-            if CP and CP.RefreshModelControls then CP.RefreshModelControls() end
-        end,
-        disabled = function()
-            return not IsEnabled("characterpanel")
-                or GetModuleField("characterpanel", "hide_model_controls") ~= true
-        end,
-        requiresReload = false,
-    })
+    -- C:AddToggle(cpSection, {
+    --     label = LO["Keep the Reset Button"],
+    --     desc = LO["Leave the reset button on its own while the rest of the model controls stay hidden."],
+    --     indent = 18,
+    --     getFunc = function()
+    --         return GetModuleField("characterpanel", "model_controls_reset_only") == true
+    --     end,
+    --     setFunc = function(val)
+    --         EnsureModuleTable("characterpanel").model_controls_reset_only = val
+    --     end,
+    --     callback = function()
+    --         local CP = addon.CharacterPanel
+    --         if CP and CP.RefreshModelControls then CP.RefreshModelControls() end
+    --     end,
+    --     disabled = function()
+    --         return not IsEnabled("characterpanel")
+    --             or GetModuleField("characterpanel", "hide_model_controls") ~= true
+    --     end,
+    --     requiresReload = false,
+    -- })
 
     -- ====================================================================
     -- STATS SIDEBAR
     -- ====================================================================
-    C:AddSpacer(scroll)
-    local statsSection = C:AddSection(scroll, LO["Stats Sidebar"])
+--     C:AddSpacer(scroll)
+--     local statsSection = C:AddSection(scroll, LO["Stats Sidebar"])
 
-    C:AddDescription(statsSection, LO["The headline numbers above the stat categories."])
+--     C:AddDescription(statsSection, LO["The headline numbers above the stat categories."])
 
-    local function RefreshSummary()
-        local CP = addon.CharacterPanel
-        if CP and CP.ApplyGearSummaryVisibility then CP.ApplyGearSummaryVisibility() end
-    end
+--     local function RefreshSummary()
+--         local CP = addon.CharacterPanel
+--         if CP and CP.ApplyGearSummaryVisibility then CP.ApplyGearSummaryVisibility() end
+--     end
 
-    C:AddToggle(statsSection, {
-        label = LO["Show Item Level"],
-        desc = LO["Show the average item level of your equipped gear."],
-        getFunc = function()
-            return GetModuleField("characterpanel", "show_item_level") ~= false
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").show_item_level = val
-        end,
-        callback = RefreshSummary,
-        disabled = function() return not IsEnabled("characterpanel") end,
-        requiresReload = false,
-    })
+--     C:AddToggle(statsSection, {
+--         label = LO["Show Item Level"],
+--         desc = LO["Show the average item level of your equipped gear."],
+--         getFunc = function()
+--             return GetModuleField("characterpanel", "show_item_level") ~= false
+--         end,
+--         setFunc = function(val)
+--             EnsureModuleTable("characterpanel").show_item_level = val
+--         end,
+--         callback = RefreshSummary,
+--         disabled = function() return not IsEnabled("characterpanel") end,
+--         requiresReload = false,
+--     })
 
-    C:AddToggle(statsSection, {
-        label = LO["Show GearScore"],
-        desc = LO["Show the GearScore of your equipped gear."],
-        getFunc = function()
-            return GetModuleField("characterpanel", "show_gear_score") == true
-        end,
-        setFunc = function(val)
-            EnsureModuleTable("characterpanel").show_gear_score = val
-        end,
-        callback = RefreshSummary,
-        disabled = function() return not IsEnabled("characterpanel") end,
-        requiresReload = false,
-    })
+--     C:AddToggle(statsSection, {
+--         label = LO["Show GearScore"],
+--         desc = LO["Show the GearScore of your equipped gear."],
+--         getFunc = function()
+--             return GetModuleField("characterpanel", "show_gear_score") == true
+--         end,
+--         setFunc = function(val)
+--             EnsureModuleTable("characterpanel").show_gear_score = val
+--         end,
+--         callback = RefreshSummary,
+--         disabled = function() return not IsEnabled("characterpanel") end,
+--         requiresReload = false,
+--     })
 end
 
 -- ============================================================================
