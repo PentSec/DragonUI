@@ -170,6 +170,11 @@ local function FlattenIfNeeded(frame)
     end
 end
 
+-- Forward declaration (LayoutFrames hook below references SweepAll before
+-- its full definition; Lua locals are lexically scoped and must be declared
+-- first or the call hits the global nil).
+local SweepAll
+
 -- ============================================================================
 -- SWEEP EXISTING FRAMES
 -- ============================================================================
@@ -224,7 +229,7 @@ local function HookContainerLayout()
     end
 end
 
-local function SweepAll()
+function SweepAll()
     HookContainerLayout()
     SweepContainer(_G.CompactRaidFrameContainer)
     SweepPartyFrame()
