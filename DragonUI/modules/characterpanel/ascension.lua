@@ -130,7 +130,13 @@ end
 
 -- The model viewport hides under a fixed global name on this client, but scan the paperdoll's
 -- children for the model frame as a fallback so the backdrop lands wherever it actually is.
-local function findModel(panel)
+-- `opts` carries the per-window model global name (AscensionPaperDollPanelModel or
+-- InspectPaperDollPanelModel) when the caller knows it; otherwise the scan alone resolves it.
+local function findModel(panel, opts)
+    if opts and opts.modelName then
+        local m = _G[opts.modelName]
+        if m then return m end
+    end
     local m = _G.AscensionPaperDollPanelModel
     if m then return m end
     if panel and panel.GetChildren then
@@ -205,8 +211,24 @@ local function applyTitle(cf)
     title:SetHeight(20)
 end
 
-local function buildChrome()
-    local cf = _G.AscensionCharacterFrame
+local CHARACTER_PANES = {
+    "AscensionSkillsPanel",
+    "AscensionReputationPanel",
+    "AscensionCurrencyPanel",
+    "AscensionCharacterTitlesPanel",
+    "AscensionEquipmentManagerPanel",
+    "AscensionMysticEnchantPanel",
+    "AscensionCharacterCompanionPanel",
+}
+
+-- The Inspect window reuses the same AscensionCharacterFrameTemplate the character window wears, so
+-- every helper here is parameterized by the root frame's name: "AscensionCharacterFrame" or
+-- "AscensionInspectFrame". The Inset/RightInset/PaperDollPanel/CloseButton/NineSlice globals all
+-- derive from that root name. Tab bits draw from the same templates and run through the same mixin
+-- hooks, so the same buildChrome/buildTabs logic reskins both windows without a duplicate tree.
+local function buildChrome(cfName, panes, opts)
+    opts = opts or {}
+    local cf = _G[cfName]
     if not cf then return end
 
     if not cf._duiChromeBuilt then
@@ -214,7 +236,7 @@ local function buildChrome()
 
         -- Ascension's own retail nineslice hides; the shared layout draws DragonUI's metal over
         -- the rock instead, so the two can never double up.
-        local ns = _G.AscensionCharacterFrameNineSlice
+        local ns = _G[cfName .. "NineSlice"]
         if ns then
             ns:Hide()
             cf._duiNineSliceFrame = ns
@@ -252,7 +274,7 @@ local function buildChrome()
         end
 
         applyTitle(cf)
-        CP.ModernizeCloseButton(_G.AscensionCharacterFrameCloseButton, cf)
+        CP.ModernizeCloseButton(_G[cfName .. "CloseButton"], cf)
 
         if not cf._duiPortraitHooked then
             cf._duiPortraitHooked = true
@@ -262,13 +284,13 @@ local function buildChrome()
         end
     end
 
-    local inset = _G.AscensionCharacterFrameInset
+    local inset = _G[cfName .. "Inset"]
     if inset then
         hideNineSlice(inset)
         sweep(inset)
         addGround(inset, "_duiBg")
     end
-    local right = _G.AscensionCharacterFrameRightInset
+    local right = _G[cfName .. "RightInset"]
     if right then
         hideNineSlice(right)
         sweep(right)
@@ -277,55 +299,66 @@ local function buildChrome()
     end
 
     -- The flat parchment grounds the list panes draw over the rock are hidden wholesale.
-    local panels = {
-        _G.AscensionSkillsPanel,
-        _G.AscensionReputationPanel,
-        _G.AscensionCurrencyPanel,
-        _G.AscensionCharacterTitlesPanel,
-        _G.AscensionEquipmentManagerPanel,
-        _G.AscensionMysticEnchantPanel,
-        _G.AscensionCharacterCompanionPanel,
-    }
-    for _, panel in ipairs(panels) do
-        sweepPanel(panel)
-        addFill(panel)
-        addPaneBorder(panel)
+    for _, name in ipairs(panes or {}) do
+        local panel = _G[name]
+        if panel then
+            sweepPanel(panel)
+            addFill(panel)
+            addPaneBorder(panel)
+        end
     end
 
     -- The paperdoll tab re-stamps its race backdrop on every OnShow, so the hide has to be
     -- re-asserted after theirs runs rather than once at build; rock replaces the interior.
-    local pd = _G.AscensionPaperDollPanel
-    local model = findModel(pd)
-    for _, frame in ipairs({ pd, model }) do
-        if frame and frame.HookScript and not frame._duiBgHooked then
-            frame._duiBgHooked = true
-            frame:HookScript("OnShow", function(self)
-                if self.Background then self.Background:Hide() end
-            end)
-            sweep(frame)
-        end
+    local pdName = opts.paperDoll
+    local pd = pdName and _G[pdName] or nil
+    local model = findModel(pd, opts)
+    if pd and pd.HookScript and not pd._duiBgHooked then
+        pd._duiBgHooked = true
+        pd:HookScript("OnShow", function(self)
+            if self.Background then self.Background:Hide() end
+        end)
+        sweep(pd)
     end
     -- Dark fill plus the retail pane rim frame the whole tab content, the sidebar's mirror.
     if pd then
         addFill(pd)
         addPaneBorder(pd)
     end
-    -- Sweeping the model frame took its viewport backdrop with it; the shared builder repaints
-    -- the same per-race backdrop (grey toggle included) the vanilla paperdoll wears, and the pane
-    -- rim frames it like every other content pane.
-    if model and CP.BuildModelBackdrop then
-        CP.BuildModelBackdrop(model)
+    -- The character model's own backdrop is swept and repainted by the shared builder (grey toggle
+    -- included) the vanilla paperdoll wears. The Inspect viewport shows the *target's* race portrait,
+    -- so its backdrop survives sweep via keep, only the model's retail nineslice chrome goes -- the
+    -- pane rim alone frames the viewport, and the OnShow hide hook never lands on its backdrop.
+    if model then
+        if not opts.skipModelBackdrop then
+            if model.HookScript and not model._duiBgHooked then
+                model._duiBgHooked = true
+                model:HookScript("OnShow", function(self)
+                    if self.Background then self.Background:Hide() end
+                end)
+            end
+            sweep(model)
+            if CP.BuildModelBackdrop then CP.BuildModelBackdrop(model) end
+        else
+            local keep = {}
+            if model.Background then keep[model.Background] = true end
+            if model.BackgroundOverlay then keep[model.BackgroundOverlay] = true end
+            sweep(model, keep)
+        end
         addPaneBorder(model)
     end
 
     -- The pets tab's companion viewport wears retail's MountJournal sheet; the companion list
     -- beside it already gets the shared pane treatment, so the 3D pane matches with the same dark
-    -- fill and rim (its Overlay shadow keeps the title readable).
-    local companionModel = _G.AscensionPetPaperDollPanelCompanionTabCompanionModel
-    if companionModel then
-        sweep(companionModel)
-        addFill(companionModel)
-        addPaneBorder(companionModel)
+    -- fill and rim (its Overlay shadow keeps the title readable). Character-only; Inspect has no
+    -- pets tab.
+    if opts.companionModel then
+        local companionModel = _G[opts.companionModel]
+        if companionModel then
+            sweep(companionModel)
+            addFill(companionModel)
+            addPaneBorder(companionModel)
+        end
     end
 end
 
@@ -348,7 +381,28 @@ function CP.RestoreAscensionChrome()
     for _, tex in ipairs(createdTextures) do
         tex:Hide()
     end
-    if tabArtHost then tabArtHost:Hide() end
+    if cf and cf._duiTabArtHost then cf._duiTabArtHost:Hide() end
+end
+
+-- Restore mirrors for the Inspect window: it has no static Panes list (the Inspect's panels reset
+-- individually via their own Hide), so we only clear shared owned textures and the per-window chrome
+-- pieces the builder stamped on AscensionInspectFrame and its Inset/RightInset.
+function CP.RestoreAscensionInspectChrome()
+    local cf = _G.AscensionInspectFrame
+    if cf then
+        if cf._duiNineSliceFrame then cf._duiNineSliceFrame:Show() end
+        for _, key in ipairs({ "_duiRockBg", "_duiStreaks" }) do
+            if cf[key] then cf[key]:Hide() end
+        end
+        for _, piece in ipairs(NINESLICE_PIECES) do
+            if cf[piece] then cf[piece]:Hide() end
+        end
+    end
+    for _, key in ipairs({ "AscensionInspectFrameInset", "AscensionInspectFrameRightInset" }) do
+        local host = _G[key]
+        if host and host._duiBg then host._duiBg:Hide() end
+    end
+    if cf and cf._duiTabArtHost then cf._duiTabArtHost:Hide() end
 end
 
 -- The main tabs are bare text buttons (TabSystemTabs); the side tabs carry an icon. Both get the
@@ -380,25 +434,30 @@ local TEXT_ACTIVE_DROP, TEXT_NUDGE_X = -7, -2
 -- window, whose rock/streaks/nineslice cover the strip's lower body, leaving only the caps above
 -- the top edge -- the retail tab-over-panel overlap. The textures still anchor to the tab buttons,
 -- and the frame tracks the window, so geometry needs no re-derivation.
-local tabArtHost = nil
+-- One host per window, stored on the frame: the Inspect window opens independently of the character
+-- window, so a single shared host would track the wrong window's show/hide and let its strip art
+-- linger or vanish with the other frame.
 local function ensureTabArtHost(cf)
-    if tabArtHost then return tabArtHost end
-    tabArtHost = CreateFrame("Frame", nil, cf:GetParent() or UIParent)
-    tabArtHost:EnableMouse(false)
-    tabArtHost:SetFrameLevel(cf:GetFrameLevel() - 1)
-    tabArtHost:SetAllPoints(cf)
-    cf:HookScript("OnShow", function() tabArtHost:Show() end)
-    cf:HookScript("OnHide", function() tabArtHost:Hide() end)
-    tabArtHost:SetShownReq(cf:IsShown())
-    return tabArtHost
+    local host = cf._duiTabArtHost
+    if host then return host end
+    host = CreateFrame("Frame", nil, cf:GetParent() or UIParent)
+    host:EnableMouse(false)
+    host:SetFrameLevel(cf:GetFrameLevel() - 1)
+    host:SetAllPoints(cf)
+    cf:HookScript("OnShow", function() host:Show() end)
+    cf:HookScript("OnHide", function() host:Hide() end)
+    host:SetShownReq(cf:IsShown())
+    cf._duiTabArtHost = host
+    return host
 end
 
 -- `paperdoll` swaps the metal strip for retail's PaperDollSidebarTabs face, the art the vanilla
 -- sidebar strip draws from the same sheet (sidebartabs.lua): a plate that swaps dim/lit on
 -- selection, the lit face as an additive hover, and a hider dropping the plate's bottom lip over
 -- the pane. Same art table shape, so the shared sync logic drives both. `host` owns the created
--- textures: the main tabs draw their strip on the behind-window tabArtHost, anchored to the button,
--- so the window's own chrome covers the strip's overlap; the side tabs keep the art on the button.
+-- textures: the main tabs draw their strip on the behind-window art host (one per window, tracked
+-- on the frame), anchored to the button, so the window's own chrome covers the strip's overlap; the
+-- side tabs keep the art on the button.
 local function tabArt(t, layer, paperdoll, host)
     local art = t._duiTabArt
     if art then return art end
@@ -573,9 +632,13 @@ end
 -- plates. Ascension's tabs hang straight off the RightInset (no strip frame), so the same two
 -- sprites land on the RightInset at the row's ends -- 3px clear of the first tab, 2px off the last,
 -- on the tab bottoms -- and draw under the tabs' own plates.
+-- sidebartabs.lua caps the vanilla strip with a decor piece at each end of the tab row, behind the
+-- plates. Ascension's tabs hang straight off the RightInset (no strip frame), so the same two
+-- sprites land on the RightInset, pinning to the first and last tab in the row. The pieces are
+-- created once but re-anchored on every build pass: the Inspect adds its MysticEnchant tab
+-- dynamically in OnShow, so the row's ends can move after the first build.
 local function addSidebarDecor(host)
-    if not host or host._duiSidebarDecor then return end
-    host._duiSidebarDecor = true
+    if not host then return end
     local firstTab, lastTab
     for _, t in ipairs(collectTabs(host)) do
         if not firstTab then firstTab = t end
@@ -583,19 +646,27 @@ local function addSidebarDecor(host)
     end
     if not firstTab or not lastTab then return end
 
-    local decorLeft = host:CreateTexture(nil, "ARTWORK")
-    decorLeft:SetTexture(SIDEBAR_SHEET)
-    decorLeft:SetSize(28, 11)
+    local decorLeft = host._duiDecorLeft
+    if not decorLeft then
+        decorLeft = host:CreateTexture(nil, "ARTWORK")
+        decorLeft:SetTexture(SIDEBAR_SHEET)
+        decorLeft:SetSize(28, 11)
+        decorLeft:SetTexCoord(unpack(SIDEBAR_TC.decorLeft))
+        own(decorLeft)
+        host._duiDecorLeft = decorLeft
+    end
     decorLeft:SetPoint("BOTTOMRIGHT", firstTab, "BOTTOMLEFT", -3, 0)
-    decorLeft:SetTexCoord(unpack(SIDEBAR_TC.decorLeft))
-    own(decorLeft)
 
-    local decorRight = host:CreateTexture(nil, "ARTWORK")
-    decorRight:SetTexture(SIDEBAR_SHEET)
-    decorRight:SetSize(28, 13)
+    local decorRight = host._duiDecorRight
+    if not decorRight then
+        decorRight = host:CreateTexture(nil, "ARTWORK")
+        decorRight:SetTexture(SIDEBAR_SHEET)
+        decorRight:SetSize(28, 13)
+        decorRight:SetTexCoord(unpack(SIDEBAR_TC.decorRight))
+        own(decorRight)
+        host._duiDecorRight = decorRight
+    end
     decorRight:SetPoint("BOTTOMLEFT", lastTab, "BOTTOMRIGHT", 2, 0)
-    decorRight:SetTexCoord(unpack(SIDEBAR_TC.decorRight))
-    own(decorRight)
 end
 
 -- SelectTab fires OnDeselected on the outgoing tab and OnSelected on the incoming one; the hooks
@@ -644,8 +715,12 @@ local function registerTabCallbacks(host)
     host:RegisterCallback("OnTabDeselected", function() syncAll(host) end)
 end
 
-local function buildTabs()
-    local cf = _G.AscensionCharacterFrame
+-- The tab system on both windows is the same TabSystemMixin; the side tabs share
+-- AscensionCharacterFrameSideTabTemplate (the Inspect's side-tab template inherits it), so the
+-- portrait-icon side tab survives sweep. Parameterize the root frame name so the same build reskins
+-- the AscensionCharacterFrame and the AscensionInspectFrame tabs.
+local function buildTabs(cfName)
+    local cf = _G[cfName]
     if not cf then return end
 
     hookSelectionMixins()
@@ -658,7 +733,7 @@ local function buildTabs()
     registerTabCallbacks(cf)
     syncAll(cf)
 
-    local right = _G.AscensionCharacterFrameRightInset
+    local right = _G[cfName .. "RightInset"]
     if right then
         for _, t in ipairs(collectTabs(right)) do
             -- The side tabs' icons are theirs to keep; the plate goes underneath at BACKGROUND so
@@ -677,12 +752,39 @@ local function buildTabs()
     end
 end
 
-CP:RegisterBuilder("ascension-chrome", buildChrome, { server = "ascension" })
-CP:RegisterBuilder("ascension-tabs", buildTabs, { server = "ascension" })
+CP:RegisterBuilder("ascension-chrome", function() return buildChrome("AscensionCharacterFrame", CHARACTER_PANES, {
+    paperDoll = "AscensionPaperDollPanel",
+    companionModel = "AscensionPetPaperDollPanelCompanionTabCompanionModel",
+}) end, { server = "ascension" })
+CP:RegisterBuilder("ascension-tabs", function() return buildTabs("AscensionCharacterFrame") end, { server = "ascension" })
+
+-- The Inspect window reuses the same AscensionCharacterFrameTemplate, so it gets the same skin:
+-- metal nineslice over rock, the pane rim on Inset/RightInset, the sidebar tabs and the main tabs.
+-- The Inspect's PaperDoll model shows the target's race portrait (not the viewer's), so the
+-- paperdoll opt skips the shared race backdrop and only frames the viewport; it has no pets tab.
+-- InspectPaperDollPanel is deliberately absent here -- its own paperdoll handling below sweeps and
+-- frames it once, and double-listing it would draw the rim twice. InspectStatsPanel is also absent,
+-- mirroring the character frame: it re-stamps a per-class background atlas on every OnShow, so it
+-- keeps its own backdrop over the RightInset fill instead of the dark pane.
+local INSPECT_PANES = {
+    "InspectPvPPanel",
+    "InspectBuildPanel",
+    "InspectMysticEnchantPanel",
+}
+CP:RegisterBuilder("ascension-inspect-chrome", function() return buildChrome("AscensionInspectFrame", INSPECT_PANES, {
+    paperDoll = "InspectPaperDollPanel",
+    modelName = "InspectPaperDollPanelModel",
+    skipModelBackdrop = true,
+}) end, { server = "ascension" })
+CP:RegisterBuilder("ascension-inspect-tabs", function() return buildTabs("AscensionInspectFrame") end, { server = "ascension" })
+
+-- Ascension detection, matching the rest of the addon: the PathToAscension micro button exists only
+-- on Ascension servers. (CP.SERVER is never assigned, so the old gate here could never fire.)
+local isAscension = _G.PathToAscensionMicroButton ~= nil or _G.AscensionCharacterFrame ~= nil
 
 -- The client builds AscensionCharacterFrame during login, but never sooner: poll briefly so the
 -- skin lands the moment it exists, whatever order login events fired in. Stops on its own.
-if CP.SERVER == "ascension" then
+if isAscension then
     local tries = 0
     local retry = CreateFrame("Frame")
     retry:SetScript("OnUpdate", function(self)
@@ -695,3 +797,24 @@ if CP.SERVER == "ascension" then
         end
     end)
 end
+
+-- Ascension_InspectUI is LoadOnDemand: the frame only exists after the player first inspects
+-- someone, so no login-time pass can skin it. ADDON_LOADED fires the moment that addon loads --
+-- and the XML has already run by then, so the builders skin the window in place. The OnShow hook
+-- covers later opens, whose panels re-stamp their backdrops per inspect. Registered unconditionally:
+-- the addon name never matches on a non-Ascension client, so there is no wasted work.
+local inspectLoader = CreateFrame("Frame")
+inspectLoader:RegisterEvent("ADDON_LOADED")
+inspectLoader:SetScript("OnEvent", function(_, _, name)
+    if name ~= "Ascension_InspectUI" then return end
+    if not CP:Enabled() then return end
+    -- Apply directly if the frame exists; otherwise the OnShow hook below catches it.
+    CP.Apply()
+    local f = _G.AscensionInspectFrame
+    if f and not f._duiInspectShownHooked then
+        f._duiInspectShownHooked = true
+        f:HookScript("OnShow", function()
+            if CP:Enabled() then CP.Apply() end
+        end)
+    end
+end)
