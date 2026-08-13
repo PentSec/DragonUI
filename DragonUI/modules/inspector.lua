@@ -1071,6 +1071,14 @@ end
 
 local current = { unit = nil, className = nil, tree = nil, slot = nil }
 
+-- Ascension resolves the class backdrop in its talent tree's SetSpecID (CoATreeViewMixin), by
+-- which time the class DBC is loaded. The inspector fires off the inspect result instead, so the
+-- first inspect of a class can run before that data landed: GetBackgroundAtlas returns nil and the
+-- backdrop stays hidden until some later inspect happens to re-render. Re-resolve on a short timer
+-- (the tree's own "Loading talents..." retry, mirrored) so the backdrop appears as soon as the
+-- data does instead of waiting for the player to inspect around.
+local CLASS_BG_RETRY_INTERVAL, CLASS_BG_RETRY_MAX = 0.5, 10
+
 local function SetClassBackground(frame, classFile, slot)
     if not classFile then return end
     local util = CAU()
@@ -1079,37 +1087,63 @@ local function SetClassBackground(frame, classFile, slot)
         return
     end
 
-    -- Resolve spec name. Ascension slots (1,2,3) are NOT Blizzard spec IDs (71,72,73).
-    -- Try GetAllSpecs indexed by slot position as a heuristic.
-    local specFile = nil
-    if slot and C_ClassInfo and C_ClassInfo.GetAllSpecs then
-        local ok, specs = pcall(C_ClassInfo.GetAllSpecs, classFile)
-        if ok and type(specs) == "table" and #specs >= slot then
-            specFile = specs[slot]
-        end
-    end
-
-    -- Try with spec, class-only, and with className variant
-    local atlas = nil
-    local className = (util.GetClassDBCByFile and pcall(util.GetClassDBCByFile, classFile))
-
-    if specFile then
-        local ok, a = pcall(util.GetBackgroundAtlas, classFile, specFile)
-        if ok and a and type(a) == "string" and a ~= "" then atlas = a end
-    end
-    if not atlas then
-        local ok, a = pcall(util.GetBackgroundAtlas, classFile, nil)
-        if ok and a and type(a) == "string" and a ~= "" then atlas = a end
-    end
-
     local border = frame._InspectorBorder
-    if not border then return end
-    if atlas and border.ClassBg then
-        border.ClassBg:SetAtlas(atlas)
-        border.ClassBg:Show()
-    elseif border.ClassBg then
-        border.ClassBg:Hide()
+    if not border or not border.ClassBg then return end
+
+    -- A new inspect replaces any pending re-resolve for the same panel.
+    local pending = frame._duiClassBgRetry
+    if pending then
+        pending:SetScript("OnUpdate", nil)
+        frame._duiClassBgRetry = nil
     end
+
+    local function resolve()
+        -- Resolve spec name. Ascension slots (1,2,3) are NOT Blizzard spec IDs (71,72,73).
+        -- Try GetAllSpecs indexed by slot position as a heuristic.
+        local specFile = nil
+        if slot and C_ClassInfo and C_ClassInfo.GetAllSpecs then
+            local ok, specs = pcall(C_ClassInfo.GetAllSpecs, classFile)
+            if ok and type(specs) == "table" and #specs >= slot then
+                specFile = specs[slot]
+            end
+        end
+
+        -- Try with spec first, then class-only.
+        local atlas = nil
+        if specFile then
+            local ok, a = pcall(util.GetBackgroundAtlas, classFile, specFile)
+            if ok and a and type(a) == "string" and a ~= "" then atlas = a end
+        end
+        if not atlas then
+            local ok, a = pcall(util.GetBackgroundAtlas, classFile, nil)
+            if ok and a and type(a) == "string" and a ~= "" then atlas = a end
+        end
+
+        if not atlas then return false end
+        -- SetAtlas errors until the client has the atlas data, so a failed apply counts as
+        -- "not ready yet" and keeps the retry running.
+        local ok = pcall(border.ClassBg.SetAtlas, border.ClassBg, atlas)
+        if not ok then return false end
+        border.ClassBg:Show()
+        return true
+    end
+
+    if resolve() then return end
+
+    local retries = 0
+    local retry = CreateFrame("Frame")
+    frame._duiClassBgRetry = retry
+    local waited = 0
+    retry:SetScript("OnUpdate", function(self, elapsed)
+        waited = waited + elapsed
+        if waited < CLASS_BG_RETRY_INTERVAL then return end
+        waited = 0
+        retries = retries + 1
+        if resolve() or retries >= CLASS_BG_RETRY_MAX then
+            self:SetScript("OnUpdate", nil)
+            if frame._duiClassBgRetry == self then frame._duiClassBgRetry = nil end
+        end
+    end)
 end
 
 local function GetInspectFrame()
