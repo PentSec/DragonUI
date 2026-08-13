@@ -9,15 +9,19 @@ local VANILLA_X, VANILLA_Y = 65, -78
 -- Gnome or Troll backdrop art.
 local RACE_FALLBACK = { GNOME = "Dwarf", TROLL = "Orc" }
 
-local function raceKey()
-    local _, fileName = UnitRace("player")
+-- `unit` lets the Ascension skin build the same backdrop for the Inspect viewport, which shows the
+-- *target* rather than the player; the character model defaults to "player" like Blizzard's own.
+local function raceKey(unit)
+    unit = unit or "player"
+    local _, fileName = UnitRace(unit)
     if not fileName then return "ORC" end
     local upper = strupper(fileName)
     return strupper(RACE_FALLBACK[upper] or fileName)
 end
 
-local function racePath()
-    local _, fileName = UnitRace("player")
+local function racePath(unit)
+    unit = unit or "player"
+    local _, fileName = UnitRace(unit)
     if not fileName then return "Interface\\DressUpFrame\\DressUpBackground-Orc" end
     local upper = strupper(fileName)
     fileName = RACE_FALLBACK[upper] or fileName
@@ -64,8 +68,8 @@ local QUARTERS = {
 
 -- The race backdrops are strongly coloured and the model reads as a cutout pasted on them. Retail
 -- desaturates then dims under black, so the character is the only colour in the viewport.
-local function overlayAlpha()
-    return RACE_OVERLAY_ALPHA[raceKey()] or OVERLAY_ALPHA_DEFAULT
+local function overlayAlpha(unit)
+    return RACE_OVERLAY_ALPHA[raceKey(unit)] or OVERLAY_ALPHA_DEFAULT
 end
 
 local function buildRaceBackdrop(model)
@@ -108,31 +112,32 @@ local function buildRaceBackdrop(model)
     model._duiRaceBgOverlay = overlay
 end
 
-local function applyRaceBackground(model)
+local function applyRaceBackground(model, unit)
     model = model or _G.CharacterModelFrame
     if not model or not model._duiRaceBg then return end
 
     -- Read plainly, never as `~= false`: Config() falls back to an empty table before the database
     -- is up, and under that idiom a missing value would read as ENABLED.
     local grey = CP:Config().grey_model_backdrop and true or false
-    local base = racePath()
+    local base = racePath(unit)
     for suffix, tex in pairs(model._duiRaceBg) do
         tex:SetTexture(base .. suffix)
         tex:SetDesaturated(grey)
         tex:Show()
     end
     if model._duiRaceBgOverlay then
-        model._duiRaceBgOverlay:SetAlpha(grey and overlayAlpha() or 0)
+        model._duiRaceBgOverlay:SetAlpha(grey and overlayAlpha(unit) or 0)
         model._duiRaceBgOverlay:Show()
     end
 end
 
 CP.ApplyModelBackdrop = applyRaceBackground
 
--- Shared with the Ascension skin, which builds the same backdrop on its own model viewport.
-function CP.BuildModelBackdrop(model)
+-- Shared with the Ascension skin, which builds the same backdrop on its own model viewport; the
+-- Inspect passes its unit ("target") so the backdrop reads that target's race, not the player's.
+function CP.BuildModelBackdrop(model, unit)
     buildRaceBackdrop(model)
-    applyRaceBackground(model)
+    applyRaceBackground(model, unit)
 end
 
 -- Blizzard anchors the viewport in XML only, so a disable that does not reload leaves the model

@@ -294,6 +294,10 @@ local function buildChrome(cfName, panes, opts)
         applyTitle(cf)
         CP.ModernizeCloseButton(_G[cfName .. "CloseButton"], cf)
 
+        -- The shared body tint (the settings cog) shades the rock and streaks this block just
+        -- drew; applied once at build so the stored config reads correctly from the first open.
+        CP.ApplyBodyBackground()
+
         if not cf._duiPortraitHooked then
             cf._duiPortraitHooked = true
             cf:HookScript("OnShow", function(self)
@@ -343,34 +347,37 @@ local function buildChrome(cfName, panes, opts)
         addFill(pd)
         addPaneBorder(pd)
     end
-    -- The character model's own backdrop is swept and repainted by the shared builder (grey toggle
-    -- included) the vanilla paperdoll wears. The Inspect viewport shows the *target's* race portrait,
-    -- so its backdrop survives sweep via keep, only the model's retail nineslice chrome goes -- the
-    -- pane rim alone frames the viewport, and the OnShow hide hook never lands on its backdrop.
+    -- The model's own backdrop is swept and repainted by the shared builder (grey toggle included)
+    -- the vanilla paperdoll wears. The Inspect viewport shows the *target*, so it builds the same
+    -- backdrop from the target's race via opts.modelUnit, and hooks the model's SetUnit so a
+    -- mid-open re-target repaints it too.
     if model then
-        if not opts.skipModelBackdrop then
-            if model.HookScript and not model._duiBgHooked then
-                model._duiBgHooked = true
-                model:HookScript("OnShow", function(self)
-                    if self.Background then self.Background:Hide() end
-                end)
-            end
-            -- The shared builder re-stamps the race backdrop on every Apply, so this sweep must
-            -- spare the art an earlier pass created: those textures are not `own`ed, and a second
-            -- pass (login's PLAYER_ENTERING_WORLD, the Inspect's ADDON_LOADED) would otherwise
-            -- neuter their Show and blank the viewport. Blizzard's own backdrop still gets swept.
-            local keep = {}
-            if model._duiRaceBg then
-                for _, tex in pairs(model._duiRaceBg) do keep[tex] = true end
-            end
-            if model._duiRaceBgOverlay then keep[model._duiRaceBgOverlay] = true end
-            sweep(model, keep)
-            if CP.BuildModelBackdrop then CP.BuildModelBackdrop(model) end
-        else
-            local keep = {}
-            if model.Background then keep[model.Background] = true end
-            if model.BackgroundOverlay then keep[model.BackgroundOverlay] = true end
-            sweep(model, keep)
+        if model.HookScript and not model._duiBgHooked then
+            model._duiBgHooked = true
+            model:HookScript("OnShow", function(self)
+                if self.Background then self.Background:Hide() end
+            end)
+        end
+        -- The shared builder re-stamps the race backdrop on every Apply, so this sweep must
+        -- spare the art an earlier pass created: those textures are not `own`ed, and a second
+        -- pass (login's PLAYER_ENTERING_WORLD, the Inspect's ADDON_LOADED) would otherwise
+        -- neuter their Show and blank the viewport. Blizzard's own backdrop still gets swept.
+        local keep = {}
+        if model._duiRaceBg then
+            for _, tex in pairs(model._duiRaceBg) do keep[tex] = true end
+        end
+        if model._duiRaceBgOverlay then keep[model._duiRaceBgOverlay] = true end
+        sweep(model, keep)
+        if CP.BuildModelBackdrop then CP.BuildModelBackdrop(model, opts.modelUnit) end
+        -- Re-targeting while the Inspect is open calls the frame's mixin OnShow directly, which
+        -- never re-fires the OnShow script, so the backdrop would keep the previous target's race.
+        -- The paperdoll's SetUnit forwards to the model on every swap, so hook that and re-apply
+        -- for the new unit right after. The character window has no modelUnit and never hooks.
+        if opts.modelUnit and model.SetUnit and not model._duiSetUnitHooked then
+            model._duiSetUnitHooked = true
+            pcall(hooksecurefunc, model, "SetUnit", function(self)
+                if CP.BuildModelBackdrop then CP.BuildModelBackdrop(self, opts.modelUnit) end
+            end)
         end
         addPaneBorder(model)
     end
@@ -788,12 +795,12 @@ CP:RegisterBuilder("ascension-tabs", function() return buildTabs("AscensionChara
 
 -- The Inspect window reuses the same AscensionCharacterFrameTemplate, so it gets the same skin:
 -- metal nineslice over rock, the pane rim on Inset/RightInset, the sidebar tabs and the main tabs.
--- The Inspect's PaperDoll model shows the target's race portrait (not the viewer's), so the
--- paperdoll opt skips the shared race backdrop and only frames the viewport; it has no pets tab.
--- InspectPaperDollPanel is deliberately absent here -- its own paperdoll handling below sweeps and
--- frames it once, and double-listing it would draw the rim twice. InspectStatsPanel is also absent,
--- mirroring the character frame: it re-stamps a per-class background atlas on every OnShow, so it
--- keeps its own backdrop over the RightInset fill instead of the dark pane.
+-- The Inspect's PaperDoll model shows the *target*, so the shared race backdrop builds from the
+-- target's race (modelUnit = "target") and follows the grey toggle like the character viewport; it
+-- has no pets tab. InspectPaperDollPanel is deliberately absent here -- its own paperdoll handling
+-- below sweeps and frames it once, and double-listing it would draw the rim twice. InspectStatsPanel
+-- is also absent, mirroring the character frame: it re-stamps a per-class background atlas on every
+-- OnShow, so it keeps its own backdrop over the RightInset fill instead of the dark pane.
 local INSPECT_PANES = {
     "InspectPvPPanel",
     "InspectBuildPanel",
@@ -802,9 +809,169 @@ local INSPECT_PANES = {
 CP:RegisterBuilder("ascension-inspect-chrome", function() return buildChrome("AscensionInspectFrame", INSPECT_PANES, {
     paperDoll = "InspectPaperDollPanel",
     modelName = "InspectPaperDollPanelModel",
-    skipModelBackdrop = true,
+    modelUnit = "target",
 }) end, { server = "ascension" })
 CP:RegisterBuilder("ascension-inspect-tabs", function() return buildTabs("AscensionInspectFrame") end, { server = "ascension" })
+
+-- The model control strip over the Ascension viewports: the model already has native drag-rotate,
+-- drag-move and scroll-zoom via ModelMixin, so the strip is pure affordance -- its rotate pair
+-- steps the facing, the zoom pair steps the camera, and reset restores the OnLoad defaults, all
+-- the same state the native gestures write. The Inspect model only exists after the first inspect,
+-- so the builders simply wait for theirs to appear.
+CP:RegisterBuilder("ascension-model-controls", function()
+    local model = _G.AscensionPaperDollPanelModel
+    if model and CP.BuildModelControls then
+        CP.BuildModelControls(model, {
+            name = "DragonUIAscensionModelControls",
+            prefix = "DragonUIAscensionModel",
+            retail = true,
+        })
+    end
+end)
+
+CP:RegisterBuilder("ascension-inspect-model-controls", function()
+    local model = _G.InspectPaperDollPanelModel
+    if model and CP.BuildModelControls then
+        CP.BuildModelControls(model, {
+            name = "DragonUIAscensionInspectModelControls",
+            prefix = "DragonUIAscensionInspectModel",
+            retail = true,
+        })
+    end
+end)
+
+-- The settings cog: on this client the stock CharacterFrame never shows, so this gear is the
+-- module's only settings entry point. The shared menu is trimmed to what the Ascension windows can
+-- actually change -- the body tint shades the rock and streaks both windows draw, and the model
+-- backdrop section only appears on the paperdoll tab, whose viewport the shared BuildModelBackdrop
+-- paints. The Gear summary section is vanilla-sidebar-only and stays out.
+local COG_SIZE = 20
+-- Measured from the close button rather than the frame corner so the pair travels together.
+local COG_X, COG_Y = -6, -3
+
+-- The cogwheel the vanilla skin's settings button uses, so both gears in the addon are the same.
+local GEAR = "Interface\\WorldMap\\Gear_64Grey"
+
+local ascCog, ascMenu
+
+local function ascSetDark(dark)
+    CP:Config().dark_background = dark and true or false
+    CP.ApplyBodyBackground()
+end
+
+-- The grey toggle writes the shared config the backdrop builder reads on every apply, so re-running
+-- the build on both Ascension models is all the refresh needs -- the Inspect's reads the target's
+-- race (it is nil-safe here: the Inspect model only exists after the first inspect).
+local function ascSetGrey(grey)
+    CP:Config().grey_model_backdrop = grey and true or false
+    if not CP.BuildModelBackdrop then return end
+    if _G.AscensionPaperDollPanelModel then
+        CP.BuildModelBackdrop(_G.AscensionPaperDollPanelModel)
+    end
+    if _G.InspectPaperDollPanelModel then
+        CP.BuildModelBackdrop(_G.InspectPaperDollPanelModel, "target")
+    end
+end
+
+local function ascMenuTitle(text, level)
+    local info = UIDropDownMenu_CreateInfo()
+    info.text = text
+    info.isTitle = 1
+    info.notCheckable = 1
+    UIDropDownMenu_AddButton(info, level)
+end
+
+local function ascMenuRadio(text, checked, onSelect, level)
+    local info = UIDropDownMenu_CreateInfo()
+    info.text = text
+    info.checked = checked
+    info.func = onSelect
+    UIDropDownMenu_AddButton(info, level)
+end
+
+-- Re-read on every open, so the radios track whichever window last changed the shared config.
+local function ascInitMenu(_, level)
+    local dark = CP:Config().dark_background
+
+    ascMenuTitle(addon.L["Background"], level)
+    ascMenuRadio(addon.L["Stone"], not dark, function() ascSetDark(false) end, level)
+    ascMenuRadio(addon.L["Dark"], dark, function() ascSetDark(true) end, level)
+
+    -- Only where there is a model to put a backdrop behind: the paperdoll tab, whose viewport the
+    -- shared BuildModelBackdrop paints. The pets tab's companion wears the MountJournal sheet, so
+    -- the section is dropped there and on the collapsed list tabs.
+    local cf = _G.AscensionCharacterFrame
+    local paperdoll = false
+    if cf and cf.GetTabForPanel and cf.GetCurrentTabID then
+        local tab = cf:GetTabForPanel("AscensionPaperDollPanel")
+        paperdoll = tab ~= nil and tab.GetTabID and tab:GetTabID() == cf:GetCurrentTabID()
+    end
+    if not paperdoll then return end
+
+    local grey = CP:Config().grey_model_backdrop
+    ascMenuTitle(addon.L["Model backdrop"], level)
+    ascMenuRadio(addon.L["Greyscale"], grey, function() ascSetGrey(true) end, level)
+    ascMenuRadio(addon.L["Full colour"], not grey, function() ascSetGrey(false) end, level)
+end
+
+-- One gear, always visible: unlike the vanilla window, every tab shares the same chrome, so the
+-- background radios mean something on each of them.
+local function buildCog()
+    local cf = _G.AscensionCharacterFrame
+    if ascCog or not cf then return end
+
+    ascMenu = CreateFrame("Frame", "DragonUIAscensionSettingsMenu", UIParent, "UIDropDownMenuTemplate")
+    UIDropDownMenu_Initialize(ascMenu, ascInitMenu, "MENU")
+
+    ascCog = CreateFrame("Button", "DragonUIAscensionSettingsCog", cf)
+    ascCog:SetSize(COG_SIZE, COG_SIZE)
+    -- The nineslice corner and the title band both paint over this corner otherwise, the same way
+    -- the close button has to clear them.
+    ascCog:SetFrameLevel(cf:GetFrameLevel() + CP.SUBFRAME_LEVEL + 20)
+
+    local close = _G.AscensionCharacterFrameCloseButton
+    if close then
+        ascCog:SetPoint("TOPRIGHT", close, "BOTTOMRIGHT", COG_X, COG_Y)
+    else
+        ascCog:SetPoint("TOPRIGHT", cf, "TOPRIGHT", COG_X - 6, COG_Y - 24)
+    end
+
+    local icon = ascCog:CreateTexture(nil, "ARTWORK")
+    icon:SetTexture(GEAR)
+    icon:SetAllPoints(ascCog)
+    ascCog.Icon = icon
+
+    local hl = ascCog:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetTexture(GEAR)
+    hl:SetAllPoints(ascCog)
+    hl:SetBlendMode("ADD")
+    hl:SetAlpha(0.4)
+
+    ascCog:SetScript("OnClick", function(self)
+        ToggleDropDownMenu(1, nil, ascMenu, self, 0, 0)
+    end)
+    -- Blizzard's DropDownList1 lives on UIParent, so it outlives the cog unless it is closed by hand.
+    ascCog:SetScript("OnHide", function()
+        if UIDROPDOWNMENU_OPEN_MENU == ascMenu then CloseDropDownMenus() end
+    end)
+    ascCog:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        -- Neutral wording: the same gear serves every tab we draw, so naming one of them is wrong
+        -- on the others and would go stale again as more arrive.
+        GameTooltip:SetText(addon.L["Panel settings"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    ascCog:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Switching main tabs re-reads the pane the model section gates on, so close a menu that is
+    -- open -- otherwise it would float over a tab whose radios no longer apply.
+    if cf.RegisterCallback and not cf._duiCogTabHooked then
+        cf._duiCogTabHooked = true
+        cf:RegisterCallback("OnTabSelected", function() CloseDropDownMenus() end)
+    end
+end
+
+CP:RegisterBuilder("ascension-settings-cog", buildCog)
 
 -- Ascension detection, matching the rest of the addon: the PathToAscension micro button exists only
 -- on Ascension servers. (CP.SERVER is never assigned, so the old gate here could never fire.)

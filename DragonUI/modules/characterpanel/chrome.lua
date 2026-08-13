@@ -165,18 +165,27 @@ local TINTS = {
     dark = { body = 0.45, paper = 0.8, streak = 0.35 },
 }
 
-function CP.ApplyBodyBackground()
-    local cf = _G.CharacterFrame
+-- The rock and streaks every reskinned window draws tile the same art, so one tint drives them
+-- all: the stock CharacterFrame and the Ascension character/Inspect windows, which reuse the same
+-- chrome (ascension.lua stamps its own _duiRockBg/_duiStreaks on those frames). The Inspect frame
+-- does not exist until Ascension_InspectUI loads, so a nil lookup is simply skipped.
+local function tintFrame(cf, tint)
     if not cf then return end
-
-    local tint = CP:Config().dark_background and TINTS.dark or TINTS.stone
-
     if cf._duiRockBg then
         cf._duiRockBg:SetVertexColor(tint.body, tint.body, tint.body)
     end
     if cf._duiStreaks then
         cf._duiStreaks:SetAlpha(tint.streak)
     end
+end
+
+function CP.ApplyBodyBackground()
+    local tint = CP:Config().dark_background and TINTS.dark or TINTS.stone
+
+    tintFrame(_G.CharacterFrame, tint)
+    tintFrame(_G.AscensionCharacterFrame, tint)
+    tintFrame(_G.AscensionInspectFrame, tint)
+
     -- The faction popup hangs off the panel, so it shades with it.
     if CP.DetailGround then
         CP.DetailGround:SetVertexColor(tint.body, tint.body, tint.body)
