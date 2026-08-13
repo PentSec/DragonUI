@@ -10,6 +10,11 @@ local CP = addon.CharacterPanel
 local ROCK = addon._dir .. "UI\\ui-background-rock"
 local TAB_TEX = addon._dir .. "UI\\uiframetabs"
 
+-- The mounts' 3D view in the collections window backdrops on this art; the pets tab's companion
+-- viewport wears the same sheet so the two panes read as one surface.
+local MOUNT_BG_TEX = addon._dir .. "Collections\\MountJournal-BG"
+local MOUNT_BG_TC = { 0, 0.78515625, 0, 1 }
+
 -- The three sidebar tabs above the right pane wear retail's PaperDollSidebarTabs sheet, the same
 -- art sidebartabs.lua draws for the vanilla sidebar strip: the plates, the hider and highlight, and
 -- the strip's end-pieces (decorLeft/decorRight) that frame the tab row at its base.
@@ -180,6 +185,19 @@ local function addFill(host)
     bg:SetTexture(PANE_FILL.r, PANE_FILL.g, PANE_FILL.b)
     bg:SetAllPoints(host)
     host._duiFill = own(bg)
+    return bg
+end
+
+-- The companion viewport backdrops on the same MountJournal art the collections window draws
+-- behind its mounts, cropped to the sheet's background frame like that window does.
+local function addMountBg(host)
+    local bg = host._duiMountBg
+    if bg then return bg end
+    bg = host:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture(MOUNT_BG_TEX)
+    bg:SetTexCoord(unpack(MOUNT_BG_TC))
+    bg:SetAllPoints(host)
+    host._duiMountBg = own(bg)
     return bg
 end
 
@@ -358,14 +376,15 @@ local function buildChrome(cfName, panes, opts)
     end
 
     -- The pets tab's companion viewport wears retail's MountJournal sheet; the companion list
-    -- beside it already gets the shared pane treatment, so the 3D pane matches with the same dark
-    -- fill and rim (its Overlay shadow keeps the title readable). Character-only; Inspect has no
-    -- pets tab.
+    -- beside it already gets the shared pane treatment. The 3D pane backdrops on the same
+    -- MountJournal art the collections window draws behind its mounts, and the pane rim frames it
+    -- like every other content pane (the model's Overlay shadow keeps the title readable).
+    -- Character-only; Inspect has no pets tab.
     if opts.companionModel then
         local companionModel = _G[opts.companionModel]
         if companionModel then
             sweep(companionModel)
-            addFill(companionModel)
+            addMountBg(companionModel)
             addPaneBorder(companionModel)
         end
     end
