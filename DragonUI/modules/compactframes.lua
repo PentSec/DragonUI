@@ -170,16 +170,18 @@ local function FlattenIfNeeded(frame)
     end
 end
 
--- Forward declaration (LayoutFrames hook below references SweepAll before
--- its full definition; Lua locals are lexically scoped and must be declared
--- first or the call hits the global nil).
+-- Forward declarations (the LayoutFrames hook and SweepAll below reference
+-- SweepAll / SetupHooks before their full definitions; Lua locals are
+-- lexically scoped and must be declared first or the calls hit the global nil).
 local SweepAll
+local SetupHooks
 
 -- ============================================================================
 -- SWEEP EXISTING FRAMES
 -- ============================================================================
 
 local MEMBERS_PER_RAID_GROUP = 5
+local MAX_RAID_GROUPS = 8
 
 -- On this client the group/party member buttons are created as $parentMemberN
 -- with NO parentKey, so they are NOT reachable as frame.MemberN. The only
@@ -193,16 +195,44 @@ local function SweepGroupMembers(groupFrame)
     end
 end
 
-local function SweepContainer(container)
-    if not container or not container.frameUpdateList then return end
+-- The Ascension container is usually _G.CompactRaidFrameContainer, but the
+-- only handle may be the manager's .container field. Resolve both.
+local function ResolveContainer()
+    local container = _G.CompactRaidFrameContainer
+    if not container then
+        local manager = _G.CompactRaidFrameManager
+        container = manager and manager.container
+    end
+    return container
+end
 
-    for _, list in pairs(container.frameUpdateList) do
-        for _, frame in ipairs(list) do
-            if frame and frame.healthBar then
-                FlattenIfNeeded(frame)
-            elseif frame and frame.GetName then
-                -- A group container (raid group or party): flatten each member.
-                SweepGroupMembers(frame)
+local function SweepContainer(container)
+    if not container then return end
+
+    if container.frameUpdateList then
+        for _, list in pairs(container.frameUpdateList) do
+            for _, frame in ipairs(list) do
+                if frame and frame.healthBar then
+                    FlattenIfNeeded(frame)
+                elseif frame and frame.GetName then
+                    -- A group container (raid group or party): flatten each member.
+                    SweepGroupMembers(frame)
+                end
+            end
+        end
+    end
+
+    -- flowFrames is what the container actually lays out right now (groups,
+    -- raid unit buttons, pets). Sweep it too so a visible frame is flattened
+    -- even when frameUpdateList is missing or does not track it.
+    if container.flowFrames then
+        for _, frame in ipairs(container.flowFrames) do
+            if type(frame) == "table" then
+                if frame.healthBar then
+                    FlattenIfNeeded(frame)
+                elseif frame.GetName then
+                    SweepGroupMembers(frame)
+                end
             end
         end
     end
@@ -217,7 +247,7 @@ end
 -- container was created relative to our hooks. Runs before SweepAll so the
 -- very first sweep also arms it.
 local function HookContainerLayout()
-    local container = _G.CompactRaidFrameContainer
+    local container = ResolveContainer()
     if not container or CompactFramesModule.hooks.containerHooked then return end
     if not container.LayoutFrames then return end
     local ok = pcall(hooksecurefunc, container, "LayoutFrames", function()
@@ -230,9 +260,22 @@ local function HookContainerLayout()
 end
 
 function SweepAll()
+    -- Re-arm the setup hooks opportunistically: the compact raid frame addon
+    -- may load after DragonUI, so a target that was nil on an earlier pass
+    -- gets hooked the moment it appears.
+    SetupHooks()
     HookContainerLayout()
-    SweepContainer(_G.CompactRaidFrameContainer)
+    SweepContainer(ResolveContainer())
     SweepPartyFrame()
+
+    -- Direct name sweep of the raid group members, independent of the
+    -- container's internal lists. Toggling "Horizontal Groups" runs the full
+    -- profile apply, which re-runs DefaultCompactUnitFrameSetup on every group
+    -- member (resetting the bar textures); sweep them by name so the flat art
+    -- is restored no matter the layout mode or the container's list state.
+    for groupNum = 1, MAX_RAID_GROUPS do
+        SweepGroupMembers(_G["CompactRaidGroup" .. groupNum])
+    end
 end
 
 -- ============================================================================
@@ -243,9 +286,10 @@ end
 -- frame (raid container buttons, party members, raid group members, minis),
 -- at creation time and on re-setup. Hooked after the fact so our flat art
 -- always wins.
-local function SetupHooks()
+function SetupHooks()
     if CompactFramesModule.hooks.setupHooked then return end
-    CompactFramesModule.hooks.setupHooked = true
+
+    local allHooked = true
 
     -- The real chokepoint: every compact frame is set up via
     -- CompactUnitMixin:SetUpFrame(func), which calls the stored setup-func
@@ -254,24 +298,46 @@ local function SetupHooks()
     -- hook. Hooking the mixin method catches every SetUpFrame regardless of
     -- which setup func was passed in. pcall-guarded so one failure never
     -- aborts the module mid-setup (sweeps + remaining hooks still run).
-    if CompactUnitMixin and CompactUnitMixin.SetUpFrame then
-        pcall(hooksecurefunc, CompactUnitMixin, "SetUpFrame", function(self, func)
-            if not CompactFramesModule.applied then return end
-            FlattenFrame(self)
-        end)
+    if not CompactFramesModule.hooks.mixinHooked then
+        if CompactUnitMixin and CompactUnitMixin.SetUpFrame then
+            CompactFramesModule.hooks.mixinHooked = pcall(hooksecurefunc, CompactUnitMixin, "SetUpFrame", function(self, func)
+                if not CompactFramesModule.applied then return end
+                FlattenFrame(self)
+            end)
+        else
+            allHooked = false
+        end
     end
 
     -- Keep the global-name hooks too: harmless, and catch any direct calls to
     -- the setup functions outside the SetUpFrame path.
-    pcall(hooksecurefunc, "DefaultCompactUnitFrameSetup", function(frame)
-        if not CompactFramesModule.applied then return end
-        FlattenFrame(frame)
-    end)
+    if not CompactFramesModule.hooks.unitSetupHooked then
+        if _G.DefaultCompactUnitFrameSetup then
+            CompactFramesModule.hooks.unitSetupHooked = pcall(hooksecurefunc, "DefaultCompactUnitFrameSetup", function(frame)
+                if not CompactFramesModule.applied then return end
+                FlattenFrame(frame)
+            end)
+        else
+            allHooked = false
+        end
+    end
 
-    pcall(hooksecurefunc, "DefaultCompactMiniFrameSetup", function(frame)
-        if not CompactFramesModule.applied then return end
-        FlattenFrame(frame)
-    end)
+    if not CompactFramesModule.hooks.miniSetupHooked then
+        if _G.DefaultCompactMiniFrameSetup then
+            CompactFramesModule.hooks.miniSetupHooked = pcall(hooksecurefunc, "DefaultCompactMiniFrameSetup", function(frame)
+                if not CompactFramesModule.applied then return end
+                FlattenFrame(frame)
+            end)
+        else
+            allHooked = false
+        end
+    end
+
+    -- Only consider the hooks armed once every target exists and is hooked.
+    -- If a target is still nil (the addon has not loaded yet), retry on a
+    -- later sweep instead of silently skipping the hook forever. Each target
+    -- keeps its own flag so nothing is ever double-hooked.
+    CompactFramesModule.hooks.setupHooked = allHooked
 end
 
 -- ============================================================================
