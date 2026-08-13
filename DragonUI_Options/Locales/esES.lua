@@ -1109,6 +1109,9 @@ L["Vertical position (only active if Override is checked)"] = "Posición vertica
 
 -- Target of Target
 L["Target of Target"] = "Objetivo del Objetivo"
+-- Player Stats
+L["Player Stats"] = "Estadísticas del Jugador"
+L["Add item level, PvE/PvP power and prestige for player units."] = "Añade nivel de objeto, poder PvE/PvP y prestigio para unidades de jugador."
 L["Follows the Target frame by default. Move it in Editor Mode (/dragonui edit) to detach and position freely."] = "Sigue al marco del Objetivo por defecto. Muévelo en el Modo Editor (/dragonui edit) para desanclar y posicionar libremente."
 L["Detached — positioned freely via Editor Mode"] = "Desanclado — posicionado libremente mediante el Modo Editor"
 L["Attached — follows Target frame"] = "Anclado — sigue al marco del Objetivo"

@@ -1199,6 +1199,9 @@ L["Vertical position (only active if Override is checked)"] = true
 
 -- Target of Target
 L["Target of Target"] = true
+-- Player Stats
+L["Player Stats"] = true
+L["Add item level, PvE/PvP power and prestige for player units."] = true
 L["Follows the Target frame by default. Move it in Editor Mode (/dragonui edit) to detach and position freely."] = true
 L["Detached \226\128\148 positioned freely via Editor Mode"] = true
 L["Attached \226\128\148 follows Target frame"] = true

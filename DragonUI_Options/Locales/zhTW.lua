@@ -1016,6 +1016,9 @@ L["Vertical position (only active if Override is checked)"] = "垂直位置（�
 
 -- 目標的目標
 L["Target of Target"] = "目標的目標"
+-- Player Stats
+L["Player Stats"] = "玩家屬性"
+L["Add item level, PvE/PvP power and prestige for player units."] = "為玩家單位顯示物品等級、PvE/PvP 強度與威望。"
 L["Follows the Target frame by default. Move it in Editor Mode (/dragonui edit) to detach and position freely."] = "預設跟隨目標框架。在編輯模式（/dragonui edit）中移動它可使其分離並自由定位。"
 L["Detached — positioned freely via Editor Mode"] = "已分離 — 透過編輯模式自由定位"
 L["Attached — follows Target frame"] = "已附加 — 跟隨目標框架"

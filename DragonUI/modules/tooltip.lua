@@ -199,6 +199,184 @@ local function AddTargetOfTarget(unit)
 end
 
 -- ============================================================================
+-- PLAYER STATS LINE (item level / PvE-PvP power / prestige)
+-- ============================================================================
+
+-- Ascension-only data for another player (UnitPvEPower/UnitPvPPower/
+-- UnitAverageItemLevel) only exists after the client has that player's gear.
+-- That normally requires an Inspect, so on hover we fire NotifyInspect and
+-- rebuild the tooltip when the data arrives — no manual Inspect needed.
+--
+-- Strategy: every hover reads the client's data live (works for group members
+-- and already-inspected players). Whatever is displayable is cached per GUID
+-- for 15 minutes so item level shows without an inspect round trip; when the
+-- gear cache is missing for a max-level player we request the inspect. Once
+-- INSPECT_READY lands, the cached snapshot is dropped so the next read picks
+-- up the fresh data.
+local INSPECT_CACHE_TTL = 900
+local INSPECT_REQUEST_COOLDOWN = 3
+
+local inspectCache = {}          -- guid -> { time, itemLevel, pvePower, pvpPower }
+local pendingInspectGUID = nil   -- guid of the inspect request in flight
+local pendingInspectUnit = nil   -- unit token of that request
+local lastInspectRequest = {}    -- guid -> GetTime() of the last request
+local inspectRequestCount = 0
+
+local function GetCachedInspect(guid)
+    local entry = guid and inspectCache[guid]
+    if entry then
+        if GetTime() - entry.time < INSPECT_CACHE_TTL then
+            return entry
+        end
+        inspectCache[guid] = nil
+    end
+    return nil
+end
+
+-- Per-GUID cooldown so rapidly alternating hovers don't spam NotifyInspect.
+-- The map is pruned when it grows past 100 entries.
+local function CanRequestInspect(guid, now)
+    local last = lastInspectRequest[guid]
+    return not last or now - last >= INSPECT_REQUEST_COOLDOWN
+end
+
+local function NoteInspectRequest(guid, now)
+    if not lastInspectRequest[guid] then
+        inspectRequestCount = inspectRequestCount + 1
+    end
+    lastInspectRequest[guid] = now
+    if inspectRequestCount > 100 then
+        local cutoff = now - 60
+        for g, t in pairs(lastInspectRequest) do
+            if t < cutoff then
+                lastInspectRequest[g] = nil
+            end
+        end
+        inspectRequestCount = 0
+    end
+end
+
+local function RequestInspectData(unit, guid)
+    if not guid then return end
+    if not CanInspect or not CanInspect(unit) then return end
+    if not NotifyInspect then return end
+    local now = GetTime()
+    if not CanRequestInspect(guid, now) then return end
+    NoteInspectRequest(guid, now)
+    pendingInspectGUID = guid
+    pendingInspectUnit = unit
+    NotifyInspect(unit)
+end
+
+local function CacheInspect(guid, itemLevel, pvePower, pvpPower)
+    if not guid then return end
+    inspectCache[guid] = { time = GetTime(), itemLevel = itemLevel, pvePower = pvePower, pvpPower = pvpPower }
+    if pendingInspectGUID == guid then
+        pendingInspectGUID = nil
+        pendingInspectUnit = nil
+    end
+end
+
+-- Add one line per stat (sidepanel order: Item Level, PvE, PvP, Prestige).
+local function AddPlayerStatsInfo(unit)
+    if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return end
+    -- Vanilla 3.3.5a has no UnitPvEPower / UnitAverageItemLevel (Ascension client only)
+    if not UnitPvEPower or not UnitAverageItemLevel then return end
+
+    local config = GetModuleConfig()
+    if not config or not config.player_stats then return end
+
+    local guid = UnitGUID(unit)
+    local itemLevel, pvePower, pvpPower, prestige
+
+    if unit == "player" then
+        -- Local player: always available, no inspect needed
+        itemLevel = UnitAverageItemLevel("player")
+        pvePower = UnitPvEPower("player")
+        pvpPower = UnitPvPPower and UnitPvPPower("player")
+        if GetPrestigeLevel then
+            prestige = select(1, GetPrestigeLevel()) -- local-only, no server data
+        end
+    else
+        local cached = GetCachedInspect(guid)
+        if cached then
+            itemLevel, pvePower, pvpPower = cached.itemLevel, cached.pvePower, cached.pvpPower
+        else
+            -- Live read: works for group members and players already inspected
+            itemLevel = UnitAverageItemLevel(unit)
+            pvePower = UnitPvEPower(unit)
+            pvpPower = UnitPvPPower and UnitPvPPower(unit)
+
+            -- PvE/PvP power only applies at max level (the Ascension sidepanel
+            -- gates it with minLevel = GetMaxLevel()); below that it is always 0.
+            local atMaxLevel = (not GetMaxLevel) or (UnitLevel(unit) >= GetMaxLevel())
+            local hasPowers = (pvePower and pvePower > 0) or (pvpPower and pvpPower > 0)
+            local hasData = (itemLevel and itemLevel > 0)
+                or (pvePower and pvePower > 0)
+                or (pvpPower and pvpPower > 0)
+
+            -- Cache whatever is displayable right away so item level shows
+            -- without waiting for an inspect round trip. Never cache an empty
+            -- snapshot, or a failed read would block retries for the TTL.
+            if hasData then
+                CacheInspect(guid, itemLevel, pvePower, pvpPower)
+            end
+
+            -- No data at all (any level), or a max-level player whose powers the
+            -- client only knows after an inspect: request the gear data.
+            if not hasData or (not hasPowers and atMaxLevel) then
+                RequestInspectData(unit, guid)
+            end
+        end
+    end
+
+    if itemLevel and itemLevel > 0 then
+        GameTooltip:AddLine(string.format("%s: |cFFFFFFFF%.2f|r", STAT_ITEM_LEVEL or "Item Level", itemLevel), 0.7, 0.7, 0.7)
+    end
+    if pvePower and pvePower > 0 then
+        GameTooltip:AddLine(string.format("%s: |cFFFFFFFF%d/%d|r", PVE_POWER_LABEL or "PvE Power", pvePower, PVE_POWER_CAP or 495), 0.7, 0.7, 0.7)
+    end
+    if pvpPower and pvpPower > 0 then
+        GameTooltip:AddLine(string.format("%s: |cFFFFFFFF%d/%d|r", PVP_POWER_LABEL or "PvP Power", pvpPower, PVP_POWER_CAP or 495), 0.7, 0.7, 0.7)
+    end
+    if prestige and prestige > 0 then
+        GameTooltip:AddLine(string.format("%s: |cFFFFFFFF%d|r", PRESTIGE_LEVEL_LABEL or "Prestige", prestige), 0.7, 0.7, 0.7)
+    end
+end
+
+-- Inspect data for the pending request has arrived: drop our cached snapshot
+-- so the next read picks up the fresh gear, and if the same player is still
+-- hovered, re-set the unit so OnTooltipSetUnit re-runs with real values.
+-- SetUnit with the same unit always re-fires OnTooltipSetUnit and clears
+-- previous lines first.
+local function OnInspectReady(event, unit)
+    if not IsModuleEnabled() then return end
+    local config = GetModuleConfig()
+    if not config or not config.player_stats then return end
+
+    -- Ignore readies for a unit we did not request (args may be empty on some
+    -- clients, in which case we rely on the pending-guid match below).
+    if unit and pendingInspectUnit and unit ~= pendingInspectUnit then return end
+
+    local guid = pendingInspectGUID
+    if not guid then return end
+    pendingInspectGUID = nil
+    pendingInspectUnit = nil
+
+    if inspectCache[guid] then
+        inspectCache[guid] = nil
+    end
+
+    local _, ttUnit = GameTooltip:GetUnit()
+    if not ttUnit or not UnitExists(ttUnit) then return end
+    if UnitGUID(ttUnit) ~= guid then return end
+
+    GameTooltip:SetUnit(ttUnit)
+end
+
+local inspectEventFrame = CreateFrame("Frame")
+
+-- ============================================================================
 -- HEALTH BAR UPDATE
 -- ============================================================================
 
@@ -518,6 +696,7 @@ local function ApplyTooltipSystem()
             if unit then
                 ColorTooltipBorder(unit)
                 AddTargetOfTarget(unit)
+                AddPlayerStatsInfo(unit)
                 UpdateHealthBar(unit)
                 self:Show() -- Resize after adding lines
                 -- Color name AFTER Show() — calling Show() can reset text colors
@@ -527,6 +706,17 @@ local function ApplyTooltipSystem()
             end
         end)
         TooltipModule.hooks["SetUnit"] = true
+    end
+
+    -- Inspect data for hovered players (item level / powers). Ascension client
+    -- fires the retail-named event; register both, only one will fire.
+    if not TooltipModule.hooks["InspectReady"] then
+        inspectEventFrame:RegisterEvent("INSPECT_READY")
+        inspectEventFrame:RegisterEvent("INSPECT_TALENT_READY")
+        inspectEventFrame:SetScript("OnEvent", function(self, event, ...)
+            OnInspectReady(event, ...)
+        end)
+        TooltipModule.hooks["InspectReady"] = true
     end
 
     -- UnitFrame_UpdateTooltip recolors TextLeft1 with GameTooltip_UnitColor after SetUnit.
@@ -583,6 +773,10 @@ end
 
 local function RestoreTooltipSystem()
     -- Hooks can't be removed, but they check IsModuleEnabled()
+    -- Stop processing inspect events and drop any pending request
+    inspectEventFrame:UnregisterAllEvents()
+    pendingInspectGUID = nil
+    pendingInspectUnit = nil
     -- Reset health bar color
     if GameTooltipStatusBar then
         GameTooltipStatusBar:SetStatusBarColor(0.2, 0.8, 0.2)

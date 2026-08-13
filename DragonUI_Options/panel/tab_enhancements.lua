@@ -624,6 +624,19 @@ local function BuildEnhancementsTab(scroll)
     })
 
     C:AddToggle(ttSection, {
+        label = LO["Player Stats"],
+        desc = LO["Add item level, PvE/PvP power and prestige for player units."],
+        getFunc = function()
+            return GetModuleField("tooltip", "player_stats") ~= false
+        end,
+        setFunc = function(val)
+            EnsureModuleTable("tooltip").player_stats = val
+        end,
+        disabled = function() return not IsEnabled("tooltip") end,
+        requiresReload = false,
+    })
+
+    C:AddToggle(ttSection, {
         label = LO["Styled Health Bar"],
         desc = LO["Restyle the tooltip health bar with class/reaction colors and slimmer look."],
         getFunc = function()

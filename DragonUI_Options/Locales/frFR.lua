@@ -884,6 +884,9 @@ L["Color the tooltip border by the unit's class (players) or reaction (NPCs)."] 
 L["Class-Colored Name"] = "Nom aux couleurs de classe"
 L["Color the unit name text in the tooltip by class color (players only)."] = "Colorer le nom de l'unité dans l'info-bulle selon la couleur de classe (joueurs uniquement)."
 L["Target of Target"] = "Cible de la cible"
+-- Player Stats
+L["Player Stats"] = "Stats du joueur"
+L["Add item level, PvE/PvP power and prestige for player units."] = "Affiche le niveau d'objet, la puissance PvE/PvP et le prestige pour les unités joueur."
 L["Add a 'Targeting: <name>' line showing who the unit is targeting."] = "Ajouter une ligne « Ciblage : <nom> » indiquant qui l'unité cible."
 L["Add a 'Targeting: <name>' line to the tooltip showing who the unit is targeting."] = "Ajouter une ligne « Ciblage : <nom> » à l'info-bulle indiquant qui l'unité cible."
 L["Styled Health Bar"] = "Barre de vie stylisée"

@@ -1109,6 +1109,7 @@ local defaults = {
                 class_colored_border = true, -- Color tooltip border by class/reaction
                 class_colored_name = true, -- Color unit name by class
                 target_of_target = true, -- Show target-of-target line
+                player_stats = true, -- Show item level / PvE-PvP power / prestige line (players only)
                 health_bar = true, -- Show health bar on tooltip
                 anchor_cursor = false, -- Anchor tooltip to cursor
                 show_aura_source = true, -- Show caster name (and spell ID) on buff/debuff tooltips

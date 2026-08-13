@@ -1062,6 +1062,9 @@ L["Vertical position (only active if Override is checked)"] = "Вертикал�
 
 -- Target of Target
 L["Target of Target"] = "Цель цели"
+-- Player Stats
+L["Player Stats"] = "Статы игрока"
+L["Add item level, PvE/PvP power and prestige for player units."] = "Показывает уровень предметов, силу PvE/PvP и престиж для игроков."
 L["Follows the Target frame by default. Move it in Editor Mode (/dragonui edit) to detach and position freely."] = "По умолчанию следует за фреймом цели. Переместите в режиме редактора (/dragonui edit) для отсоединения и свободного позиционирования."
 L["Detached — positioned freely via Editor Mode"] = "Отсоединён — свободное позиционирование в режиме редактора"
 L["Attached — follows Target frame"] = "Присоединён — следует за фреймом цели"
