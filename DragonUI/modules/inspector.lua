@@ -1121,6 +1121,19 @@ local function GetInspectFrame()
     return nil
 end
 
+-- The unit token the Ascension inspect frame actually queried. The frame tracks
+-- a token ("target", "party1", ...) not a GUID, so in combat the referent can
+-- drift (e.g. "target" now points to the mob being fought). Always use this
+-- token for the advancement queries instead of a hardcoded "target".
+local function GetInspectedUnit()
+    local f = _G.AscensionInspectFrame
+    if f and f.GetUnit then
+        local u = f:GetUnit()
+        if u and u ~= "" then return u end
+    end
+    return "target"
+end
+
 local function RenderFor(unit, slot)
     if not IsModuleEnabled() then return end
     if IsVanillaClass(unit) then TP.Hide(); return end
@@ -1235,6 +1248,42 @@ end
 local eventFrame
 local buildTabWatcher
 
+-- The Ascension inspect frame resets to the first tab (Character) every time it
+-- re-inspects, which happens on every PLAYER_TARGET_CHANGED while the frame is
+-- open (very common in combat). Track which tab the user actually clicked so we
+-- can restore it after that auto-reset instead of letting the build panel hide.
+local userWantsBuild = false
+local inspectUIHooked = false
+
+local function HookInspectUI()
+    local f = _G.AscensionInspectFrame
+    if not f or inspectUIHooked then return false end
+    if not f.Tabs or not f.GetTabForPanel then return false end
+
+    local function hookTabButton(panelName, wantsBuild)
+        local ok, tabBtn = pcall(f.GetTabForPanel, f, panelName)
+        if ok and tabBtn and tabBtn.HookScript then
+            tabBtn:HookScript("OnClick", function()
+                userWantsBuild = wantsBuild
+            end)
+        end
+    end
+
+    hookTabButton("InspectBuildPanel", true)
+    hookTabButton("InspectPaperDollPanel", false)
+    hookTabButton("InspectPvPPanel", false)
+
+    -- A new inspect session starts once the frame is closed again.
+    if f.HookScript then
+        f:HookScript("OnHide", function()
+            userWantsBuild = false
+        end)
+    end
+
+    inspectUIHooked = true
+    return true
+end
+
 function addon.ApplyInspectorSystem()
     if InspectorModule.applied then return end
     if not HasCoAAPI() then return end
@@ -1244,30 +1293,46 @@ function addon.ApplyInspectorSystem()
     eventFrame = CreateFrame("Frame")
     eventFrame:SetScript("OnEvent", function(self, event, ...)
         if event == "INSPECT_CHARACTER_ADVANCEMENT_RESULT" then
-            local active = CAReader.GetInspectInfo("target") or 1
-            RenderFor("target", active)
+            local unit = GetInspectedUnit()
+            local active = CAReader.GetInspectInfo(unit) or 1
+            RenderFor(unit, active)
         elseif event == "PLAYER_TARGET_CHANGED" then
             if not IsModuleEnabled() then return end
             current.unit = nil; current.className = nil; current.tree = nil
             current.slot = nil; current.retries = 0
             local f = GetInspectFrame()
             if not f then TP.Hide(); return end
-            if UnitExists("target") and UnitIsPlayer("target") then
+            local unit = GetInspectedUnit()
+            if UnitExists(unit) and UnitIsPlayer(unit) then
                 local api = _G.C_CharacterAdvancement
                 if api and type(api.InspectUnit) == "function" then
-                    SafeCall(api.InspectUnit, "target")
+                    SafeCall(api.InspectUnit, unit)
                 end
-                local active = CAReader.GetInspectInfo("target") or 1
-                RenderFor("target", active)
+                local active = CAReader.GetInspectInfo(unit) or 1
+                RenderFor(unit, active)
             else
                 TP.Hide()
+            end
+        elseif event == "PLAYER_REGEN_ENABLED" then
+            -- The advancement query is refused while in combat (no
+            -- INSPECT_CHARACTER_ADVANCEMENT_RESULT arrives). Once combat ends,
+            -- re-request the build data so the rendered tree gains the learned
+            -- nodes; the result event re-renders when it arrives.
+            local f = GetInspectFrame()
+            if f and current.unit then
+                local api = _G.C_CharacterAdvancement
+                if api and type(api.InspectUnit) == "function" then
+                    SafeCall(api.InspectUnit, current.unit)
+                end
             end
         end
     end)
     eventFrame:RegisterEvent("INSPECT_CHARACTER_ADVANCEMENT_RESULT")
     eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
     local accum = 0
+    local lastRenderAttempt = 0
     buildTabWatcher = CreateFrame("Frame")
     buildTabWatcher:SetScript("OnUpdate", function(_, elapsed)
         if not IsModuleEnabled() then return end
@@ -1276,16 +1341,62 @@ function addon.ApplyInspectorSystem()
         accum = 0
         local f = GetInspectFrame()
         if not f then TP.Hide(); return end
-        if current.unit then
+
+        local inspectFrame = _G.AscensionInspectFrame
+        HookInspectUI()
+        local buildTabID = inspectFrame and inspectFrame.Tabs and inspectFrame.Tabs.Build
+        local currentTabID = inspectFrame and inspectFrame.GetCurrentTabID and inspectFrame:GetCurrentTabID()
+
+        if buildTabID and currentTabID then
+            if currentTabID == buildTabID then
+                if current.unit then
+                    TP.Show()
+                    if current.compare then CP.Show() end
+                else
+                    -- Build tab is active but no inspect data arrived yet: the
+                    -- advancement query is ignored while in combat, so no
+                    -- INSPECT_CHARACTER_ADVANCEMENT_RESULT fires. Request the
+                    -- data and render the static tree anyway; the learned nodes
+                    -- fill in once the result arrives (see PLAYER_REGEN_ENABLED).
+                    local now = GetTime()
+                    if now - lastRenderAttempt >= 1 then
+                        lastRenderAttempt = now
+                        local unit = GetInspectedUnit()
+                        local api = _G.C_CharacterAdvancement
+                        if api and type(api.InspectUnit) == "function" then
+                            SafeCall(api.InspectUnit, unit)
+                        end
+                        local active = CAReader.GetInspectInfo(unit) or 1
+                        SafeCall(RenderFor, unit, active)
+                    end
+                    -- RenderFor shows/hides the panel itself; do not force-show.
+                end
+            elseif userWantsBuild then
+                -- The inspect frame auto-reset the tab after a re-inspect
+                -- (target change in combat). Restore the tab the user had
+                -- selected so the inspector stays on screen.
+                if pcall(inspectFrame.SelectTabID, inspectFrame, buildTabID) then
+                    if current.unit then
+                        TP.Show()
+                        if current.compare then CP.Show() end
+                    else
+                        TP.Hide()
+                    end
+                else
+                    TP.Hide()
+                end
+            else
+                TP.Hide()
+            end
+        else
+            -- Fallback: drive visibility off the build panel directly.
             local buildPanel = _G.InspectBuildPanelSpecs
-            if buildPanel and buildPanel:IsVisible() then
+            if current.unit and buildPanel and buildPanel:IsVisible() then
                 TP.Show()
                 if current.compare then CP.Show() end
             else
                 TP.Hide()
             end
-        else
-            TP.Hide()
         end
     end)
 
@@ -1295,6 +1406,7 @@ end
 function addon.RestoreInspectorSystem()
     if not InspectorModule.applied then return end
 
+    userWantsBuild = false
     TP.Hide()
 
     if eventFrame then
@@ -1535,6 +1647,41 @@ function DebugTools.DumpCategories()
     end
 end
 
+function DebugTools.DumpState()
+    local iframe = _G.AscensionInspectFrame
+    local buildPanel = _G.InspectBuildPanelSpecs
+    LogMsg("combat=" .. tostring(InCombatLockdown()))
+    LogMsg("inspectFrameShown=" .. tostring(iframe and iframe:IsShown()))
+    LogMsg("getInspectFrame=" .. tostring(GetInspectFrame()))
+    local unit = GetInspectedUnit()
+    local _, classFile = UnitClass(unit)
+    LogMsg("unit=" .. tostring(unit)
+        .. " exists=" .. tostring(UnitExists(unit))
+        .. " isPlayer=" .. tostring(UnitIsPlayer(unit))
+        .. " classFile=" .. tostring(classFile)
+        .. " vanilla=" .. tostring(classFile and VANILLA_CLASSES[classFile] or false))
+    if iframe then
+        LogMsg("currentTab=" .. tostring(iframe.GetCurrentTabID and iframe:GetCurrentTabID())
+            .. " buildTab=" .. tostring(iframe.Tabs and iframe.Tabs.Build)
+            .. " wantsBuild=" .. tostring(userWantsBuild))
+    end
+    LogMsg("buildPanelSpecsVisible=" .. tostring(buildPanel and buildPanel:IsVisible()))
+    LogMsg("current.unit=" .. tostring(current.unit)
+        .. " tpShown=" .. tostring(TP.Get():IsShown()))
+    local api = _G.C_CharacterAdvancement
+    if api and type(api.GetInspectedBuild) == "function" then
+        local okb, bld = pcall(api.GetInspectedBuild, unit, 1)
+        local n = 0
+        if okb and type(bld) == "table" then
+            for _ in pairs(bld) do n = n + 1 end
+        end
+        LogMsg("inspectedBuild(" .. tostring(unit) .. ",1) entries=" .. n)
+    end
+    local active, unlocked = CAReader.GetInspectInfo(unit)
+    LogMsg("inspectInfo active=" .. tostring(active)
+        .. " unlocked=" .. tostring(type(unlocked) == "table" and #unlocked or unlocked))
+end
+
 function DebugTools.DumpSpecs()
     local api = _G.C_CharacterAdvancement
     local u = "target"
@@ -1593,6 +1740,8 @@ _G.SlashCmdList["COAIT"] = function(msg)
         SafeCall(DebugTools.DumpCategories)
     elseif msg == "specs" then
         SafeCall(DebugTools.DumpSpecs)
+    elseif msg == "state" then
+        SafeCall(DebugTools.DumpState)
     else
         SafeCall(DebugTools.DumpTarget)
     end
