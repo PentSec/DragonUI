@@ -337,7 +337,16 @@ local function buildChrome(cfName, panes, opts)
                     if self.Background then self.Background:Hide() end
                 end)
             end
-            sweep(model)
+            -- The shared builder re-stamps the race backdrop on every Apply, so this sweep must
+            -- spare the art an earlier pass created: those textures are not `own`ed, and a second
+            -- pass (login's PLAYER_ENTERING_WORLD, the Inspect's ADDON_LOADED) would otherwise
+            -- neuter their Show and blank the viewport. Blizzard's own backdrop still gets swept.
+            local keep = {}
+            if model._duiRaceBg then
+                for _, tex in pairs(model._duiRaceBg) do keep[tex] = true end
+            end
+            if model._duiRaceBgOverlay then keep[model._duiRaceBgOverlay] = true end
+            sweep(model, keep)
             if CP.BuildModelBackdrop then CP.BuildModelBackdrop(model) end
         else
             local keep = {}
