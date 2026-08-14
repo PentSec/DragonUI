@@ -39,34 +39,59 @@ local STRIP_ORDER = { "left", "right", "zoomOut", "zoomIn", "reset" }
 -- One entry per viewport the strip is built over, keyed by the model itself.
 local strips = {}
 
+-- GetPosition survives a model reload unchanged on the stock model, so the vanilla count lives in
+-- Lua (issue #418); the Ascension model's native gestures write the widget directly, so its strip
+-- still reads the live position to stay in step.
 local function position(model)
     if not model.GetPosition then return 0, 0, 0 end
     local ok, x, y, z = pcall(model.GetPosition, model)
     if not ok or not x then return 0, 0, 0 end
     return x, y or 0, z or 0
 end
-
 local function clamp(v, lo, hi)
     if v < lo then return lo elseif v > hi then return hi end
     return v
 end
 
+-- GetPosition survives a model reload unchanged on the stock model, so the count is kept here
+-- instead of read back (issue #418).
+local function view(model)
+    local v = model._duiView
+    if not v then
+        v = { zoom = 0, y = 0, z = 0 }
+        model._duiView = v
+    end
+    return v
+end
+
+local function applyView(model)
+    local v = view(model)
+    pcall(model.SetPosition, model, v.zoom, v.y, v.z)
+end
+
 -- The strip's zoom writes the same axis the native gestures drive: the model's depth position,
 -- clamped to whichever range the viewport configured (the vanilla constant or the Ascension
--- model's OnLoad SetMinMaxDistance). The vanilla model's first SetPosition axis is depth; the
--- Ascension model's drag-move owns the other two axes, so the buttons and the mouse stay in step.
+-- model's OnLoad SetMinMaxDistance). The vanilla count is tracked in Lua because GetPosition
+-- survives a reload unchanged; the Ascension model's drag-move and scroll-zoom write the widget
+-- directly, so its strip reads the position live to stay in step.
 local function applyZoom(strip, delta)
     local model = strip.model
-    local x, y, z = position(model)
-    pcall(model.SetPosition, model,
-          clamp(x + delta, strip.zoomMin, strip.zoomMax), y, z)
+    if strip.retail then
+        local x, y, z = position(model)
+        pcall(model.SetPosition, model,
+              clamp(x + delta, strip.zoomMin, strip.zoomMax), y, z)
+    else
+        local v = view(model)
+        v.zoom = clamp(v.zoom + delta, strip.zoomMin, strip.zoomMax)
+        applyView(model)
+    end
 end
 
 local function applyPan(model, dy, dz)
-    local x, y, z = position(model)
-    pcall(model.SetPosition, model, x,
-          clamp(y + dy, -PAN_LIMIT, PAN_LIMIT),
-          clamp(z + dz, -PAN_LIMIT, PAN_LIMIT))
+    local v = view(model)
+    v.y = clamp(v.y + dy, -PAN_LIMIT, PAN_LIMIT)
+    v.z = clamp(v.z + dz, -PAN_LIMIT, PAN_LIMIT)
+    applyView(model)
 end
 
 local function resetModel(strip)
@@ -76,7 +101,11 @@ local function resetModel(strip)
         -- Clears the depth (zoom) and the drag-move pan in one go.
         if model.SetPosition then pcall(model.SetPosition, model, 0, 0, 0) end
     else
-        if model.SetPosition then pcall(model.SetPosition, model, 0, 0, 0) end
+        -- Zero the tracked view: on the stock model the client recenters the camera on its own, so
+        -- the counter has to follow it (issue #418).
+        local v = view(model)
+        v.zoom, v.y, v.z = 0, 0, 0
+        applyView(model)
         model.rotation = DEFAULT_ROTATION
         if model.SetRotation then pcall(model.SetRotation, model, DEFAULT_ROTATION) end
     end
@@ -97,6 +126,22 @@ local function rotateModel(strip, delta)
     else
         model.rotation = (model.rotation or DEFAULT_ROTATION) + delta
         if model.SetRotation then pcall(model.SetRotation, model, model.rotation) end
+    end
+end
+
+-- A reload snaps the camera back to default but leaves the stored position alone, so zero both.
+local function trackReloads(model)
+    if model._duiReloadTracked then return end
+    model._duiReloadTracked = true
+
+    local function reset()
+        local v = view(model)
+        v.zoom, v.y, v.z = 0, 0, 0
+        applyView(model)
+    end
+
+    for _, method in ipairs({ "SetUnit", "RefreshUnit", "SetCreature", "SetModel" }) do
+        if model[method] then hooksecurefunc(model, method, reset) end
     end
 end
 
@@ -395,6 +440,9 @@ local function buildStrip(model, opts)
     -- wheel hook and the pan/rotate drag loops below are vanilla-only.
     if not strip.retail then
         wireDrag(model)
+        -- A reload snaps the camera back to default but leaves the stored position alone, so the
+        -- tracked view is zeroed with it (issue #418).
+        trackReloads(model)
         -- 3.3.5a has no Model_OnMouseWheel, so wheel-zoom is ours to wire.
         model:EnableMouseWheel(true)
         model:HookScript("OnMouseWheel", function(_, delta)
@@ -440,6 +488,7 @@ function CP.WirePetModelControls(model)
     model.rotation = DEFAULT_ROTATION
     model:EnableMouse(true)
     model:EnableMouseWheel(true)
+    trackReloads(model)
 
     local rotator = CreateFrame("Frame", nil, model)
     rotator:Hide()
