@@ -10,24 +10,18 @@ local FADE_SECONDS = 0.15
 local PLATE_SHEET = addon._dir .. "CharacterPanel\\commonbuttons"
 local ICON_SHEET = addon._dir .. "CharacterPanel\\commonicons"
 
--- 3.3.5a's model zooms through the depth axis of SetPosition; the Ascension window's PlayerModel
--- wears retail-style method names, but this engine has no camera (SetCamDistanceScale only arrives
--- in Cataclysm), so its native scroll-zoom still moves that same depth -- SetCameraDistance does
--- nothing here, which is exactly why a camera-based strip button would be dead. Both modes rotate
--- through whatever the native drag-rotate writes: the `rotation` field on vanilla, the facing on
--- the Ascension model, so the strip's buttons and the mouse gestures stay in step.
+-- The strip's zoom buttons write the depth axis the native gestures drive. On the Ascension model
+-- the native scroll-zoom still moves that same depth (this engine has no camera -- SetCamDistanceScale
+-- only arrives in Cataclysm), so the retail buttons read the live position and clamp to the range the
+-- XML's SetMinMaxDistance configures; the vanilla and pet models are handled by the core module
+-- (core/modelview.lua), which tracks the same depth as an offset and re-bases it on reload.
 local ZOOM_STEP = 0.25
-local ZOOM_MIN, ZOOM_MAX = -3, 3
 -- Fallbacks only: the Ascension clamp is read off the model's own SetMinMaxDistance when available.
 local RETAIL_ZOOM_MIN, RETAIL_ZOOM_MAX = -1.4, 1.4
-local PAN_LIMIT = 1.5
-local PAN_SPEED = 0.004
 -- Model_OnLoad's own starting rotation, so reset returns to exactly Blizzard's default.
 local DEFAULT_ROTATION = 0.61
 -- The Ascension model's OnLoad facing (PaperDollPanel.xml), so reset returns to exactly its default.
 local DEFAULT_FACING = 0.45
--- Matches the collections model, so both windows spin at the same rate under the same drag.
-local ROTATION_SPEED = 0.012
 -- One click of a strip rotate button, matching Blizzard's own 0.15-per-press step.
 local ROTATE_STEP = 0.15
 -- Radians per second while a hold-to-rotate button is held; roughly a full turn in four seconds.
@@ -39,59 +33,34 @@ local STRIP_ORDER = { "left", "right", "zoomOut", "zoomIn", "reset" }
 -- One entry per viewport the strip is built over, keyed by the model itself.
 local strips = {}
 
--- GetPosition survives a model reload unchanged on the stock model, so the vanilla count lives in
--- Lua (issue #418); the Ascension model's native gestures write the widget directly, so its strip
--- still reads the live position to stay in step.
+-- The Ascension model's native gestures write the widget directly, so its strip reads the live
+-- position to stay in step (the vanilla model's depth is owned by the core module instead).
 local function position(model)
     if not model.GetPosition then return 0, 0, 0 end
     local ok, x, y, z = pcall(model.GetPosition, model)
     if not ok or not x then return 0, 0, 0 end
     return x, y or 0, z or 0
 end
+
 local function clamp(v, lo, hi)
     if v < lo then return lo elseif v > hi then return hi end
     return v
 end
 
--- GetPosition survives a model reload unchanged on the stock model, so the count is kept here
--- instead of read back (issue #418).
-local function view(model)
-    local v = model._duiView
-    if not v then
-        v = { zoom = 0, y = 0, z = 0 }
-        model._duiView = v
-    end
-    return v
-end
-
-local function applyView(model)
-    local v = view(model)
-    pcall(model.SetPosition, model, v.zoom, v.y, v.z)
-end
-
--- The strip's zoom writes the same axis the native gestures drive: the model's depth position,
--- clamped to whichever range the viewport configured (the vanilla constant or the Ascension
--- model's OnLoad SetMinMaxDistance). The vanilla count is tracked in Lua because GetPosition
--- survives a reload unchanged; the Ascension model's drag-move and scroll-zoom write the widget
--- directly, so its strip reads the position live to stay in step.
-local function applyZoom(strip, delta)
+-- The strip's zoom buttons write the same axis the native gestures drive: the model's depth
+-- position. The vanilla model's depth is owned by the core module (addon:ZoomModelDepth), which
+-- tracks it as an offset re-based on every reload; the Ascension model's native scroll-zoom and
+-- drag-move write the widget directly, so its strip reads the position live and clamps to the
+-- range its own XML configures.
+local function applyZoom(strip, notches)
     local model = strip.model
     if strip.retail then
         local x, y, z = position(model)
         pcall(model.SetPosition, model,
-              clamp(x + delta, strip.zoomMin, strip.zoomMax), y, z)
+              clamp(x + notches * ZOOM_STEP, strip.zoomMin, strip.zoomMax), y, z)
     else
-        local v = view(model)
-        v.zoom = clamp(v.zoom + delta, strip.zoomMin, strip.zoomMax)
-        applyView(model)
+        addon:ZoomModelDepth(model, notches)
     end
-end
-
-local function applyPan(model, dy, dz)
-    local v = view(model)
-    v.y = clamp(v.y + dy, -PAN_LIMIT, PAN_LIMIT)
-    v.z = clamp(v.z + dz, -PAN_LIMIT, PAN_LIMIT)
-    applyView(model)
 end
 
 local function resetModel(strip)
@@ -101,13 +70,8 @@ local function resetModel(strip)
         -- Clears the depth (zoom) and the drag-move pan in one go.
         if model.SetPosition then pcall(model.SetPosition, model, 0, 0, 0) end
     else
-        -- Zero the tracked view: on the stock model the client recenters the camera on its own, so
-        -- the counter has to follow it (issue #418).
-        local v = view(model)
-        v.zoom, v.y, v.z = 0, 0, 0
-        applyView(model)
-        model.rotation = DEFAULT_ROTATION
-        if model.SetRotation then pcall(model.SetRotation, model, DEFAULT_ROTATION) end
+        addon:ResetModelView(model)
+        addon:ResetModelRotation(model)
     end
 end
 
@@ -128,23 +92,6 @@ local function rotateModel(strip, delta)
         if model.SetRotation then pcall(model.SetRotation, model, model.rotation) end
     end
 end
-
--- A reload snaps the camera back to default but leaves the stored position alone, so zero both.
-local function trackReloads(model)
-    if model._duiReloadTracked then return end
-    model._duiReloadTracked = true
-
-    local function reset()
-        local v = view(model)
-        v.zoom, v.y, v.z = 0, 0, 0
-        applyView(model)
-    end
-
-    for _, method in ipairs({ "SetUnit", "RefreshUnit", "SetCreature", "SetModel" }) do
-        if model[method] then hooksecurefunc(model, method, reset) end
-    end
-end
-
 -- Square plate, centred glyph, additive glow of that glyph on hover -- how retail lights these.
 local function styleButton(btn, glyph)
     if btn._duiGlyph then return end
@@ -289,56 +236,6 @@ local function startFade(strip, target)
     end)
 end
 
--- Hooked, not set: the model's XML OnUpdate drives hold-to-rotate and its OnMouseUp is what lets an
--- item be dropped on the model. Driving the pan through either one wiped that behaviour. The
--- Ascension model needs none of this: ModelMixin already wires drag-rotate and drag-move natively.
-local panner = CreateFrame("Frame")
-panner:Hide()
-
-local rotator = CreateFrame("Frame")
-rotator:Hide()
-
-local function wireDrag(model)
-    if model._duiDragWired then return end
-    model._duiDragWired = true
-
-    -- The button state is polled, as Blizzard's own drag loops do: a release with the cursor off the
-    -- model never delivers OnMouseUp here, and this frame outlives the panel, so it would never stop.
-    panner:SetScript("OnUpdate", function(self)
-        if not IsMouseButtonDown("RightButton") then self:Hide(); return end
-        local cx, cy = GetCursorPosition()
-        local dx, dy = cx - (self.x or cx), cy - (self.y or cy)
-        self.x, self.y = cx, cy
-        -- Screen x maps to the model's lateral axis, screen y to its vertical one.
-        applyPan(model, dx * PAN_SPEED, dy * PAN_SPEED)
-    end)
-
-    -- Writes model.rotation, not just SetRotation: Model_OnUpdate reads that field to carry a held
-    -- rotate button on, so a drag that skipped it would be snapped away by the next button press.
-    rotator:SetScript("OnUpdate", function(self)
-        if not IsMouseButtonDown("LeftButton") then self:Hide(); return end
-        local cx = GetCursorPosition()
-        model.rotation = (model.rotation or DEFAULT_ROTATION) + (cx - (self.x or cx)) * ROTATION_SPEED
-        self.x = cx
-        model:SetRotation(model.rotation)
-    end)
-
-    model:HookScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then
-            rotator.x = GetCursorPosition()
-            rotator:Show()
-        elseif button == "RightButton" then
-            panner.x, panner.y = GetCursorPosition()
-            panner:Show()
-        end
-    end)
-    -- The XML OnMouseUp still runs first, so dropping an item on the model still equips it.
-    model:HookScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" then rotator:Hide() end
-        if button == "RightButton" then panner:Hide() end
-    end)
-end
-
 -- One strip per model viewport: the vanilla CharacterModelFrame (Blizzard's rotate buttons passed
 -- in) and the Ascension character/Inspect models (retail = true -- a created rotate pair, and no
 -- drag or wheel wiring, since ModelMixin owns those gestures).
@@ -349,12 +246,11 @@ local function buildStrip(model, opts)
     local strip = { model = model, retail = opts.retail and true or false }
     strips[model] = strip
 
-    -- The zoom clamp each mode's native gesture obeys, so the buttons can never push past it: the
-    -- vanilla constant for the stock model, the Ascension model's live SetMinMaxDistance (with the
-    -- same fallback the XML configures). Some getters hand back (max, min), so normalize first.
-    local min, max = ZOOM_MIN, ZOOM_MAX
+    -- The zoom clamp the retail buttons obey: the Ascension model's live SetMinMaxDistance (with
+    -- the same fallback the XML configures). Some getters hand back (max, min), so normalize first.
+    -- The vanilla model's clamp lives in the core module (DEPTH_MIN/MAX), so none is stored here.
     if strip.retail then
-        min, max = RETAIL_ZOOM_MIN, RETAIL_ZOOM_MAX
+        local min, max = RETAIL_ZOOM_MIN, RETAIL_ZOOM_MAX
         if model.GetMinMaxDistance then
             local ok, lo, hi = pcall(model.GetMinMaxDistance, model)
             if ok and type(lo) == "number" and type(hi) == "number" then
@@ -362,8 +258,8 @@ local function buildStrip(model, opts)
                 min, max = lo, hi
             end
         end
+        strip.zoomMin, strip.zoomMax = min, max
     end
-    strip.zoomMin, strip.zoomMax = min, max
 
     local bar = CreateFrame("Frame", opts.name or "DragonUIModelControls", model)
     bar:SetHeight(BTN_SIZE)
@@ -414,9 +310,9 @@ local function buildStrip(model, opts)
     end
 
     local zoomIn = makeButton(prefix .. "ZoomIn", "common-icon-zoomin",
-                              function() applyZoom(strip, ZOOM_STEP) end)
+                              function() applyZoom(strip, 1) end)
     local zoomOut = makeButton(prefix .. "ZoomOut", "common-icon-zoomout",
-                               function() applyZoom(strip, -ZOOM_STEP) end)
+                               function() applyZoom(strip, -1) end)
     local reset = makeButton(prefix .. "Reset", "common-icon-undo",
                              function() resetModel(strip) end)
 
@@ -437,17 +333,10 @@ local function buildStrip(model, opts)
 
     model:EnableMouse(true)
     -- The Ascension model's ModelMixin already owns drag-rotate, drag-move and scroll-zoom, so the
-    -- wheel hook and the pan/rotate drag loops below are vanilla-only.
+    -- wheel hook and the drag loops below are vanilla-only. Hooked, not set: the model's XML
+    -- OnMouseUp is what lets an item be dropped onto it to equip.
     if not strip.retail then
-        wireDrag(model)
-        -- A reload snaps the camera back to default but leaves the stored position alone, so the
-        -- tracked view is zeroed with it (issue #418).
-        trackReloads(model)
-        -- 3.3.5a has no Model_OnMouseWheel, so wheel-zoom is ours to wire.
-        model:EnableMouseWheel(true)
-        model:HookScript("OnMouseWheel", function(_, delta)
-            applyZoom(strip, delta * ZOOM_STEP)
-        end)
+        addon:WireModelView(model, { hook = true })
     end
 
     -- Revealed over the model OR the strip, so reaching for a button does not fade it out underneath.
@@ -480,55 +369,13 @@ end
 
 CP.StyleModelButton = styleButton
 
--- Its own drag frame and its own buttons: the character strip's are bound to CharacterModelFrame by
--- closure, so sharing them would leave whichever model was wired last driving both.
+-- Scale zoom: an imp and a felguard are framed at distances a depth push cannot serve alike.
 function CP.WirePetModelControls(model)
     if not model or model._duiPetControls then return end
     model._duiPetControls = true
-    model.rotation = DEFAULT_ROTATION
-    model:EnableMouse(true)
-    model:EnableMouseWheel(true)
-    trackReloads(model)
-
-    local rotator = CreateFrame("Frame", nil, model)
-    rotator:Hide()
-    -- Polled, not taken from OnMouseUp: releasing with the cursor off the model never delivers it.
-    rotator:SetScript("OnUpdate", function(self)
-        if not IsMouseButtonDown("LeftButton") then self:Hide(); return end
-        local x = GetCursorPosition()
-        model.rotation = (model.rotation or DEFAULT_ROTATION) + (x - (self.x or x)) * ROTATION_SPEED
-        self.x = x
-        model:SetRotation(model.rotation)
-    end)
-
-    -- Its own frame, not the character strip's panner: that one is bound to CharacterModelFrame by
-    -- closure, so sharing it would leave whichever model was wired last taking both drags.
-    local panner = CreateFrame("Frame", nil, model)
-    panner:Hide()
-    panner:SetScript("OnUpdate", function(self)
-        if not IsMouseButtonDown("RightButton") then self:Hide(); return end
-        local cx, cy = GetCursorPosition()
-        local dx, dy = cx - (self.x or cx), cy - (self.y or cy)
-        self.x, self.y = cx, cy
-        -- Screen x maps to the model's lateral axis, screen y to its vertical one.
-        applyPan(model, dx * PAN_SPEED, dy * PAN_SPEED)
-    end)
-
-    model:SetScript("OnMouseDown", function(_, button)
-        if button == "LeftButton" then
-            rotator.x = GetCursorPosition()
-            rotator:Show()
-        elseif button == "RightButton" then
-            panner.x, panner.y = GetCursorPosition()
-            panner:Show()
-        end
-    end)
-    model:SetScript("OnMouseUp", function() rotator:Hide(); panner:Hide() end)
-    model:SetScript("OnHide", function() rotator:Hide(); panner:Hide() end)
-    -- The pet model is a stock PlayerModel, so it zooms like the vanilla one: through the depth
-    -- position, clamped by the same constant.
-    local zoom = { model = model, zoomMin = ZOOM_MIN, zoomMax = ZOOM_MAX }
-    model:SetScript("OnMouseWheel", function(_, delta) applyZoom(zoom, delta * ZOOM_STEP) end)
+    -- Scale zoom: an imp and a felguard are framed at distances a depth push cannot serve alike.
+    addon:ResetModelRotation(model)
+    addon:WireModelView(model, { scale = true })
 
     local strip = CreateFrame("Frame", nil, model)
     strip:SetHeight(BTN_SIZE)
@@ -539,7 +386,7 @@ function CP.WirePetModelControls(model)
     local spinner = CreateFrame("Frame", nil, model)
     spinner:Hide()
     spinner:SetScript("OnUpdate", function(self, elapsed)
-        model.rotation = (model.rotation or DEFAULT_ROTATION) + self.step * elapsed
+        model.rotation = model.rotation + self.step * elapsed
         model:SetRotation(model.rotation)
     end)
     model:HookScript("OnHide", function() spinner:Hide() end)
