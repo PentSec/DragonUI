@@ -252,6 +252,11 @@ local function buildChrome(cfName, panes, opts)
     if not cf._duiChromeBuilt then
         cf._duiChromeBuilt = true
 
+        -- Raise to HIGH strata so the character panel draws above the cast bar (MEDIUM/10)
+        -- and the PlayerFrame leader icons (MEDIUM). PortraitFrameTemplate defaults to MEDIUM,
+        -- which lets both leak through in front of the panel chrome.
+        cf:SetFrameStrata("HIGH")
+
         -- Ascension's own retail nineslice hides; the shared layout draws DragonUI's metal over
         -- the rock instead, so the two can never double up.
         local ns = _G[cfName .. "NineSlice"]
