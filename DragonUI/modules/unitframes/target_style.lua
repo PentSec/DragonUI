@@ -396,8 +396,16 @@ function UF.TargetStyle.Create(opts)
             ManaBar:SetFrameLevel(BlizzFrame:GetFrameLevel())
         end
         if NameText then
+            local cfg = GetConfig()
+            local cn = cfg and cfg.centerName
             NameText:ClearAllPoints()
-            NameText:SetPoint("BOTTOM", HealthBar, "TOP", 10, 3)
+            if cn then
+                NameText:SetPoint("BOTTOM", HealthBar, "TOP", 0, 3)
+                NameText:SetJustifyH("CENTER")
+            else
+                NameText:SetPoint("BOTTOMRIGHT", HealthBar, "TOPRIGHT", 0, 3)
+                NameText:SetJustifyH("RIGHT")
+            end
         end
         if LevelText then
             LevelText:ClearAllPoints()
@@ -765,6 +773,22 @@ function UF.TargetStyle.Create(opts)
         NameBackground:Show()
     end
 
+    -- Apply class color to name text if enabled
+    local function UpdateNameColor()
+        if not NameText then return end
+        local config = GetConfig()
+        if config.classColorName and UnitExists(unitToken) and UnitIsPlayer(unitToken) then
+            local _, class = UnitClass(unitToken)
+            local color = class and RAID_CLASS_COLORS[class]
+            if color then
+                NameText:SetTextColor(color.r, color.g, color.b)
+            end
+        else
+            -- Restore default name color
+            NameText:SetTextColor(1.0, 0.82, 0.0)
+        end
+    end
+
     -- ================================================================
     -- FRAME INITIALIZATION
     -- ================================================================
@@ -931,8 +955,16 @@ function UF.TargetStyle.Create(opts)
 
         -- ---- Configure text elements ----
         if NameText then
+            local config = GetConfig()
+            local centerName = config and config.centerName
             NameText:ClearAllPoints()
-            NameText:SetPoint("BOTTOM", HealthBar, "TOP", 10, 3)
+            if centerName then
+                NameText:SetPoint("BOTTOM", HealthBar, "TOP", 0, 3)
+                NameText:SetJustifyH("CENTER")
+            else
+                NameText:SetPoint("BOTTOMRIGHT", HealthBar, "TOPRIGHT", 0, 3)
+                NameText:SetJustifyH("RIGHT")
+            end
             NameText:SetDrawLayer("OVERLAY", 2)
             if opts.nameFontSize then
                 local font, _, flags = NameText:GetFont()
@@ -1210,6 +1242,7 @@ function UF.TargetStyle.Create(opts)
                     ForceReapplyLayout()
                 end
                 UpdateNameBackground()
+                UpdateNameColor()
                 UpdateClassification()
                 QueueClassificationRefresh(0.12)
                 UpdateThreat()
@@ -1224,6 +1257,7 @@ function UF.TargetStyle.Create(opts)
                 ForceReapplyLayout()
             end
             UpdateNameBackground()
+            UpdateNameColor()
             UpdateClassification()
             QueueClassificationRefresh(0.08)
             UpdateThreat()

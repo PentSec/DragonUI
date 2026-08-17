@@ -416,6 +416,41 @@ local function InstallDetachedAuraLayoutHook()
     _G.DragonUI_DetachedAuraLayoutHooked = true
 end
 
+-- Hide/show buff and debuff icons based on per-frame config.
+local function ApplyAuraVisibility(frame)
+    if not frame or not frame.GetName then return end
+    local name = frame:GetName()
+    local unitToken = frame.unit
+    if not unitToken then return end
+
+    -- Determine which config section to read
+    local configKey = (unitToken == "focus") and "focus" or "target"
+    local config = addon.db and addon.db.profile
+        and addon.db.profile.unitframe
+        and addon.db.profile.unitframe[configKey]
+    if not config then return end
+
+    if config.show_buffs == false then
+        for i = 1, MAX_TARGET_BUFFS do
+            local buff = _G[name .. "Buff" .. i]
+            if buff then buff:Hide() end
+        end
+    end
+    if config.show_debuffs == false then
+        for i = 1, MAX_TARGET_DEBUFFS do
+            local debuff = _G[name .. "Debuff" .. i]
+            if debuff then debuff:Hide() end
+        end
+    end
+end
+
+local function InstallAuraVisibilityHook()
+    if _G.DragonUI_AuraVisibilityHooked then return end
+    if type(_G.TargetFrame_UpdateAuras) ~= "function" then return end
+    hooksecurefunc("TargetFrame_UpdateAuras", ApplyAuraVisibility)
+    _G.DragonUI_AuraVisibilityHooked = true
+end
+
 -- ============================================================================
 -- CREATE VIA FACTORY
 -- ============================================================================
@@ -540,6 +575,7 @@ local api = UF.TargetStyle.Create({
         end
 
         InstallDetachedAuraLayoutHook()
+        InstallAuraVisibilityHook()
      end,
 
     -- ----------------------------------------------------------------
