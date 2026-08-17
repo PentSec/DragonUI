@@ -9,9 +9,13 @@
   - Config: addon.db.profile.unitframe.boss
   - Atlas: texture:set_atlas(name, true) (from utils/atlas.lua)
   - Editor: RegisterEditableFrame for drag positioning
-  - Visibility: RegisterUnitWatch(bossFrame) per boss frame — required because
-    INSTANCE_ENCOUNTER_ENGAGE_UNIT does NOT exist in 3.3.5a (MCP Ch.25).
-    RegisterUnitWatch auto-shows/hides frames based on UnitExists("bossN").
+  - Visibility: A SecureHandlerStateTemplate anchor per boss frame drives
+    Show/Hide from the restricted secure environment via RegisterUnitWatch
+    on the anchor (asState=true).  We do NOT call RegisterUnitWatch on the
+    Blizzard boss frames directly because that propagates addon taint to
+    the secure Hide()/Show() calls ("prevented the call of the secure
+    function" errors).  INSTANCE_ENCOUNTER_ENGAGE_UNIT does NOT exist in
+    3.3.5a (MCP Ch.25).
 ]]
 
 local _, addon = ...
@@ -196,15 +200,19 @@ local function CreateSecureBossAnchor(wrapper, bossFrame, bossIndex)
     anchor:SetAllPoints(wrapper)
     anchor:SetFrameRef("bossFrame", bossFrame)
     anchor:SetAttribute("unit", "boss" .. bossIndex)
+    -- Drive boss frame Show/Hide from the secure restricted environment to
+    -- avoid taint propagation.  RegisterUnitWatch(bossFrame) would call
+    -- Hide()/Show() through a tainted addon execution path, triggering
+    -- "prevented the call of the secure function" errors.
     anchor:SetAttribute("_onstate-unitexists", [[
+        local bossFrame = self:GetFrameRef("bossFrame")
+        if not bossFrame then return end
         if newstate then
-            local bossFrame = self:GetFrameRef("bossFrame")
-            if bossFrame then
-                bossFrame:ClearAllPoints()
-                bossFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-            end
-            -- Clear the cache so later Blizzard reanchors are repaired on the next unit-watch pass.
-            self:SetAttribute("state-unitexists", nil)
+            bossFrame:Show()
+            bossFrame:ClearAllPoints()
+            bossFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+        else
+            bossFrame:Hide()
         end
     ]])
     RegisterUnitWatch(anchor, true)
@@ -548,8 +556,13 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
 
     -- ShowTest function for editor mode / testboss command
     bossFrame.ShowTest = function(self)
-        -- UnregisterUnitWatch so Blizzard doesn't auto-hide us
-        UnregisterUnitWatch(self)
+        -- Unregister the secure anchor's unit watch so the state driver
+        -- doesn't hide us while in test mode.  The anchor drives
+        -- Show/Hide — the boss frame itself is not unit-watch registered.
+        local anchor = BossModule.secureAnchors[bossIndex]
+        if anchor then
+            UnregisterUnitWatch(anchor)
+        end
         self:SetAttribute("unit", "player")
         self.unit = "player"
 
@@ -607,12 +620,29 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
     end
 
     bossFrame.HideTest = function(self)
-        -- Can't call Hide() on a RegisterUnitWatch-protected frame from a hook
+        -- Restore unit and re-register the secure anchor's unit watch
+        -- so it resumes driving Show/Hide from the restricted environment.
+        -- Use SetAlpha(0) as an immediate visual hide since we can't call
+        -- Hide() on a secure frame from addon code.
         self:SetAlpha(0)
-        -- Re-register unit watch so normal boss show/hide resumes
-        self.unit = "boss" .. bossIndex
-        self:SetAttribute("unit", "boss" .. bossIndex)
-        RegisterUnitWatch(self)
+        local restore = function()
+            if InCombatLockdown() then return end
+            self.unit = "boss" .. bossIndex
+            self:SetAttribute("unit", "boss" .. bossIndex)
+            -- Re-register the secure anchor so the state driver resumes
+            -- controlling boss frame visibility.
+            local anchor = BossModule.secureAnchors[bossIndex]
+            if anchor then
+                RegisterUnitWatch(anchor, true)
+            end
+        end
+        if InCombatLockdown() then
+            if addon.CombatQueue then
+                addon.CombatQueue:Add("boss_hidetest_" .. bossIndex, restore)
+            end
+        else
+            restore()
+        end
     end
 end
 
@@ -937,12 +967,17 @@ local function InitializeBossFrames()
                 bossFrame:SetAttribute("unit", "boss" .. i)
             end
 
-            -- RegisterUnitWatch: auto show/hide based on UnitExists("bossN").
-            -- This is the 3.3.5a replacement for INSTANCE_ENCOUNTER_ENGAGE_UNIT.
-            -- DragonflightUI Bossframe.mixin.lua uses the same pattern.
-            RegisterUnitWatch(bossFrame)
+            -- Visibility is driven by the secure anchor's _onstate-unitexists
+            -- snippet (CreateSecureBossAnchor) which calls Show/Hide from the
+            -- taint-free restricted environment.  We do NOT call
+            -- RegisterUnitWatch(bossFrame) directly because that would
+            -- propagate addon taint to the secure Hide()/Show() calls.
+            -- Hide initially; the secure anchor will Show when unit exists.
+            if not UnitExists("boss" .. i) then
+                bossFrame:Hide()
+            end
 
-            -- Alpha-only fade layered on top of RegisterUnitWatch's own Show/Hide.
+            -- Alpha-only fade layered on top of the secure anchor's Show/Hide.
             if addon.VisibilityFade then
                 addon.VisibilityFade.Register("boss" .. i, bossFrame, {
                     dbTable = function() return addon.UF.GetConfig("boss") end,
@@ -1046,7 +1081,9 @@ local function SetupEditorMode()
             for i = 1, NUM_BOSS_FRAMES do
                 local bossFrame = _G["Boss" .. i .. "TargetFrame"]
                 if bossFrame and not InCombatLockdown() then
-                    UnregisterUnitWatch(bossFrame)
+                    -- ShowTest unregisters the secure anchor that drives
+                    -- boss frame visibility.  No UnregisterUnitWatch on
+                    -- bossFrame needed — it was never registered directly.
                     if bossFrame.ShowTest then
                         bossFrame:ShowTest()
                     end
@@ -1057,7 +1094,8 @@ local function SetupEditorMode()
             for i = 1, NUM_BOSS_FRAMES do
                 local bossFrame = _G["Boss" .. i .. "TargetFrame"]
                 if bossFrame and not InCombatLockdown() then
-                    RegisterUnitWatch(bossFrame)
+                    -- Visibility is driven by the secure anchor now;
+                    -- no need to re-register RegisterUnitWatch on bossFrame.
                     if bossFrame.HideTest and not UnitExists("boss" .. i) then
                         bossFrame:HideTest()
                     end
