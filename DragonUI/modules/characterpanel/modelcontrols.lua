@@ -1,3 +1,5 @@
+-- Copyright (c) 2026 NeticSoul. Licensed under the MIT License; see LICENSE.
+
 local addon = select(2, ...)
 local CP = addon.CharacterPanel
 
@@ -26,8 +28,10 @@ local DEFAULT_FACING = 0.45
 local ROTATE_STEP = 0.15
 -- Radians per second while a hold-to-rotate button is held; roughly a full turn in four seconds.
 local ROTATE_PER_SECOND = 1.6
+-- A tap can begin and end inside one frame, so it is worth this much of a hold on its own.
+local TAP_SECONDS = 0.02
 
--- Draw order of the whole strip; the settings decide which of these actually stand.
+-- Draw order of the strip; the settings decide which of these actually stand.
 local STRIP_ORDER = { "left", "right", "zoomOut", "zoomIn", "reset" }
 
 -- One entry per viewport the strip is built over, keyed by the model itself.
@@ -48,7 +52,7 @@ local function clamp(v, lo, hi)
 end
 
 -- The strip's zoom buttons write the same axis the native gestures drive: the model's depth
--- position. The vanilla model's depth is owned by the core module (addon:ZoomModelDepth), which
+-- position. The vanilla model's depth is owned by the core module (addon:ZoomModelView), which
 -- tracks it as an offset re-based on every reload; the Ascension model's native scroll-zoom and
 -- drag-move write the widget directly, so its strip reads the position live and clamps to the
 -- range its own XML configures.
@@ -59,7 +63,7 @@ local function applyZoom(strip, notches)
         pcall(model.SetPosition, model,
               clamp(x + notches * ZOOM_STEP, strip.zoomMin, strip.zoomMax), y, z)
     else
-        addon:ZoomModelDepth(model, notches)
+        addon:ZoomModelView(model, notches)
     end
 end
 
@@ -92,6 +96,7 @@ local function rotateModel(strip, delta)
         if model.SetRotation then pcall(model.SetRotation, model, model.rotation) end
     end
 end
+
 -- Square plate, centred glyph, additive glow of that glyph on hover -- how retail lights these.
 local function styleButton(btn, glyph)
     if btn._duiGlyph then return end
@@ -114,8 +119,7 @@ local function styleButton(btn, glyph)
     pushed:ClearAllPoints()
     pushed:SetAllPoints(btn)
 
-    -- OVERLAY, not ARTWORK: a button's normal texture also sits there and creation order decides,
-    -- so the plate could end up in front of the glyph.
+    -- OVERLAY, not ARTWORK: a button's normal texture sits there too and creation order decides.
     local icon = btn:CreateTexture(nil, "OVERLAY")
     icon:set_atlas(glyph)
     icon:SetSize(GLYPH_SIZE, GLYPH_SIZE)
@@ -131,13 +135,25 @@ local function styleButton(btn, glyph)
     hl:SetAlpha(0.45)
 end
 
--- Hiding a rotate button between its down and its up swallows the up and leaves it latched PUSHED,
--- drawing the dark plate for good -- and fading the strip under a held button does exactly that.
-local function releaseButtons(strip)
-    if not strip.controls then return end
-    for _, btn in ipairs(strip.controls) do
-        if btn:GetButtonState() == "PUSHED" then btn:SetButtonState("NORMAL") end
+CP.StyleModelButton = styleButton
+
+-- Blizzard's rotate buttons stay parented to the model: their OnClick passes self:GetParent() on.
+local function isSibling(btn)
+    return btn:GetParent() ~= bar
+end
+
+local function eachButton(fn)
+    for _, key in ipairs(STRIP_ORDER) do
+        local btn = buttons[key]
+        if btn then fn(btn) end
     end
+end
+
+-- Hiding a button between its down and its up strands it latched PUSHED, drawing the dark plate.
+local function releaseButtons()
+    eachButton(function(btn)
+        if btn:GetButtonState() == "PUSHED" then btn:SetButtonState("NORMAL") end
+    end)
 end
 
 -- Rebuilt rather than toggled button by button: the strip is centred on the model, so dropping one
@@ -154,43 +170,17 @@ local function layoutControls(strip)
         order[1] = buttons.reset
     end
 
-    local standing = {}
-    for _, btn in ipairs(order) do standing[btn] = true end
+    releaseButtons()
 
-    -- Only the vanilla rotate pair fades on their own: they are the strip's siblings, while the
-    -- strip's own children (including the Ascension-made rotate pair) inherit the bar's alpha.
-    strip.faded = {}
-    if not strip.retail then
-        for _, btn in ipairs(order) do
-            if btn == buttons.left or btn == buttons.right then strip.faded[#strip.faded + 1] = btn end
-        end
+    -- Everything down first: a sibling dropped from the standing set has nothing left to hide it.
+    eachButton(function(btn)
+        btn:Hide()
+        if isSibling(btn) then btn:SetAlpha(0) end
+    end)
+    for _, btn in ipairs(order) do
+        if not isSibling(btn) then btn:Show() end
     end
-    strip.controls = order
-
-    for _, key in ipairs(STRIP_ORDER) do
-        local btn = buttons[key]
-        -- Unlatched first: hiding a button between its down and its up strands it PUSHED for good.
-        if btn:GetButtonState() == "PUSHED" then
-            btn:SetButtonState("NORMAL")
-        end
-    end
-
-    -- The vanilla rotate pair are siblings of the strip and are shown only by the fade, so they
-    -- stay down here; the strip's own children each carry their own shown flag through a parent
-    -- Show -- the retail-made rotate pair are children too, so they follow the standing flags.
-    if strip.retail then
-        for _, key in ipairs({ "left", "right", "zoomOut", "zoomIn", "reset" }) do
-            local btn = buttons[key]
-            if standing[btn] then btn:Show() else btn:Hide() end
-        end
-    else
-        buttons.left:Hide()
-        buttons.right:Hide()
-        for _, key in ipairs({ "zoomOut", "zoomIn", "reset" }) do
-            local btn = buttons[key]
-            if standing[btn] then btn:Show() else btn:Hide() end
-        end
-    end
+    strip.standing = order
 
     local step = BTN_SIZE - BTN_OVERLAP
     bar:SetWidth(math.max(1, step * (#order - 1) + BTN_SIZE))
@@ -205,12 +195,17 @@ end
 local function startFade(strip, target)
     local bar = strip.bar
     if not bar then return end
+    local standing = strip.standing or {}
+    if target > 0 and #standing == 0 then return end
     bar._duiTarget = target
 
     if target > 0 then
-        releaseButtons(strip)
+        -- Not while a button is held: moving off one onto the model re-fires this and stops the spin.
+        if not IsMouseButtonDown("LeftButton") then releaseButtons() end
         bar:Show()
-        for _, btn in ipairs(strip.faded) do btn:Show() end
+        for _, btn in ipairs(standing) do
+            if isSibling(btn) then btn:Show() end
+        end
     end
 
     bar:SetScript("OnUpdate", function(self, elapsed)
@@ -224,13 +219,17 @@ local function startFade(strip, target)
         end
 
         self:SetAlpha(current)
-        for _, btn in ipairs(strip.faded) do btn:SetAlpha(current) end
+        for _, btn in ipairs(standing) do
+            if isSibling(btn) then btn:SetAlpha(current) end
+        end
 
         if current == goal then
             self:SetScript("OnUpdate", nil)
             if goal == 0 then
                 self:Hide()
-                for _, btn in ipairs(strip.faded) do btn:Hide() end
+                for _, btn in ipairs(standing) do
+                    if isSibling(btn) then btn:Hide() end
+                end
             end
         end
     end)
@@ -278,8 +277,7 @@ local function buildStrip(model, opts)
         styleButton(opts.left, "common-icon-rotateright")
         styleButton(opts.right, "common-icon-rotateleft")
         buttons.left, buttons.right = opts.left, opts.right
-        strip.faded = { opts.left, opts.right }
-        for _, btn in ipairs(strip.faded) do
+        for _, btn in ipairs({ opts.left, opts.right }) do
             -- Siblings of the strip, not children, and the strip has mouse enabled over the same area
             -- -- so without an explicit level it swallows their clicks.
             btn:SetFrameLevel(bar:GetFrameLevel() + 1)
@@ -299,7 +297,6 @@ local function buildStrip(model, opts)
         -- the facing down, the right shows the left-turn arrow and steps it up.
         buttons.left = makeRotate(prefix .. "RotateLeft", "common-icon-rotateright", -ROTATE_STEP)
         buttons.right = makeRotate(prefix .. "RotateRight", "common-icon-rotateleft", ROTATE_STEP)
-        strip.faded = {}
     end
 
     local function makeButton(name, glyph, onClick)
@@ -319,30 +316,10 @@ local function buildStrip(model, opts)
     buttons.zoomOut, buttons.zoomIn, buttons.reset = zoomOut, zoomIn, reset
     layoutControls(strip)
 
-    -- Closing the panel kills the ticker mid-fade, so reset rather than reopen at a frozen alpha.
-    bar:SetScript("OnHide", function(self)
-        self:SetScript("OnUpdate", nil)
-        self:SetAlpha(0)
-        self._duiTarget = 0
-        for _, btn in ipairs(strip.faded) do
-            btn:SetAlpha(0)
-            btn:Hide()
-        end
-        releaseButtons(strip)
-    end)
-
-    model:EnableMouse(true)
-    -- The Ascension model's ModelMixin already owns drag-rotate, drag-move and scroll-zoom, so the
-    -- wheel hook and the drag loops below are vanilla-only. Hooked, not set: the model's XML
-    -- OnMouseUp is what lets an item be dropped onto it to equip.
-    if not strip.retail then
-        addon:WireModelView(model, { hook = true })
-    end
-
     -- Revealed over the model OR the strip, so reaching for a button does not fade it out underneath.
     -- Nothing standing means nothing to reveal; drag-rotate and wheel-zoom are not buttons and stay.
     local function show()
-        if not strip.controls or #strip.controls == 0 then return end
+        if not strip.standing or #strip.standing == 0 then return end
         startFade(strip, 1)
     end
     local function hide()
@@ -352,8 +329,38 @@ local function buildStrip(model, opts)
     model:HookScript("OnEnter", show)
     model:HookScript("OnLeave", hide)
     bar:EnableMouse(true)
-    bar:SetScript("OnEnter", show)
-    bar:SetScript("OnLeave", hide)
+    bar:HookScript("OnEnter", show)
+    bar:HookScript("OnLeave", hide)
+    eachButton(function(btn)
+        btn:HookScript("OnEnter", show)
+        btn:HookScript("OnLeave", hide)
+    end)
+
+    -- The strip and its buttons lie across the model, so the gestures they cover are handed back.
+    addon:ForwardModelInput(bar, model)
+    eachButton(function(btn) addon:ForwardModelInput(btn, model, true) end)
+
+    -- Closing the panel kills the ticker mid-fade, so reset rather than reopen at a frozen alpha.
+    bar:HookScript("OnHide", function(self)
+        self:SetScript("OnUpdate", nil)
+        self:SetAlpha(0)
+        self._duiTarget = 0
+        for _, btn in ipairs(strip.standing or {}) do
+            if isSibling(btn) then
+                btn:SetAlpha(0)
+                btn:Hide()
+            end
+        end
+        releaseButtons()
+    end)
+
+    model:EnableMouse(true)
+    -- The Ascension model's ModelMixin already owns drag-rotate, drag-move and scroll-zoom, so the
+    -- wheel hook and the drag loops below are vanilla-only. Hooked, not set: the model's XML
+    -- OnMouseUp is what lets an item be dropped onto it to equip.
+    if not strip.retail then
+        addon:WireModelView(model, { hook = true })
+    end
 end
 
 CP.BuildModelControls = buildStrip
@@ -367,27 +374,40 @@ function CP.RefreshModelControls()
     end
 end
 
-CP.StyleModelButton = styleButton
+-- Emptied, not just hidden: the model keeps its OnEnter hook for the session, and the fade only
+-- stands down a strip with nothing standing.
+function CP.RestoreModelControls()
+    if not bar then return end
+    bar:SetScript("OnUpdate", nil)
+    bar:Hide()
+    eachButton(function(btn) btn:Hide() end)
+    local standing = {}
+    for _, strip in pairs(strips) do strip.standing = standing end
+
+    local model = _G.CharacterModelFrame
+    if model then addon:ResetModelView(model) end
+    for _, btn in ipairs({ buttons.left, buttons.right }) do
+        btn:SetAlpha(1)
+        btn:Show()
+    end
+end
 
 -- Scale zoom: an imp and a felguard are framed at distances a depth push cannot serve alike.
 function CP.WirePetModelControls(model)
     if not model or model._duiPetControls then return end
     model._duiPetControls = true
-    -- Scale zoom: an imp and a felguard are framed at distances a depth push cannot serve alike.
     addon:ResetModelRotation(model)
-    addon:WireModelView(model, { scale = true })
+    addon:WireModelView(model, { pivot = addon.ModelPivot.creature })
 
     local strip = CreateFrame("Frame", nil, model)
     strip:SetHeight(BTN_SIZE)
     strip:SetPoint("BOTTOM", model, "BOTTOM", 0, 2)
 
-    -- Held, not clicked: Blizzard's own hold-to-rotate lives in Model_OnUpdate, which finds its
-    -- buttons by GLOBAL NAME and so can never drive ours. This is that loop, per button.
     local spinner = CreateFrame("Frame", nil, model)
     spinner:Hide()
     spinner:SetScript("OnUpdate", function(self, elapsed)
-        model.rotation = model.rotation + self.step * elapsed
-        model:SetRotation(model.rotation)
+        model.rotation = (model.rotation or 0) + self.step * elapsed
+        addon:ApplyModelView(model)
     end)
     model:HookScript("OnHide", function() spinner:Hide() end)
 
@@ -395,14 +415,18 @@ function CP.WirePetModelControls(model)
     local function add(glyph, step)
         local btn = CreateFrame("Button", nil, strip)
         styleButton(btn, glyph)
-        btn:RegisterForClicks("LeftButtonDown", "LeftButtonUp")
-        btn:SetScript("OnMouseDown", function()
+        btn:SetScript("OnMouseDown", function(_, button)
+            if button ~= "LeftButton" then return end
+            -- One step up front, so a click that ends before the next frame still turns it.
+            model.rotation = (model.rotation or 0) + step * TAP_SECONDS
+            addon:ApplyModelView(model)
             spinner.step = step
             spinner:Show()
         end)
-        -- Also on leave: releasing off the button never delivers OnMouseUp, and it would spin forever.
+        -- Also on leave: releasing off the button never delivers OnMouseUp, and it would spin on.
         btn:SetScript("OnMouseUp", function() spinner:Hide() end)
         btn:SetScript("OnLeave", function() spinner:Hide() end)
+        addon:ForwardModelInput(btn, model, true)
         order[#order + 1] = btn
     end
 
