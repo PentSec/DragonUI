@@ -451,6 +451,11 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
         healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
         healthText:SetDrawLayer("OVERLAY")
     end
+    -- Force health text always visible (override Blizzard hover-only behavior)
+    if healthBar then
+        healthBar.lockShow = 1
+        ShowTextStatusBarText(healthBar)
+    end
 
     -- Dead text
     local deadText = _G[frameName .. "TextureFrameDeadText"]
@@ -466,6 +471,11 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
         manaText:ClearAllPoints()
         manaText:SetPoint("CENTER", manaBar, "CENTER", 0, 0)
         manaText:SetDrawLayer("OVERLAY")
+    end
+    -- Force mana text always visible (override Blizzard hover-only behavior)
+    if manaBar then
+        manaBar.lockShow = 1
+        ShowTextStatusBarText(manaBar)
     end
 
     -- PVP icon
@@ -538,6 +548,11 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
 
     -- ShowTest function for editor mode / testboss command
     bossFrame.ShowTest = function(self)
+        -- UnregisterUnitWatch so Blizzard doesn't auto-hide us
+        UnregisterUnitWatch(self)
+        self:SetAttribute("unit", "player")
+        self.unit = "player"
+
         local fn = self:GetName()
         local p = _G[fn .. "Portrait"]
         if p then
@@ -592,7 +607,12 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
     end
 
     bossFrame.HideTest = function(self)
-        self:Hide()
+        -- Can't call Hide() on a RegisterUnitWatch-protected frame from a hook
+        self:SetAlpha(0)
+        -- Re-register unit watch so normal boss show/hide resumes
+        self.unit = "boss" .. bossIndex
+        self:SetAttribute("unit", "boss" .. bossIndex)
+        RegisterUnitWatch(self)
     end
 end
 
@@ -1202,6 +1222,82 @@ eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventsFrame:RegisterEvent("RAID_TARGET_UPDATE")
 
 -- ============================================================================
+-- TEXT FORMAT OVERRIDE
+-- ============================================================================
+
+local BOSS_FORMATTERS = {
+    numeric = function(cur, _max)
+        return tostring(cur)
+    end,
+    percentage = function(cur, max)
+        if max == 0 then return "0%" end
+        return string.format("%.1f%%", cur / max * 100)
+    end,
+    both = function(cur, max)
+        if max == 0 then return tostring(cur) end
+        return string.format("%s (%.1f%%)", tostring(cur), cur / max * 100)
+    end,
+    formatted = function(cur, max)
+        return tostring(cur) .. " / " .. tostring(max)
+    end,
+}
+
+local function GetBossConfig()
+    return addon.db and addon.db.profile
+        and addon.db.profile.unitframe
+        and addon.db.profile.unitframe.boss
+end
+
+local function FormatBossBarText(bar, unit)
+    if not bar or not bar.TextString then return end
+    local config = GetBossConfig()
+    if not config or not config.textFormat then return end
+    local formatter = BOSS_FORMATTERS[config.textFormat]
+    if not formatter then return end
+    if not unit or not UnitExists(unit) then return end
+
+    local cur = bar:GetValue()
+    local _, max = bar:GetMinMaxValues()
+    bar.TextString:SetText(formatter(cur, max))
+end
+
+local function InstallBossTextFormatHook()
+    if _G.DragonUI_BossTextFormatHooked then return end
+
+    -- Hook health bar SetValue for each boss frame
+    for i = 1, NUM_BOSS_FRAMES do
+        local bossFrame = _G["Boss" .. i .. "TargetFrame"]
+        if bossFrame then
+            local hpBar = _G["Boss" .. i .. "TargetFrameHealthBar"]
+            local mpBar = _G["Boss" .. i .. "TargetFrameManaBar"]
+
+            if hpBar then
+                hooksecurefunc(hpBar, "SetValue", function(self)
+                    local parent = self:GetParent()
+                    if parent and parent.unit then
+                        FormatBossBarText(self, parent.unit)
+                    end
+                end)
+            end
+
+            if mpBar then
+                hooksecurefunc(mpBar, "SetValue", function(self)
+                    local parent = self:GetParent()
+                    if parent and parent.unit then
+                        FormatBossBarText(self, parent.unit)
+                    end
+                end)
+            end
+        end
+    end
+
+    _G.DragonUI_BossTextFormatHooked = true
+end
+
+-- Install hook on load
+InstallBossTextFormatHook()
+
+-- ============================================================================
 -- PUBLIC API
 -- ============================================================================
 
@@ -1224,6 +1320,16 @@ function addon.RefreshBossFrames()
     end
 
     PositionBossFrames()
+
+    -- Re-run text format on all boss frames
+    if type(TargetFrame_Update) == "function" then
+        for i = 1, NUM_BOSS_FRAMES do
+            local bossFrame = _G["Boss" .. i .. "TargetFrame"]
+            if bossFrame and UnitExists(bossFrame.unit) then
+                TargetFrame_Update(bossFrame)
+            end
+        end
+    end
 end
 
 -- Store reference on addon for profile callbacks
