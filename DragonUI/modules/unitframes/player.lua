@@ -904,6 +904,11 @@ local function UpdateGroupIndicator()
 
     groupIndicatorFrame:Hide()
 
+    local config = GetPlayerConfig()
+    if not config.showGroupIndicator then
+        return
+    end
+
     local numRaidMembers = GetNumRaidMembers()
     if numRaidMembers == 0 then
         return
@@ -1127,6 +1132,24 @@ local function UpdatePlayerHealthBarColor()
         PlayerFrameHealthBar:SetStatusBarColor(1, 1, 1, 1)
     end
 end
+
+-- ============================================================================
+-- Update player name color based on class color setting
+local function UpdatePlayerNameColor()
+    if not PlayerName then return end
+    local config = GetPlayerConfig()
+    if config.classColorName then
+        local _, class = UnitClass("player")
+        local color = class and RAID_CLASS_COLORS[class]
+        if color then
+            PlayerName:SetTextColor(color.r, color.g, color.b)
+        end
+    else
+        -- Restore Blizzard default name color (yellow-ish)
+        PlayerName:SetTextColor(1.0, 0.82, 0.0)
+    end
+end
+
 -- Update health bar color and texture
 local function UpdateHealthBarColor(statusBar, unit)
     if not unit then
@@ -2083,31 +2106,29 @@ local function ChangePlayerframe()
 
     -- Position name and level (shifted right in vehicle due to larger portrait)
     -- Ensure name/level are on OVERLAY draw layer so they render above vehicle textures
+    local playerConfig = addon.UF.GetConfig("player")
+    local centerName = playerConfig and playerConfig.centerName
     PlayerName:SetDrawLayer('OVERLAY', 7)
     PlayerName:ClearAllPoints()
     if hasVehicleUI then
-        PlayerName:SetJustifyH("LEFT")
-        PlayerName:SetWidth(90)
+        PlayerName:SetJustifyH("CENTER")
+        PlayerName:SetWidth(110)
         PlayerName:SetPoint('CENTER', PlayerFrame, 'CENTER', 50, 20)
+    elseif centerName then
+        -- Centered above health bar
+        PlayerName:SetJustifyH("CENTER")
+        PlayerName:SetWidth(110)
+        PlayerName:SetPoint('BOTTOM', PlayerFrameHealthBar, 'TOP', 0, 2)
     else
-        local pConfig = GetPlayerConfig()
-        local decorationType = pConfig.dragon_decoration or "none"
-        local isPlayerEliteMode = decorationType == "elite" or decorationType == "rareelite"
-        if isPlayerEliteMode then
-            -- Dragon decoration mode: center the name above the health bar
-            PlayerName:SetJustifyH("CENTER")
-            PlayerName:SetWidth(110)
-            PlayerName:SetPoint('BOTTOM', PlayerFrameHealthBar, 'TOP', 0, 2)
-        else
-            -- Normal mode: left-aligned above health bar
-            PlayerName:SetJustifyH("LEFT")
-            PlayerName:SetWidth(90)
-            PlayerName:SetPoint('BOTTOMLEFT', PlayerFrameHealthBar, 'TOPLEFT', 12, 2)
-        end
+        -- Left-aligned above health bar
+        PlayerName:SetJustifyH("LEFT")
+        PlayerName:SetWidth(110)
+        PlayerName:SetPoint('BOTTOMLEFT', PlayerFrameHealthBar, 'TOPLEFT', 0, 2)
     end
     -- Force name visible — Blizzard vehicle transition can hide it
     PlayerName:SetAlpha(1)
     PlayerName:Show()
+    UpdatePlayerNameColor()
 
     PlayerLevelText:SetDrawLayer('OVERLAY', 7)
     PlayerLevelText:ClearAllPoints()
@@ -2456,6 +2477,9 @@ local function RefreshPlayerFrame()
 
     --  UPDATE CLASS COLOR
     UpdatePlayerHealthBarColor()
+
+    --  UPDATE NAME COLOR
+    UpdatePlayerNameColor()
 
     --  UPDATE DRAGON DECORATION (important for scale)
     UpdatePlayerDragonDecoration()
