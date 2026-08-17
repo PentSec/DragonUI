@@ -135,6 +135,19 @@ local function AddCommonControls(parent, unitKey, refreshFunc, opts)
         callback = refreshFunc,
     })
 
+    C:AddToggle(parent, {
+        label = LO["Class Color Name"],
+        dbPath = "unitframe." .. unitKey .. ".classColorName",
+        callback = refreshFunc,
+    })
+
+    C:AddToggle(parent, {
+        label = LO["Center Name"],
+        desc = LO["Center the unit name above the health bar."],
+        dbPath = "unitframe." .. unitKey .. ".centerName",
+        callback = refreshFunc,
+    })
+
     if opts.hasClassPortrait then
         C:AddToggle(parent, {
             label = LO["Class Portrait"],
@@ -242,6 +255,13 @@ local function BuildPlayerSection(scroll)
         disabled = function()
             return not C:GetDBValue("unitframe.player.combat_flash_enabled")
         end,
+        callback = refreshPlayer,
+    })
+
+    C:AddToggle(s, {
+        label = LO["Show Group Indicator"],
+        desc = LO["Show the raid subgroup indicator (e.g. Group 2) above the player frame."],
+        dbPath = "unitframe.player.showGroupIndicator",
         callback = refreshPlayer,
     })
 
@@ -407,6 +427,26 @@ local function BuildTargetSection(scroll)
         callback = refreshTarget,
     })
 
+    C:AddToggle(s, {
+        label = LO["Show Buffs"],
+        desc = LO["Show buff icons on the target frame."],
+        dbPath = "unitframe.target.show_buffs",
+        callback = function()
+            refreshTarget()
+            if addon.RefreshTargetFocusAuraLayout then addon.RefreshTargetFocusAuraLayout() end
+        end,
+    })
+
+    C:AddToggle(s, {
+        label = LO["Show Debuffs"],
+        desc = LO["Show debuff icons on the target frame."],
+        dbPath = "unitframe.target.show_debuffs",
+        callback = function()
+            refreshTarget()
+            if addon.RefreshTargetFocusAuraLayout then addon.RefreshTargetFocusAuraLayout() end
+        end,
+    })
+
     C:AddHeading(s, LO["Visibility"])
     C:AddDescription(s, LO["Also fades the Target of Target and target cast bar, attached or not."])
     C:AddVisibilityFadeToggles(s, {
@@ -439,6 +479,26 @@ local function BuildFocusSection(scroll)
         desc = LO["Uses the native large focus frame mode to show buffs and debuffs on the focus frame."],
         dbPath = "unitframe.focus.show_buff_debuff",
         callback = refreshFocus,
+    })
+
+    C:AddToggle(s, {
+        label = LO["Show Buffs"],
+        desc = LO["Show buff icons on the focus frame."],
+        dbPath = "unitframe.focus.show_buffs",
+        callback = function()
+            refreshFocus()
+            if addon.RefreshTargetFocusAuraLayout then addon.RefreshTargetFocusAuraLayout() end
+        end,
+    })
+
+    C:AddToggle(s, {
+        label = LO["Show Debuffs"],
+        desc = LO["Show debuff icons on the focus frame."],
+        dbPath = "unitframe.focus.show_debuffs",
+        callback = function()
+            refreshFocus()
+            if addon.RefreshTargetFocusAuraLayout then addon.RefreshTargetFocusAuraLayout() end
+        end,
     })
 
     C:AddHeading(s, LO["Visibility"])
@@ -770,6 +830,13 @@ local function BuildBossSection(scroll)
         dbPath = "unitframe.boss.scale",
         min = 0.5, max = 2.0, step = 0.01,
         width = 200,
+        callback = refreshBoss,
+    })
+
+    C:AddDropdown(s, {
+        label = LO["Text Format"],
+        dbPath = "unitframe.boss.textFormat",
+        values = textFormatValues,
         callback = refreshBoss,
     })
 
