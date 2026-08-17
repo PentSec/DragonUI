@@ -142,16 +142,16 @@ local function isSibling(btn)
     return btn:GetParent() ~= bar
 end
 
-local function eachButton(fn)
+local function eachButton(btns, fn)
     for _, key in ipairs(STRIP_ORDER) do
-        local btn = buttons[key]
+        local btn = btns[key]
         if btn then fn(btn) end
     end
 end
 
 -- Hiding a button between its down and its up strands it latched PUSHED, drawing the dark plate.
-local function releaseButtons()
-    eachButton(function(btn)
+local function releaseButtons(btns)
+    eachButton(btns, function(btn)
         if btn:GetButtonState() == "PUSHED" then btn:SetButtonState("NORMAL") end
     end)
 end
@@ -170,10 +170,10 @@ local function layoutControls(strip)
         order[1] = buttons.reset
     end
 
-    releaseButtons()
+    releaseButtons(buttons)
 
     -- Everything down first: a sibling dropped from the standing set has nothing left to hide it.
-    eachButton(function(btn)
+    eachButton(buttons, function(btn)
         btn:Hide()
         if isSibling(btn) then btn:SetAlpha(0) end
     end)
@@ -201,7 +201,7 @@ local function startFade(strip, target)
 
     if target > 0 then
         -- Not while a button is held: moving off one onto the model re-fires this and stops the spin.
-        if not IsMouseButtonDown("LeftButton") then releaseButtons() end
+        if not IsMouseButtonDown("LeftButton") then releaseButtons(strip.buttons) end
         bar:Show()
         for _, btn in ipairs(standing) do
             if isSibling(btn) then btn:Show() end
@@ -331,14 +331,14 @@ local function buildStrip(model, opts)
     bar:EnableMouse(true)
     bar:HookScript("OnEnter", show)
     bar:HookScript("OnLeave", hide)
-    eachButton(function(btn)
+    eachButton(buttons, function(btn)
         btn:HookScript("OnEnter", show)
         btn:HookScript("OnLeave", hide)
     end)
 
     -- The strip and its buttons lie across the model, so the gestures they cover are handed back.
     addon:ForwardModelInput(bar, model)
-    eachButton(function(btn) addon:ForwardModelInput(btn, model, true) end)
+    eachButton(buttons, function(btn) addon:ForwardModelInput(btn, model, true) end)
 
     -- Closing the panel kills the ticker mid-fade, so reset rather than reopen at a frozen alpha.
     bar:HookScript("OnHide", function(self)
@@ -351,7 +351,7 @@ local function buildStrip(model, opts)
                 btn:Hide()
             end
         end
-        releaseButtons()
+        releaseButtons(buttons)
     end)
 
     model:EnableMouse(true)
@@ -380,15 +380,24 @@ function CP.RestoreModelControls()
     if not bar then return end
     bar:SetScript("OnUpdate", nil)
     bar:Hide()
-    eachButton(function(btn) btn:Hide() end)
+    for _, strip in pairs(strips) do
+        if strip.buttons then
+            eachButton(strip.buttons, function(btn) btn:Hide() end)
+        end
+    end
     local standing = {}
     for _, strip in pairs(strips) do strip.standing = standing end
 
     local model = _G.CharacterModelFrame
     if model then addon:ResetModelView(model) end
-    for _, btn in ipairs({ buttons.left, buttons.right }) do
-        btn:SetAlpha(1)
-        btn:Show()
+    local vanillaStrip = strips[model]
+    if vanillaStrip and vanillaStrip.buttons then
+        for _, btn in ipairs({ vanillaStrip.buttons.left, vanillaStrip.buttons.right }) do
+            if btn then
+                btn:SetAlpha(1)
+                btn:Show()
+            end
+        end
     end
 end
 
