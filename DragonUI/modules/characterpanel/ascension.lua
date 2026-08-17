@@ -792,6 +792,46 @@ local function buildTabs(cfName)
     end
 end
 
+-- The equipment flyout (item slots that pop out when clicking a gear slot) is defined at HIGH
+-- strata in EquipmentFlyout.xml, the same strata the character panel now occupies. Other chrome
+-- children at the same strata can intercept mouse events before the flyout receives them. Raise
+-- the frame and its known children to DIALOG on show so they always render above the character
+-- panel. Children are created dynamically by the Ascension client after OnShow, so iterate on
+-- every show rather than once at build time.
+local FLYOUT_DIALOG = "DIALOG"
+local FLYOUT_NAMED = {
+    "EquipmentFlyoutFrame",
+    "EquipmentFlyoutFrameButtons",
+}
+local function raiseFlyoutStrata()
+    for _, name in ipairs(FLYOUT_NAMED) do
+        local f = _G[name]
+        if f and f.SetFrameStrata and f:GetFrameStrata() ~= FLYOUT_DIALOG then
+            f:SetFrameStrata(FLYOUT_DIALOG)
+        end
+    end
+end
+
+local function hookEquipmentFlyout()
+    local flyout = _G.EquipmentFlyoutFrame
+    if not flyout or flyout._duiStrataHooked then return end
+    flyout._duiStrataHooked = true
+    -- Raise immediately if already shown.
+    if flyout:IsShown() then raiseFlyoutStrata() end
+    -- Raise on every open: the client rebuilds children each time and may reset strata
+    -- after our hook runs. OnUpdate keeps re-raising for a few frames to cover that.
+    local ticks = 0
+    flyout:HookScript("OnShow", function()
+        ticks = 0
+        raiseFlyoutStrata()
+    end)
+    flyout:HookScript("OnUpdate", function(self, elapsed)
+        if ticks > 10 then self:SetScript("OnUpdate", nil) return end
+        ticks = ticks + 1
+        raiseFlyoutStrata()
+    end)
+end
+
 CP:RegisterBuilder("ascension-chrome", function()
     buildChrome("AscensionCharacterFrame", CHARACTER_PANES, {
         paperDoll = "AscensionPaperDollPanel",
@@ -847,46 +887,6 @@ CP:RegisterBuilder("ascension-inspect-model-controls", function()
         })
     end
 end)
-
--- The equipment flyout (item slots that pop out when clicking a gear slot) is defined at HIGH
--- strata in EquipmentFlyout.xml, the same strata the character panel now occupies. Other chrome
--- children at the same strata can intercept mouse events before the flyout receives them. Raise
--- the frame and its known children to DIALOG on show so they always render above the character
--- panel. Children are created dynamically by the Ascension client after OnShow, so iterate on
--- every show rather than once at build time.
-local FLYOUT_DIALOG = "DIALOG"
-local FLYOUT_NAMED = {
-    "EquipmentFlyoutFrame",
-    "EquipmentFlyoutFrameButtons",
-}
-local function raiseFlyoutStrata()
-    for _, name in ipairs(FLYOUT_NAMED) do
-        local f = _G[name]
-        if f and f.SetFrameStrata and f:GetFrameStrata() ~= FLYOUT_DIALOG then
-            f:SetFrameStrata(FLYOUT_DIALOG)
-        end
-    end
-end
-
-local function hookEquipmentFlyout()
-    local flyout = _G.EquipmentFlyoutFrame
-    if not flyout or flyout._duiStrataHooked then return end
-    flyout._duiStrataHooked = true
-    -- Raise immediately if already shown.
-    if flyout:IsShown() then raiseFlyoutStrata() end
-    -- Raise on every open: the client rebuilds children each time and may reset strata
-    -- after our hook runs. OnUpdate keeps re-raising for a few frames to cover that.
-    local ticks = 0
-    flyout:HookScript("OnShow", function()
-        ticks = 0
-        raiseFlyoutStrata()
-    end)
-    flyout:HookScript("OnUpdate", function(self, elapsed)
-        if ticks > 10 then self:SetScript("OnUpdate", nil) return end
-        ticks = ticks + 1
-        raiseFlyoutStrata()
-    end)
-end
 
 -- The settings cog: on this client the stock CharacterFrame never shows, so this gear is the
 -- module's only settings entry point. The shared menu is trimmed to what the Ascension windows can
