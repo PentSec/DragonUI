@@ -48,23 +48,20 @@ local function BuildGeneralTab(scroll)
 
     local localeNames = {
         enUS = "English",
-        esES = "Español",
-        esMX = "Español (México)",
-        ptBR = "Português",
-        deDE = "Deutsch",
-        frFR = "Français",
-        ruRU = "Русский",
-        zhCN = "简体中文",
-        zhTW = "繁體中文",
-        koKR = "한국어",
+        esES = "Spanish",
+        esMX = "Spanish (Mexico)",
+        ptBR = "Portuguese (Brazil)",
+        deDE = "German",
+        frFR = "French",
+        ruRU = "Russian",
+        zhCN = "Chinese (Simplified)",
+        zhTW = "Chinese (Traditional)",
+        koKR = "Korean",
     }
 
-    -- Hide languages the client font cannot draw; their names would already show as "?" here.
     local localeValues = { auto = LO["Follow the client language"] }
     for code, name in pairs(localeNames) do
-        if not addon.CanRenderLocale or addon.CanRenderLocale(code) then
-            localeValues[code] = name
-        end
+        localeValues[code] = name
     end
 
     C:AddDropdown(language, {

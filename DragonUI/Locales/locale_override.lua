@@ -37,7 +37,7 @@ function addon.GetActiveLocale()
         local sv = _G.DragonUIDB
         pref = sv and sv.global and sv.global.locale
     end
-    if type(pref) == "string" and SUPPORTED[pref] and addon.CanRenderLocale(pref) then
+    if type(pref) == "string" and SUPPORTED[pref] then
         return pref
     end
     return CLIENT_LOCALE
