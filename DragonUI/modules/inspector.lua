@@ -886,7 +886,7 @@ local function RenderColumns(f, model, order, keyPrefix, headerPrefix, startX, c
             local header = AcquireHeader(f, headerIndex)
             header:ClearAllPoints()
             header:SetJustifyH("CENTER")
-            header:SetPoint("TOP", f.content, "TOPLEFT", xOffset + colW / 2, 0)
+            header:SetPoint("TOP", f.content, "TOPLEFT", xOffset + colW / 2, -4)
             local label = (tabName == CLASS and className) or SpecDisplayName(classFile, tabName)
             header:SetText(headerPrefix .. label)
 
@@ -1000,8 +1000,8 @@ ComparePanel = CP
 function CP.Get()
     if cpFrame then return cpFrame end
     cpFrame = CreateFrame("Frame", "DragonUIInspectorCompare", UIParent)
-    cpFrame:SetWidth(360)
-    cpFrame:SetHeight(400)
+    cpFrame:SetWidth(450)
+    cpFrame:SetHeight(500)
     AddInspectorBorder(cpFrame)
     cpFrame:SetFrameStrata("DIALOG")
     cpFrame:SetScale(0.83)
@@ -1044,12 +1044,13 @@ function CP.Render(model, slot, className, classFile)
     local order = TreeModel.LayoutTabs(model, slot)
     local cols, tabs = ShownCols(model, order)
     local nGaps = math.max(0, tabs - 1)
-    local maxContentW = 280 - nGaps * TAB_COL_GAP
+    local sw = (UIParent and UIParent.GetWidth and UIParent:GetWidth()) or 1024
+    local maxContentW = math.floor(sw * 0.45) - nGaps * TAB_COL_GAP
     local cell = TreeModel.FitScale(cols, BASE_CELL, maxContentW, MIN_CELL)
     local iconSize = math.max(14, cell - 8)
 
     local rects, placed = {}, {}
-    local x, maxColH = RenderColumns(f, model, order, "m", "YOU · ", 0, cell, iconSize, 0, 0, rects, placed, className, classFile)
+    local x, maxColH = RenderColumns(f, model, order, "m", "", 0, cell, iconSize, 0, 0, rects, placed, className, classFile)
     local contentW = math.max(1, x - TAB_COL_GAP)
     local contentH = math.max(1, maxColH + 10)
     cpContent:SetWidth(contentW)
@@ -1063,7 +1064,7 @@ function CP.Render(model, slot, className, classFile)
     for _, e in ipairs(model.edges) do edges[#edges + 1] = { from = "m" .. e.from, to = "m" .. e.to } end
     EdgeLines.Draw(f.content, edges, centers, 2, f.linePool, iconSize)
 
-    local maxPanelInner = 600
+    local maxPanelInner = 750
     local innerH = math.min(contentH, maxPanelInner)
     cpFrame:SetWidth(contentW + 2 * PAD)
     cpFrame:SetHeight(innerH + 2 * PAD)
