@@ -972,10 +972,13 @@ local function InitializeBossFrames()
             -- taint-free restricted environment.  We do NOT call
             -- RegisterUnitWatch(bossFrame) directly because that would
             -- propagate addon taint to the secure Hide()/Show() calls.
-            -- Hide initially; the secure anchor will Show when unit exists.
-            if not UnitExists("boss" .. i) then
-                bossFrame:Hide()
-            end
+            -- Do NOT call bossFrame:Hide() here either: this is a protected
+            -- frame, and a tainted Hide() poisons its script handlers — the
+            -- next time Blizzard's encounter code hides a sibling boss frame
+            -- mid-combat, the poisoned chain surfaces as "AddOn 'DragonUI'
+            -- prevented the call of the secure function 'BossNTargetFrame:
+            -- Hide()'".  Boss frames start hidden anyway; the secure anchor
+            -- performs the real Hide/Show from the restricted environment.
 
             -- Alpha-only fade layered on top of the secure anchor's Show/Hide.
             if addon.VisibilityFade then
