@@ -136,6 +136,13 @@ local function IsEnabled(unitType)
     return cfg and cfg.enabled
 end
 
+-- True when the user hid this castbar completely (no DragonUI bar, no Blizzard bar).
+-- Only meaningful while the module is enabled for that unit.
+local function IsHidden(unitType)
+    local cfg = GetConfig(unitType)
+    return cfg and cfg.enabled and cfg.hidden
+end
+
 local function UsesModernIconBorder(cfg)
     return addon.CreateIconFrameTexture ~= nil and not (cfg and cfg.modernIconBorder == false)
 end
@@ -1670,13 +1677,20 @@ function CastbarModule:RefreshCastbar(unitType)
         return
     end
     
-    if cfg.enabled then
-        HideBlizzardCastbar(unitType)
-    else
+    if not cfg.enabled then
         ShowBlizzardCastbar(unitType)
         self:HideCastbar(unitType)
         return
     end
+    
+    if cfg.hidden then
+        -- Hidden by user: suppress the Blizzard bar and keep our bar hidden too.
+        HideBlizzardCastbar(unitType)
+        self:HideCastbar(unitType)
+        return
+    end
+    
+    HideBlizzardCastbar(unitType)
     
     if not self.frames[unitType].castbar then
         CreateCastbar(unitType)
@@ -2029,6 +2043,12 @@ function CastbarModule:HandleCastingEvent(event, unit, ...)
         return
     end
     
+    if IsHidden(unitType) then
+        -- Castbar hidden by user: keep suppressing the Blizzard bar on every event.
+        HideBlizzardCastbar(unitType)
+        return
+    end
+    
     HideBlizzardCastbar(unitType)
     
     -- GUID verification for target/focus
@@ -2355,12 +2375,24 @@ function CastbarModule:LoadDefaultSettings()
         addon.db.profile.castbar = {}
     end
 
+    if addon.db.profile.castbar.hidden == nil then
+        addon.db.profile.castbar.hidden = false
+    end
+
     if addon.db.profile.castbar.target and addon.db.profile.castbar.target.override == nil then
         addon.db.profile.castbar.target.override = false
     end
 
+    if addon.db.profile.castbar.target and addon.db.profile.castbar.target.hidden == nil then
+        addon.db.profile.castbar.target.hidden = false
+    end
+
     if addon.db.profile.castbar.focus and addon.db.profile.castbar.focus.override == nil then
         addon.db.profile.castbar.focus.override = false
+    end
+
+    if addon.db.profile.castbar.focus and addon.db.profile.castbar.focus.hidden == nil then
+        addon.db.profile.castbar.focus.hidden = false
     end
 end
 
@@ -2377,8 +2409,7 @@ function CastbarModule:UpdateWidgets()
 end
 
 local function ShouldPlayerCastbarBeVisible()
-    local cfg = GetConfig("player")
-    return cfg and cfg.enabled
+    return not IsHidden("player") and IsEnabled("player")
 end
 
 local function ShowPlayerCastbarTest()
@@ -2621,10 +2652,10 @@ local function InitializeCastbarForEditor()
         frame = CastbarModule.targetAnchor,
         configPath = {"widgets", "targetCastbar"},
         hasTarget = function()
-            return IsEnabled("target")
+            return not IsHidden("target") and IsEnabled("target")
         end,
         editorVisible = function()
-            return IsEnabled("target")
+            return not IsHidden("target") and IsEnabled("target")
         end,
         showTest = function()
             ShowCastbarTest("target")
@@ -2642,10 +2673,10 @@ local function InitializeCastbarForEditor()
         frame = CastbarModule.focusAnchor,
         configPath = {"widgets", "focusCastbar"},
         hasTarget = function()
-            return IsEnabled("focus")
+            return not IsHidden("focus") and IsEnabled("focus")
         end,
         editorVisible = function()
-            return IsEnabled("focus")
+            return not IsHidden("focus") and IsEnabled("focus")
         end,
         showTest = function()
             ShowCastbarTest("focus")

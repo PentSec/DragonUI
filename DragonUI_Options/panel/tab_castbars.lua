@@ -50,6 +50,13 @@ local function AddCastbarControls(parent, dbPrefix, refreshFunc, opts)
     local sizeYMin = opts.sizeYMin or 10
     local sizeYMax = opts.sizeYMax or 64
 
+    C:AddToggle(parent, {
+        label = LO["Hide Castbar"],
+        desc = LO["Hide Castbar Desc"],
+        dbPath = dbPrefix .. ".hidden",
+        callback = refreshFunc,
+    })
+
     C:AddSlider(parent, {
         label = LO["Width"],
         dbPath = dbPrefix .. ".sizeX",
