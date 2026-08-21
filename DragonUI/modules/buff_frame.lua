@@ -1402,31 +1402,27 @@ function BuffFrameModule:Enable()
         -- is the closest element to the first icon.
         local vanityAnchor = VanityBuffs and VanityBuffs:IsShown() and (BuffFrame.numVanity or 0) > 0
 
+        -- Returns the desired anchor instead of setting it so the caller can
+        -- diff against the button's real GetPoint() and skip no-op writes.
         if weaponEnchantsAreSeparated then
             -- No TemporaryEnchantFrame in the chain; anchor to whatever is
             -- immediately to the left of the first buff.
             if vanityAnchor then
-                button:ClearAllPoints()
-                button:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0)
-                return
+                return "TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0
             end
             if ConsolidatedBuffs then
-                button:ClearAllPoints()
                 if ConsolidatedBuffs:IsShown() then
-                    button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-                else
-                    button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+                    return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
                 end
+                return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
             end
-            return
+            return nil
         end
 
         if slack > 0 then
             local lastEnchant = _G["TempEnchant" .. slack]
             if lastEnchant and lastEnchant:IsShown() then
-                button:ClearAllPoints()
-                button:SetPoint("TOPRIGHT", lastEnchant, "TOPLEFT", -6, 0)
-                return
+                return "TOPRIGHT", lastEnchant, "TOPLEFT", -6, 0
             end
         end
 
@@ -1435,22 +1431,48 @@ function BuffFrameModule:Enable()
         -- first non-vanity buff anchors to VanityBuffs.LEFT so the normal row
         -- starts right after the vanity container.
         if vanityAnchor then
-            button:ClearAllPoints()
-            button:SetPoint("TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0)
-            return
+            return "TOPRIGHT", VanityBuffs, "TOPLEFT", -5, 0
         end
 
         if ConsolidatedBuffs then
-            button:ClearAllPoints()
             if ConsolidatedBuffs:IsShown() then
-                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0)
-            else
-                button:SetPoint("TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0)
+                return "TOPRIGHT", ConsolidatedBuffs, "TOPLEFT", -6, 0
             end
+            return "TOPRIGHT", ConsolidatedBuffs, "TOPRIGHT", 0, 0
         end
+        return nil
     end
 
     local buffRowStarts = {}
+
+    -- GetPoint() reads back scaled floats (a SetPoint of -6 returns
+    -- -5.99999986), so offsets compare within an epsilon. Point names and the
+    -- relative frame must match exactly; a nil GetPoint counts as drift.
+    local ANCHOR_EPSILON = 2.0
+
+    local function ButtonAnchorMatches(button, point, relFrame, relPoint, x, y)
+        local actPoint, actRelFrame, actRelPoint, actX, actY = button:GetPoint()
+        if not actPoint then return false end
+        if actPoint ~= point or actRelFrame ~= relFrame or actRelPoint ~= relPoint then
+            return false
+        end
+        if math.abs((actX or 0) - (x or 0)) > ANCHOR_EPSILON then return false end
+        if math.abs((actY or 0) - (y or 0)) > ANCHOR_EPSILON then return false end
+        return true
+    end
+
+    -- Writes the anchor only when the button is NOT already there. This keeps
+    -- the sorted layout pass safe to run on every aura tick: in steady state
+    -- it performs zero writes, so it cannot re-trigger the anchor-reflow
+    -- flicker that forced upstream to make this pass minimal.
+    local function ApplySortedAnchor(button, point, relFrame, relPoint, x, y)
+        if not point or not relFrame then return end
+        if ButtonAnchorMatches(button, point, relFrame, relPoint, x, y) then
+            return
+        end
+        button:ClearAllPoints()
+        button:SetPoint(point, relFrame, relPoint, x, y)
+    end
 
     local function ReanchorBuffButtons()
         local buffGap = GetBuffHorizontalGap()
@@ -1479,18 +1501,16 @@ function BuffFrameModule:Enable()
                 local column = math.fmod(layoutIndex - 1, perRow) + 1
 
                 if count == 1 then
-                    AnchorFirstBuff(button, slack)
+                    ApplySortedAnchor(button, AnchorFirstBuff(button, slack))
                     rowStarts[row] = button
                 elseif column == 1 then
                     local previousRowStart = rowStarts[row - 1] or rowStarts[1] or previousBuff
                     if previousRowStart then
-                        button:ClearAllPoints()
-                        button:SetPoint("TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
+                        ApplySortedAnchor(button, "TOPRIGHT", previousRowStart, "BOTTOMRIGHT", 0, -vGap)
                     end
                     rowStarts[row] = button
                 elseif previousBuff then
-                    button:ClearAllPoints()
-                    button:SetPoint("TOPRIGHT", previousBuff, "TOPLEFT", -spacing, 0)
+                    ApplySortedAnchor(button, "TOPRIGHT", previousBuff, "TOPLEFT", -spacing, 0)
                 end
 
                 previousBuff = button
@@ -1748,6 +1768,20 @@ function BuffFrameModule:Enable()
                         _applyAnchor(firstButton, "firstBuffVanityHidden", pt, rf, rp, x, y)
                     end
                 end
+            end
+
+            -- 3.7) Custom buff order (player_first / other_first / duration).
+            --    Blizzard re-anchors BuffButtons in aura-index order on every
+            --    update, which undoes the sorted layout applied by
+            --    RefreshAuraSpacing() — sorting only "stuck" until the next
+            --    UNIT_AURA. Re-apply it here. ApplySortedAnchor diffs each
+            --    button against its real GetPoint(), so this writes nothing
+            --    while the row already matches the sorted layout (no flicker),
+            --    and only corrects the buttons Blizzard actually moved.
+            --    Skipped entirely in Default (Blizzard) order: that path keeps
+            --    upstream's minimal pass untouched.
+            if GetBuffOrder() ~= BUFF_ORDER_BLIZZARD then
+                ReanchorBuffButtons()
             end
 
             -- 4) Debuffs follow the latest buff / consolidated layout.
