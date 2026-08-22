@@ -554,96 +554,11 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
     -- Apply classification-based atlas border
     UpdateBossFrameBorder(bossFrame)
 
-    -- ShowTest function for editor mode / testboss command
-    bossFrame.ShowTest = function(self)
-        -- Unregister the secure anchor's unit watch so the state driver
-        -- doesn't hide us while in test mode.  The anchor drives
-        -- Show/Hide — the boss frame itself is not unit-watch registered.
-        local anchor = BossModule.secureAnchors[bossIndex]
-        if anchor then
-            UnregisterUnitWatch(anchor)
-        end
-        self:SetAttribute("unit", "player")
-        self.unit = "player"
-
-        local fn = self:GetName()
-        local p = _G[fn .. "Portrait"]
-        if p then
-            SetPortraitTexture(p, "player")
-        end
-
-        local bg = _G[fn .. "NameBackground"]
-        if bg then
-            bg:SetVertexColor(UnitSelectionColor("player"))
-        end
-
-        local dead = _G[fn .. "TextureFrameDeadText"]
-        if dead then dead:Hide() end
-
-        local highLevel = _G[fn .. "TextureFrameHighLevelTexture"]
-        if highLevel then highLevel:Hide() end
-
-        local name = _G[fn .. "TextureFrameName"]
-        if name then name:SetText(UnitName("player")) end
-
-        local level = _G[fn .. "TextureFrameLevelText"]
-        if level then
-            level:SetText(UnitLevel("player"))
-            level:Show()
-        end
-
-        local hpText = _G[fn .. "TextureFrameHealthBarText"]
-        local curHP = UnitHealth("player")
-        if hpText then hpText:SetText(curHP .. "/" .. curHP) end
-
-        local mpText = _G[fn .. "TextureFrameManaBarText"]
-        local curMP = UnitPower("player", 0) -- Mana
-        if mpText then mpText:SetText(curMP .. "/" .. curMP) end
-
-        local hp = _G[fn .. "HealthBar"]
-        if hp then
-            hp:SetMinMaxValues(0, curHP)
-            hp:SetStatusBarColor(0.29, 0.69, 0.07)
-            hp:SetValue(curHP)
-            hp:Show()
-        end
-
-        local mp = _G[fn .. "ManaBar"]
-        if mp then
-            mp:SetMinMaxValues(0, curMP)
-            mp:SetValue(curMP)
-            mp:SetStatusBarColor(0.02, 0.32, 0.71)
-            mp:Show()
-        end
-
-        self:Show()
-    end
-
-    bossFrame.HideTest = function(self)
-        -- Restore unit and re-register the secure anchor's unit watch
-        -- so it resumes driving Show/Hide from the restricted environment.
-        -- Use SetAlpha(0) as an immediate visual hide since we can't call
-        -- Hide() on a secure frame from addon code.
-        self:SetAlpha(0)
-        local restore = function()
-            if InCombatLockdown() then return end
-            self.unit = "boss" .. bossIndex
-            self:SetAttribute("unit", "boss" .. bossIndex)
-            -- Re-register the secure anchor so the state driver resumes
-            -- controlling boss frame visibility.
-            local anchor = BossModule.secureAnchors[bossIndex]
-            if anchor then
-                RegisterUnitWatch(anchor, true)
-            end
-        end
-        if InCombatLockdown() then
-            if addon.CombatQueue then
-                addon.CombatQueue:Add("boss_hidetest_" .. bossIndex, restore)
-            end
-        else
-            restore()
-        end
-    end
+    -- No debug test-mode scaffolding here on purpose: Boss1-4TargetFrame are
+    -- protected frames. Any insecure SetAttribute("unit", ...) or Show() from
+    -- addon code poisons Blizzard's own secure visibility path and later
+    -- surfaces as "AddOn 'DragonUI' prevented the call of the secure function
+    -- 'BossNTargetFrame:Show()'". Editor preview only shows the wrapper.
 end
 
 -- ============================================================================
@@ -1076,34 +991,17 @@ local function SetupEditorMode()
         hasTarget = function()
             return true
         end,
+        -- Preview shows only the editor wrapper: forcing the protected boss
+        -- frames visible from addon code is what tainted their secure
+        -- visibility path ("prevented the call of the secure function").
         showTest = function()
             if BossModule.overlay then
                 BossModule.overlay:Show()
             end
-            -- Show boss frames in test mode
-            for i = 1, NUM_BOSS_FRAMES do
-                local bossFrame = _G["Boss" .. i .. "TargetFrame"]
-                if bossFrame and not InCombatLockdown() then
-                    -- ShowTest unregisters the secure anchor that drives
-                    -- boss frame visibility.  No UnregisterUnitWatch on
-                    -- bossFrame needed — it was never registered directly.
-                    if bossFrame.ShowTest then
-                        bossFrame:ShowTest()
-                    end
-                end
-            end
         end,
         hideTest = function()
-            for i = 1, NUM_BOSS_FRAMES do
-                local bossFrame = _G["Boss" .. i .. "TargetFrame"]
-                if bossFrame and not InCombatLockdown() then
-                    -- Visibility is driven by the secure anchor now;
-                    -- no need to re-register RegisterUnitWatch on bossFrame.
-                    if bossFrame.HideTest and not UnitExists("boss" .. i) then
-                        bossFrame:HideTest()
-                    end
-                end
-            end
+            -- Nothing to restore on the secure boss frames themselves; the
+            -- editor tears its own overlay down.
         end,
         onHide = function()
             if BossModule.overlay and BossModule.overlay.DragonUI_WasDragged then
