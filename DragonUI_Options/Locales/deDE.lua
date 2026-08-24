@@ -2015,3 +2015,16 @@ L["Hide Model Controls"] = "Modellsteuerung ausblenden"
 L["Hide the rotate, zoom and reset buttons over the character model."] = "Blendet die Dreh-, Zoom- und Zurücksetzen-Schaltflächen über dem Charaktermodell aus."
 L["Keep the Reset Button"] = "Zurücksetzen-Schaltfläche behalten"
 L["Leave the reset button on its own while the rest of the model controls stay hidden."] = "Lässt die Zurücksetzen-Schaltfläche allein stehen, während die übrige Modellsteuerung ausgeblendet bleibt."
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "Schadensmeter-Skin"
+L["|cffff5555Details! is not installed.|r This module skins the Details! Damage Meter, it is not a meter of its own - with Details! absent there is nothing to skin."] = "|cffff5555Details! ist nicht installiert.|r Dieses Modul gestaltet den Details!-Schadensmesser, es ist selbst kein Messer - ohne Details! gibt es nichts zu gestalten."
+L["A retail-styled theme for |cffffcc55Details!|r, drawn with art from retail's own damage meter: a gold-titled header bar, class-coloured bars on a near-invisible panel, and abbreviated numbers. It is registered with Details! at login, so it also appears in Details!' own skin list under |cffffcc55DragonUI|r."] = "Ein Design im Retail-Stil für |cffffcc55Details!|r, gezeichnet mit Grafik aus dem Schadensmesser der Retailversion: goldene Titelleiste, klassenfarbene Balken auf einem fast unsichtbaren Panel und abgekürzte Zahlen. Es wird beim Login bei Details! registriert und erscheint daher auch in Details!' eigener Skinliste als |cffffcc55DragonUI|r."
+L["Enable Damage Meter Skin"] = "Schadensmeter-Skin aktivieren"
+L["Registers the DragonUI theme with Details! and puts your chosen skin back after a reload. Turning it off hands every window back to Details!' own chrome."] = "Registriert das DragonUI-Design bei Details! und stellt deinen gewählten Skin nach einem /reload wieder her. Beim Deaktivieren erhalten alle Fenster die eigene Optik von Details! zurück."
+L["Apply the DragonUI Skin"] = "DragonUI-Skin anwenden"
+L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Stellt alle Details!-Fenster auf den Skin um und aktiviert die K/M-Zahlenabkürzung. Größe und Position der Fenster bleiben deine Sache - dafür gibt es den Scale-Regler in Details!. Deine Wahl wird gemerkt und nach einem /reload wiederhergestellt; wer in Details! eine andere Skin wählt, beendet das. Führe dies erneut aus, wenn du etwas in Details! angepasst hast und das Thema zurück möchtest."
+L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Führe |cffffcc55/duidetails|r aus, um sie über den Chat anzuwenden."

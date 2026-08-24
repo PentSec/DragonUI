@@ -705,3 +705,13 @@ L["GearScore"] = true
 L["Weighted score of your equipped gear."] = true
 L["Reset stat order"] = true
 L["Restore the stat categories to their default order?"] = true
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = true
+L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, class-coloured bars and abbreviated numbers."] = true
+L["Details! skin applied."] = true
+L["Could not apply the skin - Details! is not ready yet."] = true
+L["Details! is not installed."] = true

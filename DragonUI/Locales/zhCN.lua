@@ -717,3 +717,13 @@ L["GearScore"] = "GearScore"
 L["Weighted score of your equipped gear."] = "你已装备物品的加权评分。"
 L["Reset stat order"] = "重置排序"
 L["Restore the stat categories to their default order?"] = "将属性分类恢复为默认顺序？"
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "伤害统计皮肤"
+L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, class-coloured bars and abbreviated numbers."] = "为Details!伤害统计打造的正式服风格主题：金色标题栏、职业配色条形和缩写数字。"
+L["Details! skin applied."] = "Details!皮肤已应用。"
+L["Could not apply the skin - Details! is not ready yet."] = "无法应用皮肤 - Details!尚未就绪。"
+L["Details! is not installed."] = "未安装Details!。"

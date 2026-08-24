@@ -2014,3 +2014,16 @@ L["Hide Model Controls"] = "모델 조작 버튼 숨기기"
 L["Hide the rotate, zoom and reset buttons over the character model."] = "캐릭터 모델 위의 회전, 확대, 초기화 버튼을 숨깁니다."
 L["Keep the Reset Button"] = "초기화 버튼은 남기기"
 L["Leave the reset button on its own while the rest of the model controls stay hidden."] = "나머지 모델 조작 버튼은 숨긴 채 초기화 버튼만 남깁니다."
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "전투력 측정기 스킨"
+L["|cffff5555Details! is not installed.|r This module skins the Details! Damage Meter, it is not a meter of its own - with Details! absent there is nothing to skin."] = "|cffff5555Details!가 설치되어 있지 않습니다.|r 이 모듈은 Details! 전투력 측정기의 외형을 꾸미는 모듈이며 자체 측정기가 아닙니다 - Details!가 없으면 꾸밀 것이 없습니다."
+L["A retail-styled theme for |cffffcc55Details!|r, drawn with art from retail's own damage meter: a gold-titled header bar, class-coloured bars on a near-invisible panel, and abbreviated numbers. It is registered with Details! at login, so it also appears in Details!' own skin list under |cffffcc55DragonUI|r."] = "|cffffcc55Details!|r용 리테일 스타일 테마로, 리테일 전투력 측정기의 아트를 사용해 그렸습니다: 금색 제목 줄, 거의 투명한 패널 위의 직업 색상 막대, 축약된 숫자. 로그인 시 Details!에 등록되므로 Details!의 스킨 목록에도 |cffffcc55DragonUI|r 이름으로 나타납니다."
+L["Enable Damage Meter Skin"] = "전투력 측정기 스킨 활성화"
+L["Registers the DragonUI theme with Details! and puts your chosen skin back after a reload. Turning it off hands every window back to Details!' own chrome."] = "Details!에 DragonUI 테마를 등록하고 재시작 후 선택한 스킨을 복원합니다. 비활성화하면 모든 창이 Details! 기본 외형으로 돌아갑니다."
+L["Apply the DragonUI Skin"] = "DragonUI 스킨 적용"
+L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "모든 Details! 창을 이 스킨으로 전환하고 K/M 숫자 축약을 설정합니다. 창 크기와 위치는 그대로 유지됩니다 - 크기는 Details! 자체 슬라이더를 사용하세요. 선택은 기억되며 재시작 후 복원됩니다. Details!에서 다른 스킨을 고르면 해제됩니다. Details!에서 무언가를 변경한 후 테마를 되찾으려면 다시 실행하세요."
+L["Run |cffffcc55/duidetails|r to apply it from chat."] = "채팅에서 적용하려면 |cffffcc55/duidetails|r를 입력하세요."

@@ -4,7 +4,7 @@
 ## Version: 3.1.2
 ## Author: PentSec, NeticSoul
 ## SavedVariables: DragonUIDB
-## OptionalDeps: Blizzard_TimeManager
+## OptionalDeps: Blizzard_TimeManager, Details
 ## X-License: MIT for project-authored code; bundled dependencies retain their own licenses
 
 # Core libraries (always loaded)

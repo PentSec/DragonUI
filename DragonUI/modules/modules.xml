@@ -125,4 +125,7 @@
 
     <!-- Ascension WildCard Dice movability widget -->
     <Script file="wildcarddice.lua"/>
+
+    <!-- Details! Damage Meter skin (inert until applied; requires the Details! addon) -->
+    <Script file="detailsskin.lua"/>
 </Ui>

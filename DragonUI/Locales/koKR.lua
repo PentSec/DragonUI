@@ -753,3 +753,13 @@ L["GearScore"] = "GearScore"
 L["Weighted score of your equipped gear."] = "착용 중인 장비의 가중 점수입니다."
 L["Reset stat order"] = "순서 초기화"
 L["Restore the stat categories to their default order?"] = "능력치 분류를 기본 순서로 되돌릴까요?"
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "전투력 측정기 스킨"
+L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, class-coloured bars and abbreviated numbers."] = "Details! 전투력 측정기용 리테일 스타일 테마: 금색 제목 줄, 직업 색상 막대, 축약된 숫자."
+L["Details! skin applied."] = "Details! 스킨이 적용되었습니다."
+L["Could not apply the skin - Details! is not ready yet."] = "스킨을 적용할 수 없습니다 - Details!가 아직 준비되지 않았습니다."
+L["Details! is not installed."] = "Details!가 설치되어 있지 않습니다."

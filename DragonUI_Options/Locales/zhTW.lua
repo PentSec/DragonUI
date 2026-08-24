@@ -2020,3 +2020,16 @@ L["Hide Model Controls"] = "隱藏模型控制按鈕"
 L["Hide the rotate, zoom and reset buttons over the character model."] = "隱藏角色模型上方的旋轉、縮放和重設按鈕。"
 L["Keep the Reset Button"] = "保留重設按鈕"
 L["Leave the reset button on its own while the rest of the model controls stay hidden."] = "在其餘模型控制按鈕保持隱藏時，只留下重設按鈕。"
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "傷害統計外觀"
+L["|cffff5555Details! is not installed.|r This module skins the Details! Damage Meter, it is not a meter of its own - with Details! absent there is nothing to skin."] = "|cffff5555未安裝Details!。|r 本模組用於美化Details!傷害統計的外觀，本身並非統計工具 - 沒有Details!便無可美化。"
+L["A retail-styled theme for |cffffcc55Details!|r, drawn with art from retail's own damage meter: a gold-titled header bar, class-coloured bars on a near-invisible panel, and abbreviated numbers. It is registered with Details! at login, so it also appears in Details!' own skin list under |cffffcc55DragonUI|r."] = "為|cffffcc55Details!|r打造的正式版風格主題，使用正式版傷害統計的美術資源：金色標題列、近乎隱形面板上的職業配色條，以及縮寫數字。主題會在登入時註冊至Details!，因此也會以|cffffcc55DragonUI|r之名出現在Details!自己的外觀清單中。"
+L["Enable Damage Meter Skin"] = "啟用傷害統計外觀"
+L["Registers the DragonUI theme with Details! and puts your chosen skin back after a reload. Turning it off hands every window back to Details!' own chrome."] = "在Details!中註冊DragonUI主題，並在重載介面後還原你選擇的外觀。關閉後所有視窗恢復Details!內建外觀。"
+L["Apply the DragonUI Skin"] = "套用DragonUI外觀"
+L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "將所有Details!視窗切換為此外觀並啟用K/M數字縮寫。視窗大小與位置仍由你掌控 - 請使用Details!內建的縮放滑桿。你的選擇會被記住並於重載後還原；在Details!中選擇其他外觀即會結束。若你在Details!中進行過自訂並想取回主題，請再次執行。"
+L["Run |cffffcc55/duidetails|r to apply it from chat."] = "輸入|cffffcc55/duidetails|r即可從聊天視窗套用。"

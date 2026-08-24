@@ -28,6 +28,15 @@ The retail-style Collections textures under `DragonUI/Textures/Collections/` (ro
 star, model backdrop, faction crests, search glyph, journal portraits) are taken from EZCollections
 by ZEUStiger.
 
+## Details! Damage Meter theme
+
+The Details! skin in `DragonUI/modules/detailsskin.lua` structures its skin keys after
+Details_TWW by Karl-Heinz Schneider (MIT); the license text is shared with the DragonflightUI
+notice above and included in `LICENSES/MIT-DragonflightUI.txt`. The four textures under
+`DragonUI/Textures/DetailsSkin/` are cut from retail's own Blizzard_DamageMeter sheets
+(© Blizzard Entertainment) and repacked power-of-two for 3.3.5a; they arrived via
+DragonUI_NewEra's downport of the same theme.
+
 ## Bundled Fonts
 
 | Font | Path | License | License File |

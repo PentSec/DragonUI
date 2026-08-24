@@ -968,3 +968,13 @@ L["GearScore"] = "GearScore"
 L["Weighted score of your equipped gear."] = "Score pondéré de votre équipement."
 L["Reset stat order"] = "Réinitialiser l'ordre"
 L["Restore the stat categories to their default order?"] = "Rétablir l'ordre par défaut des catégories de statistiques ?"
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = "Skin du compteur de dégâts"
+L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, class-coloured bars and abbreviated numbers."] = "Thème au style retail pour le compteur de dégâts Details! : barre de titre dorée, barres aux couleurs des classes et nombres abrégés."
+L["Details! skin applied."] = "Skin de Details! appliqué."
+L["Could not apply the skin - Details! is not ready yet."] = "Impossible d'appliquer le skin - Details! n'est pas encore prêt."
+L["Details! is not installed."] = "Details! n'est pas installé."

@@ -1943,3 +1943,16 @@ L["Hide Model Controls"] = true
 L["Hide the rotate, zoom and reset buttons over the character model."] = true
 L["Keep the Reset Button"] = true
 L["Leave the reset button on its own while the rest of the model controls stay hidden."] = true
+
+-- ============================================================================
+-- DAMAGE METER SKIN (DETAILS!)
+-- ============================================================================
+
+L["Damage Meter Skin"] = true
+L["|cffff5555Details! is not installed.|r This module skins the Details! Damage Meter, it is not a meter of its own - with Details! absent there is nothing to skin."] = true
+L["A retail-styled theme for |cffffcc55Details!|r, drawn with art from retail's own damage meter: a gold-titled header bar, class-coloured bars on a near-invisible panel, and abbreviated numbers. It is registered with Details! at login, so it also appears in Details!' own skin list under |cffffcc55DragonUI|r."] = true
+L["Enable Damage Meter Skin"] = true
+L["Registers the DragonUI theme with Details! and puts your chosen skin back after a reload. Turning it off hands every window back to Details!' own chrome."] = true
+L["Apply the DragonUI Skin"] = true
+L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = true
+L["Run |cffffcc55/duidetails|r to apply it from chat."] = true

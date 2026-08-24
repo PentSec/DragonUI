@@ -1276,6 +1276,10 @@ local defaults = {
             },
             collections = {
                 enabled = true, -- Dedicated Pets & Mounts window opened from the micro menu
+            },
+            detailsskin = {
+                enabled = true, -- Details! Damage Meter theme: registers the DragonUI skin and restores the player's choice
+                chosen = false, -- true once the player applies the skin; cleared when another skin is picked or the module turns off
             }
         },
 
