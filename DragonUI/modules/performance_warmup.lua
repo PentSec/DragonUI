@@ -31,6 +31,9 @@ local WARMUP_PANELS = {
     "SpellBookFrame",
     "LFDParentFrame",
     "FriendsFrame",
+    "WorldMapFrame",
+    "TradeFrame",
+    "AscensionLFGFrame",
 }
 
 -- Show/Hide triggers each panel's own OnShow sound. Muting SFX only around
