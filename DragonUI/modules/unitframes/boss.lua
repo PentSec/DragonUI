@@ -9,13 +9,9 @@
   - Config: addon.db.profile.unitframe.boss
   - Atlas: texture:set_atlas(name, true) (from utils/atlas.lua)
   - Editor: RegisterEditableFrame for drag positioning
-  - Visibility: A SecureHandlerStateTemplate anchor per boss frame drives
-    Show/Hide from the restricted secure environment via RegisterUnitWatch
-    on the anchor (asState=true).  We do NOT call RegisterUnitWatch on the
-    Blizzard boss frames directly because that propagates addon taint to
-    the secure Hide()/Show() calls ("prevented the call of the secure
-    function" errors).  INSTANCE_ENCOUNTER_ENGAGE_UNIT does NOT exist in
-    3.3.5a (MCP Ch.25).
+  - Visibility: RegisterUnitWatch(bossFrame) per boss frame — required because
+    INSTANCE_ENCOUNTER_ENGAGE_UNIT does NOT exist in 3.3.5a (MCP Ch.25).
+    RegisterUnitWatch auto-shows/hides frames based on UnitExists("bossN").
 ]]
 
 local _, addon = ...
@@ -200,19 +196,15 @@ local function CreateSecureBossAnchor(wrapper, bossFrame, bossIndex)
     anchor:SetAllPoints(wrapper)
     anchor:SetFrameRef("bossFrame", bossFrame)
     anchor:SetAttribute("unit", "boss" .. bossIndex)
-    -- Drive boss frame Show/Hide from the secure restricted environment to
-    -- avoid taint propagation.  RegisterUnitWatch(bossFrame) would call
-    -- Hide()/Show() through a tainted addon execution path, triggering
-    -- "prevented the call of the secure function" errors.
     anchor:SetAttribute("_onstate-unitexists", [[
-        local bossFrame = self:GetFrameRef("bossFrame")
-        if not bossFrame then return end
         if newstate then
-            bossFrame:Show()
-            bossFrame:ClearAllPoints()
-            bossFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-        else
-            bossFrame:Hide()
+            local bossFrame = self:GetFrameRef("bossFrame")
+            if bossFrame then
+                bossFrame:ClearAllPoints()
+                bossFrame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+            end
+            -- Clear the cache so later Blizzard reanchors are repaired on the next unit-watch pass.
+            self:SetAttribute("state-unitexists", nil)
         end
     ]])
     RegisterUnitWatch(anchor, true)
@@ -459,11 +451,6 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
         healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
         healthText:SetDrawLayer("OVERLAY")
     end
-    -- Force health text always visible (override Blizzard hover-only behavior)
-    if healthBar then
-        healthBar.lockShow = 1
-        ShowTextStatusBarText(healthBar)
-    end
 
     -- Dead text
     local deadText = _G[frameName .. "TextureFrameDeadText"]
@@ -479,11 +466,6 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
         manaText:ClearAllPoints()
         manaText:SetPoint("CENTER", manaBar, "CENTER", 0, 0)
         manaText:SetDrawLayer("OVERLAY")
-    end
-    -- Force mana text always visible (override Blizzard hover-only behavior)
-    if manaBar then
-        manaBar.lockShow = 1
-        ShowTextStatusBarText(manaBar)
     end
 
     -- PVP icon
@@ -554,11 +536,64 @@ local function ReskinBossFrame(wrapperFrame, bossFrame, bossIndex)
     -- Apply classification-based atlas border
     UpdateBossFrameBorder(bossFrame)
 
-    -- No debug test-mode scaffolding here on purpose: Boss1-4TargetFrame are
-    -- protected frames. Any insecure SetAttribute("unit", ...) or Show() from
-    -- addon code poisons Blizzard's own secure visibility path and later
-    -- surfaces as "AddOn 'DragonUI' prevented the call of the secure function
-    -- 'BossNTargetFrame:Show()'". Editor preview only shows the wrapper.
+    -- ShowTest function for editor mode / testboss command
+    bossFrame.ShowTest = function(self)
+        local fn = self:GetName()
+        local p = _G[fn .. "Portrait"]
+        if p then
+            SetPortraitTexture(p, "player")
+        end
+
+        local bg = _G[fn .. "NameBackground"]
+        if bg then
+            bg:SetVertexColor(UnitSelectionColor("player"))
+        end
+
+        local dead = _G[fn .. "TextureFrameDeadText"]
+        if dead then dead:Hide() end
+
+        local highLevel = _G[fn .. "TextureFrameHighLevelTexture"]
+        if highLevel then highLevel:Hide() end
+
+        local name = _G[fn .. "TextureFrameName"]
+        if name then name:SetText(UnitName("player")) end
+
+        local level = _G[fn .. "TextureFrameLevelText"]
+        if level then
+            level:SetText(UnitLevel("player"))
+            level:Show()
+        end
+
+        local hpText = _G[fn .. "TextureFrameHealthBarText"]
+        local curHP = UnitHealth("player")
+        if hpText then hpText:SetText(curHP .. "/" .. curHP) end
+
+        local mpText = _G[fn .. "TextureFrameManaBarText"]
+        local curMP = UnitPower("player", 0) -- Mana
+        if mpText then mpText:SetText(curMP .. "/" .. curMP) end
+
+        local hp = _G[fn .. "HealthBar"]
+        if hp then
+            hp:SetMinMaxValues(0, curHP)
+            hp:SetStatusBarColor(0.29, 0.69, 0.07)
+            hp:SetValue(curHP)
+            hp:Show()
+        end
+
+        local mp = _G[fn .. "ManaBar"]
+        if mp then
+            mp:SetMinMaxValues(0, curMP)
+            mp:SetValue(curMP)
+            mp:SetStatusBarColor(0.02, 0.32, 0.71)
+            mp:Show()
+        end
+
+        self:Show()
+    end
+
+    bossFrame.HideTest = function(self)
+        self:Hide()
+    end
 end
 
 -- ============================================================================
@@ -882,20 +917,12 @@ local function InitializeBossFrames()
                 bossFrame:SetAttribute("unit", "boss" .. i)
             end
 
-            -- Visibility is driven by the secure anchor's _onstate-unitexists
-            -- snippet (CreateSecureBossAnchor) which calls Show/Hide from the
-            -- taint-free restricted environment.  We do NOT call
-            -- RegisterUnitWatch(bossFrame) directly because that would
-            -- propagate addon taint to the secure Hide()/Show() calls.
-            -- Do NOT call bossFrame:Hide() here either: this is a protected
-            -- frame, and a tainted Hide() poisons its script handlers — the
-            -- next time Blizzard's encounter code hides a sibling boss frame
-            -- mid-combat, the poisoned chain surfaces as "AddOn 'DragonUI'
-            -- prevented the call of the secure function 'BossNTargetFrame:
-            -- Hide()'".  Boss frames start hidden anyway; the secure anchor
-            -- performs the real Hide/Show from the restricted environment.
+            -- RegisterUnitWatch: auto show/hide based on UnitExists("bossN").
+            -- This is the 3.3.5a replacement for INSTANCE_ENCOUNTER_ENGAGE_UNIT.
+            -- DragonflightUI Bossframe.mixin.lua uses the same pattern.
+            RegisterUnitWatch(bossFrame)
 
-            -- Alpha-only fade layered on top of the secure anchor's Show/Hide.
+            -- Alpha-only fade layered on top of RegisterUnitWatch's own Show/Hide.
             if addon.VisibilityFade then
                 addon.VisibilityFade.Register("boss" .. i, bossFrame, {
                     dbTable = function() return addon.UF.GetConfig("boss") end,
@@ -991,17 +1018,31 @@ local function SetupEditorMode()
         hasTarget = function()
             return true
         end,
-        -- Preview shows only the editor wrapper: forcing the protected boss
-        -- frames visible from addon code is what tainted their secure
-        -- visibility path ("prevented the call of the secure function").
         showTest = function()
             if BossModule.overlay then
                 BossModule.overlay:Show()
             end
+            -- Show boss frames in test mode
+            for i = 1, NUM_BOSS_FRAMES do
+                local bossFrame = _G["Boss" .. i .. "TargetFrame"]
+                if bossFrame and not InCombatLockdown() then
+                    UnregisterUnitWatch(bossFrame)
+                    if bossFrame.ShowTest then
+                        bossFrame:ShowTest()
+                    end
+                end
+            end
         end,
         hideTest = function()
-            -- Nothing to restore on the secure boss frames themselves; the
-            -- editor tears its own overlay down.
+            for i = 1, NUM_BOSS_FRAMES do
+                local bossFrame = _G["Boss" .. i .. "TargetFrame"]
+                if bossFrame and not InCombatLockdown() then
+                    RegisterUnitWatch(bossFrame)
+                    if bossFrame.HideTest and not UnitExists("boss" .. i) then
+                        bossFrame:HideTest()
+                    end
+                end
+            end
         end,
         onHide = function()
             if BossModule.overlay and BossModule.overlay.DragonUI_WasDragged then
@@ -1161,82 +1202,6 @@ eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventsFrame:RegisterEvent("RAID_TARGET_UPDATE")
 
 -- ============================================================================
--- TEXT FORMAT OVERRIDE
--- ============================================================================
-
-local BOSS_FORMATTERS = {
-    numeric = function(cur, _max)
-        return tostring(cur)
-    end,
-    percentage = function(cur, max)
-        if max == 0 then return "0%" end
-        return string.format("%.1f%%", cur / max * 100)
-    end,
-    both = function(cur, max)
-        if max == 0 then return tostring(cur) end
-        return string.format("%s (%.1f%%)", tostring(cur), cur / max * 100)
-    end,
-    formatted = function(cur, max)
-        return tostring(cur) .. " / " .. tostring(max)
-    end,
-}
-
-local function GetBossConfig()
-    return addon.db and addon.db.profile
-        and addon.db.profile.unitframe
-        and addon.db.profile.unitframe.boss
-end
-
-local function FormatBossBarText(bar, unit)
-    if not bar or not bar.TextString then return end
-    local config = GetBossConfig()
-    if not config or not config.textFormat then return end
-    local formatter = BOSS_FORMATTERS[config.textFormat]
-    if not formatter then return end
-    if not unit or not UnitExists(unit) then return end
-
-    local cur = bar:GetValue()
-    local _, max = bar:GetMinMaxValues()
-    bar.TextString:SetText(formatter(cur, max))
-end
-
-local function InstallBossTextFormatHook()
-    if _G.DragonUI_BossTextFormatHooked then return end
-
-    -- Hook health bar SetValue for each boss frame
-    for i = 1, NUM_BOSS_FRAMES do
-        local bossFrame = _G["Boss" .. i .. "TargetFrame"]
-        if bossFrame then
-            local hpBar = _G["Boss" .. i .. "TargetFrameHealthBar"]
-            local mpBar = _G["Boss" .. i .. "TargetFrameManaBar"]
-
-            if hpBar then
-                hooksecurefunc(hpBar, "SetValue", function(self)
-                    local parent = self:GetParent()
-                    if parent and parent.unit then
-                        FormatBossBarText(self, parent.unit)
-                    end
-                end)
-            end
-
-            if mpBar then
-                hooksecurefunc(mpBar, "SetValue", function(self)
-                    local parent = self:GetParent()
-                    if parent and parent.unit then
-                        FormatBossBarText(self, parent.unit)
-                    end
-                end)
-            end
-        end
-    end
-
-    _G.DragonUI_BossTextFormatHooked = true
-end
-
--- Install hook on load
-InstallBossTextFormatHook()
-
--- ============================================================================
 -- PUBLIC API
 -- ============================================================================
 
@@ -1259,16 +1224,6 @@ function addon.RefreshBossFrames()
     end
 
     PositionBossFrames()
-
-    -- Re-run text format on all boss frames
-    if type(TargetFrame_Update) == "function" then
-        for i = 1, NUM_BOSS_FRAMES do
-            local bossFrame = _G["Boss" .. i .. "TargetFrame"]
-            if bossFrame and UnitExists(bossFrame.unit) then
-                TargetFrame_Update(bossFrame)
-            end
-        end
-    end
 end
 
 -- Store reference on addon for profile callbacks

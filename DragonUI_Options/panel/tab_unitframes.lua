@@ -833,13 +833,6 @@ local function BuildBossSection(scroll)
         callback = refreshBoss,
     })
 
-    C:AddDropdown(s, {
-        label = LO["Text Format"],
-        dbPath = "unitframe.boss.textFormat",
-        values = textFormatValues,
-        callback = refreshBoss,
-    })
-
     C:AddHeading(s, LO["Visibility"])
     C:AddVisibilityFadeToggles(s, {
         dbPrefix = "unitframe.boss",

@@ -820,7 +820,6 @@ local defaults = {
                 enabled = true,
                 scale = 1.0,
                 override = false,
-                textFormat = "both", -- "numeric", "percentage", "both", "formatted"
                 anchor = 'TOPRIGHT',
                 anchorParent = 'TOPRIGHT',
                 x = -85,
