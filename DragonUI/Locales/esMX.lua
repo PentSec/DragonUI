@@ -218,6 +218,8 @@ L["TargetPrimaryStat"] = "Estadística Principal (Objetivo)"
 L["Primary stat icon movability widget"] = "Widget de movilidad del icono de estadística principal"
 L["WildCardDice"] = "Dados WildCard"
 L["Ascension WildCard dice movability widget"] = "Widget de movilidad de los dados WildCard de Ascension"
+L["DurabilityFrameWidget"] = "Marco de Durabilidad"
+L["Durability frame movability widget"] = "Widget de movilidad del marco de durabilidad"
 
 -- Editor mode system messages
 L["All editable frames shown for editing"] = "Marcos editables mostrados"

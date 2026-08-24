@@ -218,6 +218,8 @@ L["TargetPrimaryStat"] = "Hauptstatistik (Ziel)"
 L["Primary stat icon movability widget"] = "Widget zur Beweglichkeit des Primärstatistik-Symbols"
 L["WildCardDice"] = "WildCard-Würfel"
 L["Ascension WildCard dice movability widget"] = "Beweglichkeits-Widget für die WildCard-Würfel von Ascension"
+L["DurabilityFrameWidget"] = "Haltbarkeitsfenster"
+L["Durability frame movability widget"] = "Beweglichkeits-Widget für das Haltbarkeitsfenster"
 
 -- Editor mode system messages
 L["All editable frames shown for editing"] = "Alle bearbeitbaren Frames zum Bearbeiten angezeigt"

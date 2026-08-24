@@ -58,6 +58,9 @@
     <!-- Player Primary Stat movability widget -->
     <Script file="player_primary_stat.lua"/>
 
+    <!-- DurabilityFrame movability widget -->
+    <Script file="durabilityframe.lua"/>
+
     <!-- Dark Mode module -->
     <Script file="darkmode.lua"/>
 
