@@ -715,3 +715,11 @@ L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, 
 L["Details! skin applied."] = true
 L["Could not apply the skin - Details! is not ready yet."] = true
 L["Details! is not installed."] = true
+
+-- WORLD MAP MODULE
+-- ============================================================================
+
+L["World Map"] = true
+L["Modern frame, portrait and breadcrumb navigation on the world map, with the quest log as a side panel."] = true
+L["Drag to resize"] = true
+L["Right-click to reset the size."] = true

@@ -2014,3 +2014,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "Aplicar la skin de DragonUI"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Cambia todas las ventanas de Details! a la skin y activa la abreviación K/M de los números. El tamaño y la posición de las ventanas siguen siendo tuyos - usa el deslizador de escala del propio Details!. Tu elección se recuerda y se restaura tras un /reload; elegir otra skin en Details! lo cancela. Vuelve a ejecutarlo si personalizaste algo en Details! y quieres recuperar el tema."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Ejecuta |cffffcc55/duidetails|r para aplicarla desde el chat."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "Mapa del mundo"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Mapa del mundo con estilo retail con navegación por migas de pan, redimensionamiento con arrastre y registro de misiones como panel lateral. Se requiere /reload completo tras cambiar."
+L["Enable World Map"] = "Activar mapa del mundo"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "Activa el marco moderno del mapa del mundo. Se requiere /reload para que surta efecto."
+L["Enable Fog Reveal"] = "Activar revelación de niebla"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Dibuja un tinte gris sobre las zonas no descubiertas usando datos de exploración compartidos entre personajes."
+L["Enable Wheel Zoom"] = "Activar zoom con rueda"
+L["Mouse wheel zooms and pans the map canvas."] = "La rueda del ratón hace zoom y mueve el lienzo del mapa."

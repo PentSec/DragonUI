@@ -833,13 +833,13 @@ function NP.gather.SyncName(plateData, unit)
         local skipFriendlyClass = isFriendlyPlayer and not allowFriendlyNameClass
         r, g, b = NP.gather.GetHealthBarColor(plateData, skipFriendlyClass)
         if isEnemyPlayer then
-            if allowEnemyNameClass then
+            if allowEnemyNameClass and classColor then
                 r, g, b = classColor.r, classColor.g, classColor.b
             else
                 r, g, b = 1, 0.1, 0.1
             end
         end
-    elseif isEnemyPlayer and allowEnemyNameClass then
+    elseif isEnemyPlayer and allowEnemyNameClass and classColor then
         r, g, b = classColor.r, classColor.g, classColor.b
     elseif isFriendlyPlayer and allowFriendlyNameClass then
         local cr, cg, cb = NP.gather.GetFriendlyPlayerClassColor(plateData)

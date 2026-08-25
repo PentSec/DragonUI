@@ -2018,3 +2018,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "Применить скин DragonUI"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Переключает все окна Details! на скин и включает сокращение чисел до K/M. Размер и положение окон остаются вашими - используйте ползунок масштаба в самом Details!. Ваш выбор запоминается и восстанавливается после перезагрузки; выбор другого скина в Details! отменяет это. Запустите снова, если настроили что-то в Details! и хотите вернуть тему."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Введите |cffffcc55/duidetails|r, чтобы применить скин из чата."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "Карта мира"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Карта в стиле零售, навигация по цепочке, изменение размера перетаскиванием и боковая панель со списком заданий. После включения требуется /reload."
+L["Enable World Map"] = "Включить карту мира"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "Активирует современную рамку карты мира. Требуется /reload."
+L["Enable Fog Reveal"] = "Включить раскрытие тумана"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Серый оттенок на неоткрытых зонах на основе данных исследования со всех персонажей."
+L["Enable Wheel Zoom"] = "Включить масштаб колесом"
+L["Mouse wheel zooms and pans the map canvas."] = "Колесо мыши масштабирует и перемещает карту."

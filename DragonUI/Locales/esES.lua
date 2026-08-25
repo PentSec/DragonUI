@@ -746,3 +746,11 @@ L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, 
 L["Details! skin applied."] = "Skin de Details! aplicada."
 L["Could not apply the skin - Details! is not ready yet."] = "No se pudo aplicar la skin - Details! aún no está listo."
 L["Details! is not installed."] = "Details! no está instalado."
+
+-- WORLD MAP MODULE
+-- ============================================================================
+
+L["World Map"] = "Mapa del mundo"
+L["Modern frame, portrait and breadcrumb navigation on the world map, with the quest log as a side panel."] = "Marco moderno, retrato y navegación por migas de pan en el mapa del mundo, con el registro de misiones como panel lateral."
+L["Drag to resize"] = "Arrastrar para redimensionar."
+L["Right-click to reset the size."] = "Clic derecho para restablecer el tamaño."

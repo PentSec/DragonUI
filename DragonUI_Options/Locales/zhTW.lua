@@ -2033,3 +2033,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "套用DragonUI外觀"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "將所有Details!視窗切換為此外觀並啟用K/M數字縮寫。視窗大小與位置仍由你掌控 - 請使用Details!內建的縮放滑桿。你的選擇會被記住並於重載後還原；在Details!中選擇其他外觀即會結束。若你在Details!中進行過自訂並想取回主題，請再次執行。"
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "輸入|cffffcc55/duidetails|r即可從聊天視窗套用。"
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "世界地圖"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "帶有導覽列、拖曳調整大小和任務記錄側邊面板的正式版風格世界地圖。切換後需完整 /reload。"
+L["Enable World Map"] = "啟用世界地圖"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "啟用現代世界地圖框架。需要 /reload 生效。"
+L["Enable Fog Reveal"] = "啟用迷霧揭示"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "使用帳號範圍內的探索資料在未發現區域上繪製灰色遮罩。"
+L["Enable Wheel Zoom"] = "啟用滾輪縮放"
+L["Mouse wheel zooms and pans the map canvas."] = "滑鼠滾輪縮放和平移地圖畫布。"

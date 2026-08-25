@@ -2470,3 +2470,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "Aplicar a skin do DragonUI"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Altera todas as janelas do Details! para a skin e ativa a abreviação K/M dos números. Tamanho e posição das janelas continuam seus - use o controle de escala do próprio Details!. Sua escolha é lembrada e reaplicada após um /reload; escolher outra skin no Details! encerra isso. Execute novamente se personalizar algo no Details! e quiser o tema de volta."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Execute |cffffcc55/duidetails|r para aplicá-la pelo chat."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "Mapa do mundo"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Mapa do mundo com estilo retail com navegação por migalhas, redimensionamento por arraste e registro de missões como painel lateral. Necessário /reload após alternar."
+L["Enable World Map"] = "Ativar mapa do mundo"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "Ativa o quadro moderno do mapa do mundo. Necessário /reload."
+L["Enable Fog Reveal"] = "Ativar revelação de névoa"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Tinge de cinza zonas não descobertas usando dados de exploração compartilhados entre personagens."
+L["Enable Wheel Zoom"] = "Ativar zoom com roda"
+L["Mouse wheel zooms and pans the map canvas."] = "A roda do mouse faz zoom e move o mapa."

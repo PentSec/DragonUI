@@ -2028,3 +2028,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "DragonUI-Skin anwenden"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Stellt alle Details!-Fenster auf den Skin um und aktiviert die K/M-Zahlenabkürzung. Größe und Position der Fenster bleiben deine Sache - dafür gibt es den Scale-Regler in Details!. Deine Wahl wird gemerkt und nach einem /reload wiederhergestellt; wer in Details! eine andere Skin wählt, beendet das. Führe dies erneut aus, wenn du etwas in Details! angepasst hast und das Thema zurück möchtest."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Führe |cffffcc55/duidetails|r aus, um sie über den Chat anzuwenden."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "Weltkarte"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Retail-Stil Weltkarte mit Breadcrumb-Navigation, Größenänderung durch Ziehen und Questlog-Seitenpanel. Vollständiges /reload nach dem Umschalten erforderlich."
+L["Enable World Map"] = "Weltkarte aktivieren"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "Aktiviert das moderne Weltkarten-Fenster. /reload erforderlich."
+L["Enable Fog Reveal"] = "Nebel aufdecken aktivieren"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Zeichnet einen grauen Schleier über unentdeckte Zonen mit kontoweiten Erkundungsdaten."
+L["Enable Wheel Zoom"] = "Radzoom aktivieren"
+L["Mouse wheel zooms and pans the map canvas."] = "Mausrad zoomt und schwenkt die Kartenleinwand."

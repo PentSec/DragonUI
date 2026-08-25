@@ -2027,3 +2027,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "DragonUI 스킨 적용"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "모든 Details! 창을 이 스킨으로 전환하고 K/M 숫자 축약을 설정합니다. 창 크기와 위치는 그대로 유지됩니다 - 크기는 Details! 자체 슬라이더를 사용하세요. 선택은 기억되며 재시작 후 복원됩니다. Details!에서 다른 스킨을 고르면 해제됩니다. Details!에서 무언가를 변경한 후 테마를 되찾으려면 다시 실행하세요."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "채팅에서 적용하려면 |cffffcc55/duidetails|r를 입력하세요."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "세계 지도"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "브레드크럼 네비게이션, 드래그 크기 조절, 퀘스트 기록 옆 패널이 있는 리테일 스타일 세계 지도. 전환 후 완전한 /reload 필요."
+L["Enable World Map"] = "세계 지도 활성화"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "최신 스타일 세계 지도 프레임을 활성화합니다. /reload가 필요합니다."
+L["Enable Fog Reveal"] = "안개 표시 활성화"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "캐릭터 간 공유된 탐험 데이터를 사용하여 미발견 지역에 회색 틴트를 그립니다."
+L["Enable Wheel Zoom"] = "휠 줌 활성화"
+L["Mouse wheel zooms and pans the map canvas."] = "마우스 휠로 지도 확대/축소 및 이동."

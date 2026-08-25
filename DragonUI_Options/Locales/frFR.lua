@@ -2473,3 +2473,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = "Appliquer l'habillage DragonUI"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Passe toutes les fenêtres de Details! à l'habillage et active l'abréviation K/M des nombres. La taille et la position des fenêtres restent les vôtres - utilisez le curseur d'échelle de Details!. Votre choix est mémorisé et réappliqué après un /reload ; choisir un autre habillage dans Details! y met fin. Relancez ceci après avoir personnalisé quelque chose dans Details! pour retrouver le thème."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Exécutez |cffffcc55/duidetails|r pour l'appliquer depuis le chat."
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = "Carte du monde"
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Carte du monde style retail avec navigation par fil d'Ariane, redimensionnement par glissement et journal de quêtes en panneau latéral. Nécessite un /reload complet."
+L["Enable World Map"] = "Activer la carte du monde"
+L["Activates the modern world map frame. Requires /reload to take effect."] = "Active le cadre moderne de la carte du monde. Nécessite un /reload."
+L["Enable Fog Reveal"] = "Activer le brouillard"
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Teinte grise sur les zones non découvertes basée sur les données d'exploration partagées entre personnages."
+L["Enable Wheel Zoom"] = "Activer le zoom à la molette"
+L["Mouse wheel zooms and pans the map canvas."] = "La molette zoome et déplace la carte."

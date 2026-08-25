@@ -1280,6 +1280,16 @@ local defaults = {
             detailsskin = {
                 enabled = true, -- Details! Damage Meter theme: registers the DragonUI skin and restores the player's choice
                 chosen = false, -- true once the player applies the skin; cleared when another skin is picked or the module turns off
+            },
+            worldmap = {
+                enabled = true, -- Modern world map with retail chrome, breadcrumb, drag-resize and quest side panel
+                canvasW = 697, -- canvas width; height follows from the map child's 1002/668 aspect
+                maximized = false, -- true = maximize preset; false = player's dragged/default width
+                wheelZoom = false, -- mouse wheel zooms the map canvas
+                fog = false, -- fog-of-war reveal: draw grey over undiscovered zones using account-wide data
+                overlays = {}, -- accumulated overlay data: [zone] = { {name,x,y,w,h}, ... } harvested from GetMapOverlays
+                poiFilters = {}, -- per-pin show/hide preferences for the filter menu
+                panelCollapsed = false, -- quest log side panel collapsed state
             }
         },
 

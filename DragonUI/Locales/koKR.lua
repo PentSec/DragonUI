@@ -763,3 +763,11 @@ L["A retail-styled theme for the Details! Damage Meter: gold-titled header bar, 
 L["Details! skin applied."] = "Details! 스킨이 적용되었습니다."
 L["Could not apply the skin - Details! is not ready yet."] = "스킨을 적용할 수 없습니다 - Details!가 아직 준비되지 않았습니다."
 L["Details! is not installed."] = "Details!가 설치되어 있지 않습니다."
+
+-- WORLD MAP MODULE
+-- ============================================================================
+
+L["World Map"] = "세계 지도"
+L["Modern frame, portrait and breadcrumb navigation on the world map, with the quest log as a side panel."] = "최신 스타일의 테두리, 초상화, 빵 부스러기 탐색이 있는 세계 지도. 퀘스트 기록이 옆 패널로 표시됩니다."
+L["Drag to resize"] = "드래그하여 크기 변경."
+L["Right-click to reset the size."] = "오른쪽 클릭으로 크기 초기화."

@@ -128,4 +128,7 @@
 
     <!-- Details! Damage Meter skin (inert until applied; requires the Details! addon) -->
     <Script file="detailsskin.lua"/>
+
+    <!-- World Map — retail-styled chrome, breadcrumb, pins, quest panel, fog reveal -->
+    <Include file="worldmap\worldmap.xml"/>
 </Ui>

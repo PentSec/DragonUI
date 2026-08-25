@@ -1956,3 +1956,15 @@ L["Registers the DragonUI theme with Details! and puts your chosen skin back aft
 L["Apply the DragonUI Skin"] = true
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = true
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = true
+
+-- WORLD MAP TAB
+-- ============================================================================
+
+L["World Map"] = true
+L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = true
+L["Enable World Map"] = true
+L["Activates the modern world map frame. Requires /reload to take effect."] = true
+L["Enable Fog Reveal"] = true
+L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = true
+L["Enable Wheel Zoom"] = true
+L["Mouse wheel zooms and pans the map canvas."] = true
