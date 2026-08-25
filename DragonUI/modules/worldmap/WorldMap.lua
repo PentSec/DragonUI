@@ -47,7 +47,8 @@
 local NE = DragonUIWorldMapHost
 if not NE or NE.disabled then return end
 
-NE.worldmap = NE.worldmap or {}
+local addon = select(2, ...)
+local L = addon.L
 local WM = NE.worldmap
 local PC = NE.panelchrome
 local SQ = NE.squelch
@@ -244,6 +245,7 @@ local SQUELCH_GLOBALS = {
   "WorldMapFrameMiniBorderRight",
   "WorldMapFrameTitle",
   "WorldMapTitleButton",          -- the client's drag bar; our title band drags instead
+  "WorldMapPositioningGuide",     -- anchors all mini-window chrome; we position freely
   -- The fullscreen dim behind the map. We are a window, not a takeover.
   "BlackoutWorld",
   -- Navigation, replaced by the NavBar breadcrumb (NavBar.lua).
@@ -338,7 +340,11 @@ local function suppressClassicChrome()
   -- window alone left a full 1024x768 of classic art painted around our 702-wide window.
   for _, child in ipairs({ f:GetChildren() }) do
     local name = child.GetName and child:GetName()
-    if not (name and KEEP_FRAMES[name]) and not isOurs(child) then
+    -- Hard-skip known protected frames. Calling IsProtected() on a protected frame can taint.
+    -- WorldMapBlobFrame is protected; WorldMapFrameAreaFrame is not (we scale it directly).
+    if name == "WorldMapBlobFrame" then
+      -- Protected: do not sweep. The child's own regions (blob art) stay as-is.
+    elseif not (name and KEEP_FRAMES[name]) and not isOurs(child) then
       sweepRegions(child)
     end
   end
@@ -672,10 +678,24 @@ local function layoutCanvas(f)
   if _G.WORLDMAP_SETTINGS then _G.WORLDMAP_SETTINGS.size = scale end
   _G.WORLDMAP_WINDOWED_SIZE = scale
 
-  for _, name in ipairs({ "WorldMapDetailFrame", "WorldMapButton",
-                          "WorldMapFrameAreaFrame", "WorldMapBlobFrame" }) do
+  -- Unprotected canvas frames: safe to scale immediately.
+  for _, name in ipairs({ "WorldMapDetailFrame", "WorldMapButton", "WorldMapFrameAreaFrame" }) do
     local w = _G[name]
     if w and w.SetScale then w:SetScale(scale) end
+  end
+
+  -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Defer via AfterCombat so it runs
+  -- after PLAYER_REGEN_ENABLED. The blob frame caches hit translations against scale; clearing
+  -- xRatio + recalc is also deferred (see CanvasZoom.lua _BlobsFollowZoom).
+  local blob = _G.WorldMapBlobFrame
+  if blob and blob.SetScale then
+    NE.FrameUtil.AfterCombat(function()
+      if blob.SetScale then blob:SetScale(scale) end
+      blob.xRatio = nil
+      if _G.WorldMapBlobFrame_CalculateHitTranslations then
+        pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
+      end
+    end)
   end
 
   -- Anchor offsets are read in the ANCHORED frame's own units, and this frame is scaled — so the
@@ -1119,11 +1139,40 @@ local function forceWindowedMode()
   local settings = _G.WORLDMAP_SETTINGS
   local alreadyWindowed = settings and WM.clientWindowedSize
                           and settings.size == WM.clientWindowedSize
-  if not alreadyWindowed and type(_G.WorldMap_ToggleSizeDown) == "function" then
-    -- The client's own toggle, not our own reimplementation of it: it hides the whole fullscreen
-    -- layout (border, backdrop quadrants, the three quest panels) as well as resizing, and it keeps
-    -- the UIPanelWindows bookkeeping consistent on the way through.
-    pcall(_G.WorldMap_ToggleSizeDown)
+  if not alreadyWindowed then
+    -- The client's WorldMap_ToggleSizeDown touches PROTECTED frames (WorldMapBlobFrame:Hide/Show)
+    -- which taints in combat. We replicate only what we need: scale, settings, UIPanelWindows.
+    -- NO Show/Hide on protected frames. Use Alpha instead if needed.
+    local scale = WM.clientWindowedSize
+
+    if _G.WORLDMAP_SETTINGS then _G.WORLDMAP_SETTINGS.size = scale end
+    _G.WORLDMAP_WINDOWED_SIZE = scale
+
+    -- Unprotected canvas frames: safe to scale immediately.
+    for _, name in ipairs({ "WorldMapDetailFrame", "WorldMapButton", "WorldMapFrameAreaFrame" }) do
+      local w = _G[name]
+      if w and w.SetScale then w:SetScale(scale) end
+    end
+
+    -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Defer via AfterCombat.
+    local blob = _G.WorldMapBlobFrame
+    if blob and blob.SetScale then
+      NE.FrameUtil.AfterCombat(function()
+        if blob.SetScale then blob:SetScale(scale) end
+        blob.xRatio = nil
+        if _G.WorldMapBlobFrame_CalculateHitTranslations then
+          pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
+        end
+      end)
+    end
+
+    -- UIPanelWindows bookkeeping (same as client's toggle)
+    if _G.UIPanelWindows then _G.UIPanelWindows["WorldMapFrame"] = nil end
+    local f = _G.WorldMapFrame
+    if f and f.SetAttribute then
+      pcall(f.SetAttribute, f, "UIPanelLayout-enabled", false)
+      pcall(f.SetAttribute, f, "UIPanelLayout-defined", true)
+    end
   end
   if SetCVar then pcall(SetCVar, "miniWorldMap", 1) end
 end
@@ -1135,10 +1184,17 @@ end
 -- clearing the entry once at boot is not enough, because the client puts it back on the next size
 -- change and the panel manager then starts moving and resizing a window we are positioning
 -- ourselves. Called from boot, from both size-toggle hooks, and on every show.
+--
+-- ASCENSION COMPAT: their FrameXML adds `WorldMapFrame_SetMiniMode`, which writes
+-- `UIPanelWindows["WorldMapFrame"].area` WITHOUT a nil check when the frame lacks the
+-- "UIPanelLayout-defined" attribute. Setting that attribute routes their code down its own
+-- SetAttribute branch instead, so the table entry can stay deleted without crashing — and the
+-- disabled layout attribute keeps the panel manager off our geometry either way.
 local function detachFromPanelSystem(f)
   if _G.UIPanelWindows then _G.UIPanelWindows["WorldMapFrame"] = nil end
   if f.SetAttribute then
     pcall(f.SetAttribute, f, "UIPanelLayout-enabled", false)
+    pcall(f.SetAttribute, f, "UIPanelLayout-defined", true)
   end
   if f:GetParent() ~= UIParent then f:SetParent(UIParent) end
   f:SetToplevel(true)
@@ -1160,23 +1216,40 @@ local function installHooks(f)
 
   -- While the corner is held the frame's rect changes every frame, and the map has to follow it --
   -- otherwise the player drags an empty stone box around and only sees the result on release.
+  -- layoutCanvas touches protected frames (WorldMapBlobFrame:SetScale) — defer in combat.
   f:HookScript("OnSizeChanged", function(self)
     if not WM.sizing then return end
-    layoutCanvas(self)
-    paintBody(self)
-    if WM.RefreshSidePanelToggle then WM.RefreshSidePanelToggle() end
-    if WM.OnGeometryChanged then pcall(WM.OnGeometryChanged, self) end
+    NE.FrameUtil.AfterCombat(function()
+      layoutCanvas(self)
+      paintBody(self)
+      if WM.RefreshSidePanelToggle then WM.RefreshSidePanelToggle() end
+      if WM.OnGeometryChanged then pcall(WM.OnGeometryChanged, self) end
+    end)
   end)
 
   f:HookScript("OnShow", function()
     -- The client re-runs its own size logic on show; ours goes on top of it.
-    detachFromPanelSystem(f)
-    -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
-    -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
-    -- button produced, and it is cheap to make impossible rather than merely fixed.
-    if f._neBorder and not f._neBorder:IsShown() then f._neBorder:Show() end
-    WM.ApplyGeometry()
-    if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
+    -- In combat the client's OnShow touches protected frames (WorldMapBlobFrame:Hide/Show).
+    -- Defer our pass so we're not in the call stack when the client taints.
+    if InCombatLockdown and InCombatLockdown() then
+      NE.FrameUtil.AfterCombat(function()
+        detachFromPanelSystem(f)
+        -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
+        -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
+        -- button produced, and it is cheap to make impossible rather than merely fixed.
+        if f._neBorder and not f._neBorder:IsShown() then f._neBorder:Show() end
+        WM.ApplyGeometry()
+        if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
+      end)
+    else
+      detachFromPanelSystem(f)
+      -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
+      -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
+      -- button produced, and it is cheap to make impossible rather than merely fixed.
+      if f._neBorder and not f._neBorder:IsShown() then f._neBorder:Show() end
+      WM.ApplyGeometry()
+      if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
+    end
   end)
 
   -- Both size toggles rewrite WORLDMAP_SETTINGS.size, the four scales and the detail anchor. Hook
@@ -1184,10 +1257,18 @@ local function installHooks(f)
   for _, name in ipairs({ "WorldMap_ToggleSizeUp", "WorldMap_ToggleSizeDown" }) do
     if type(_G[name]) == "function" then
       hooksecurefunc(name, function()
-        -- Both of these put the UIPanelWindows entry back; take it out again before the geometry
-        -- pass, or the panel manager fights us for the window's position on the very next show.
-        detachFromPanelSystem(f)
-        WM.ApplyGeometry()
+        -- Client's toggle runs first and touches protected frames (WorldMapBlobFrame:Hide/Show).
+        -- In combat that taints and the blame falls on the last addon in the stack (us).
+        -- Defer our cleanup to after combat so we're not in the call stack when the client taints.
+        if InCombatLockdown and InCombatLockdown() then
+          NE.FrameUtil.AfterCombat(function()
+            detachFromPanelSystem(f)
+            WM.ApplyGeometry()
+          end)
+        else
+          detachFromPanelSystem(f)
+          WM.ApplyGeometry()
+        end
       end)
     end
   end
@@ -1196,11 +1277,32 @@ local function installHooks(f)
   -- re-places POIs against WORLDMAP_SETTINGS.size. Re-assert the bounds so they clamp to ours.
   if type(_G.WorldMapFrame_Update) == "function" then
     hooksecurefunc("WorldMapFrame_Update", function()
-      if _G.WorldMapFrame_SetPOIMaxBounds then pcall(_G.WorldMapFrame_SetPOIMaxBounds) end
-      if WM.OnMapChanged then
-        local okm, err = pcall(WM.OnMapChanged)
-        if not okm and NE.Log then NE.Log("WORLDMAP", "OnMapChanged: " .. tostring(err)) end
+      -- Client's update may touch protected frames in combat. Defer our pass.
+      if InCombatLockdown and InCombatLockdown() then
+        NE.FrameUtil.AfterCombat(function()
+          if _G.WorldMapFrame_SetPOIMaxBounds then pcall(_G.WorldMapFrame_SetPOIMaxBounds) end
+          if WM.OnMapChanged then pcall(WM.OnMapChanged) end
+        end)
+      else
+        if _G.WorldMapFrame_SetPOIMaxBounds then pcall(_G.WorldMapFrame_SetPOIMaxBounds) end
+        if WM.OnMapChanged then
+          local okm, err = pcall(WM.OnMapChanged)
+          if not okm and NE.Log then NE.Log("WORLDMAP", "OnMapChanged: " .. tostring(err)) end
+        end
       end
+    end)
+  end
+
+  -- ASCENSION COMPAT: WorldMapButton_OnUpdate does unguarded arithmetic on GetCenter(), which is
+  -- nil for the frames between a ClearAllPoints and its next SetPoint — exactly the state our
+  -- geometry pass creates during boot and every resize. One cheap IsShown+center check up front;
+  -- once laid out the original body runs untouched.
+  local btn = _G.WorldMapButton
+  local origOnUpdate = btn and btn.GetScript and btn:GetScript("OnUpdate")
+  if btn and origOnUpdate then
+    btn:SetScript("OnUpdate", function(self, elapsed)
+      if not self:GetCenter() then return end
+      origOnUpdate(self, elapsed)
     end)
   end
 end

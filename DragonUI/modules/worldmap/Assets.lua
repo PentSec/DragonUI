@@ -33,6 +33,31 @@ local SB_ART     = "Interface\\AddOns\\DragonUI\\Textures\\Spellbook\\"
 -- client's own WorldMap_GetPOITextureCoords crop still lands on the right icon after a straight file
 -- substitution. That is why the swap needs no coordinate table of its own (Pins.lua).
 NE.tex.RegisterLocal(136441, COMMON_ART .. "136441-poiicons.blp")
+-- UI-Background-Rock: the window body fill (WorldMap.lua paintBody, ROCK_FDID). NewEra registered
+-- this from its core PanelChrome; DragonUI has no shared chrome module, so it is registered here.
+NE.tex.RegisterLocal(374155, COMMON_ART .. "374155-uibackground-rock.blp")
+
+-- The NineSliceLayouts sheet set (vendored core files). NewEra's Textures/Assets.lua supplied the
+-- fdid->path map for these; ours does it here. Registering every FDID the layouts file references,
+-- even ones the worldmap itself never draws: an atlas entry with no local path falls back to the
+-- raw FDID and renders as a red block on 3.3.5a.
+NE.tex.RegisterLocal(2406979,  COMMON_ART .. "2406979-uiframe-metal-corners.blp")             -- 512x512; all metal corners (incl. PortraitMetal/Double)
+NE.tex.RegisterLocal(2406984,  COMMON_ART .. "2406984-uiframe-metal-edges-vert.blp")          -- 512x32;  !-tile L/R edges
+NE.tex.RegisterLocal(2406987,  COMMON_ART .. "2406987-uiframe-metal-edges-horiz.blp")         -- 64x256;  _-tile Top/Bottom edges
+NE.tex.RegisterLocal(4698972,  COMMON_ART .. "4698972-redbutton-exit-2x.blp")                 -- RedButton family: close X + MaxMin expand/condense
+NE.tex.RegisterLocal(1536801,  COMMON_ART .. "1536801-128redbutton.blp")
+NE.tex.RegisterLocal(1723831,  COMMON_ART .. "1723831-uiframe-inner.blp")                     -- InsetFrameTemplate inner border pieces
+NE.tex.RegisterLocal(1723832,  COMMON_ART .. "1723832-uiframe-inner.blp")
+NE.tex.RegisterLocal(1723833,  COMMON_ART .. "1723833-uiframe-inner.blp")                     -- also TopTileStreaks band
+NE.tex.RegisterLocal(3056750,  COMMON_ART .. "3056750-diamondmetal-frame.blp")
+NE.tex.RegisterLocal(3056755,  COMMON_ART .. "3056755-diamondmetal-edges.blp")
+NE.tex.RegisterLocal(4331838,  COMMON_ART .. "4331838-minimal-scrollbar.blp")
+NE.tex.RegisterLocal(4332072,  COMMON_ART .. "4332072-minimal-scrollbar-track-middle.blp")
+NE.tex.RegisterLocal(4567914,  COMMON_ART .. "4567914-minimalsliderbar.blp")
+NE.tex.RegisterLocal(4707839,  COMMON_ART .. "4707839-uiframe-tab.blp")
+NE.tex.RegisterLocal(5142784,  COMMON_ART .. "5142784-minimal-scrollbar-small-thumb-middle.blp")
+NE.tex.RegisterLocal(5142787,  COMMON_ART .. "5142787-minimal-scrollbar-small.blp")
+NE.tex.RegisterLocal(5390329,  COMMON_ART .. "5390329-common-dropdown-bg.blp")
 NE.worldmap.poiIconsFDID = 136441
 
 -- The quest-log chrome sheet. Already on disk for the spellbook, and it carries most of the panel:

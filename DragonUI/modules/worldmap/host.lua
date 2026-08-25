@@ -204,25 +204,14 @@ if not NE.money then
 end
 
 -- ============================================================================
--- 12. NINESLICE — used for ApplyLayout. Minimal implementation: applies a
---     predefined layout to 9 frame textures following the PortraitFrame pattern.
+-- 12. NINESLICE — the real implementation is vendored at lib/NineSlice.lua +
+--     lib/NineSliceLayouts.lua (loaded right after lib/Texture.lua in
+--     worldmap.xml). Nothing to stub here; the table is created by the lib.
 -- ============================================================================
 
-NE.nineslice = NE.nineslice or {}
-function NE.nineslice.ApplyLayout(borderFrame, layoutName, templateInfo)
-	if not borderFrame then return end
-	-- If the frame already has proper nineslice regions from our portrait frame
-	-- template, just ensure they exist. The worldmap builds its own border with
-	-- CreateTexture + SetTexCoord rather than going through the nineslice system
-	-- in most cases; this stub prevents nil-call errors.
-end
-
 -- ============================================================================
--- 13. PORTRAIT — stub for ApplyCutout (guarded in WorldMap.lua).
+-- 13. PORTRAIT — real implementation vendored at lib/Portrait.lua.
 -- ============================================================================
-
-NE.portrait = NE.portrait or {}
-function NE.portrait.ApplyCutout() end
 
 -- ============================================================================
 -- 14. MENU — used in QuestLogPanel.lua:810 for cog dropdown. Provides the

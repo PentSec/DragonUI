@@ -1,43 +1,49 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <!-- World Map module — retail-styled chrome, breadcrumb, pins, quest panel, fog reveal.
-         Load order matters: host shim first, then vendored libs that self-wire onto it,
-         then the module files (Assets registers textures that WorldMap consumes), and
-         Register last to boot everything after PLAYER_LOGIN. -->
+         Paths are relative to THIS file's directory (modules/worldmap/). -->
 
     <!-- 1. Host shim: creates DragonUIWorldMapHost global (= NE surface) + stubs -->
-    <Script file="worldmap\host.lua"/>
+    <Script file="host.lua"/>
 
-    <!-- 2. Vendored NewEra core libs: self-assign onto DragonUIWorldMapHost.tex / .FrameUtil / etc -->
-    <Script file="worldmap\lib\Texture.lua"/>
-    <Script file="worldmap\lib\FrameUtil.lua"/>
-    <Script file="worldmap\lib\Squelch.lua"/>
-    <Script file="worldmap\lib\MaxMin.lua"/>
-    <Script file="worldmap\lib\NavBar.lua"/>
+    <!-- 2. Vendored NewEra core libs: self-assign onto DragonUIWorldMapHost.tex / .FrameUtil / etc.
+         NineSlice must load after Texture (routes piece atlases through NE.tex.SetAtlas) and
+         before Assets (its layouts' atlas coords register here; Assets registers their BLPs).
+         PanelChrome loads after NineSliceLayouts (uses its redbutton atlases).
+         Portrait loads after NineSliceLayouts (uses its corner cutout coords). -->
+    <Script file="lib\Texture.lua"/>
+    <Script file="lib\NineSlice.lua"/>
+    <Script file="lib\NineSliceLayouts.lua"/>
+    <Script file="lib\PanelChrome.lua"/>
+    <Script file="lib\Portrait.lua"/>
+    <Script file="lib\FrameUtil.lua"/>
+    <Script file="lib\Squelch.lua"/>
+    <Script file="lib\MaxMin.lua"/>
+    <Script file="lib\NavBar.lua"/>
 
     <!-- 3. Texture registrations (must load before anything that calls NE.tex.Set) -->
-    <Script file="worldmap\Assets.lua"/>
+    <Script file="Assets.lua"/>
 
     <!-- 4. Core chrome: builds NE.worldmap namespace, canvas, drag, squelch -->
-    <Script file="worldmap\WorldMap.lua"/>
+    <Script file="WorldMap.lua"/>
 
     <!-- 5. Sub-features (order within this block is flexible) -->
-    <Script file="worldmap\FogClear.lua"/>
-    <Script file="worldmap\CanvasZoom.lua"/>
-    <Script file="worldmap\WheelZoom.lua"/>
-    <Script file="worldmap\Pins.lua"/>
-    <Script file="worldmap\PinFilter.lua"/>
-    <Script file="worldmap\NavBar.lua"/>
-    <Script file="worldmap\DungeonMap.lua"/>
-    <Script file="worldmap\DungeonMapData.lua"/>
-    <Script file="worldmap\OverlayData.lua"/>
+    <Script file="FogClear.lua"/>
+    <Script file="CanvasZoom.lua"/>
+    <Script file="WheelZoom.lua"/>
+    <Script file="Pins.lua"/>
+    <Script file="PinFilter.lua"/>
+    <Script file="NavBar.lua"/>
+    <Script file="DungeonMap.lua"/>
+    <Script file="DungeonMapData.lua"/>
+    <Script file="OverlayData.lua"/>
 
     <!-- 6. Quest log side panel (QuestLogPanel creates NE.questlogpanel; Detail uses it) -->
-    <Script file="worldmap\QuestLogPanel.lua"/>
-    <Script file="worldmap\QuestLogDetail.lua"/>
+    <Script file="QuestLogPanel.lua"/>
+    <Script file="QuestLogDetail.lua"/>
 
     <!-- 7. Diagnostics (/neworldmap debug command) -->
-    <Script file="worldmap\Diagnostics.lua"/>
+    <Script file="Diagnostics.lua"/>
 
     <!-- 8. Boot: registers the module with DragonUI's ModuleRegistry and wires PLAYER_LOGIN -->
-    <Script file="worldmap\Register.lua"/>
+    <Script file="Register.lua"/>
 </Ui>
