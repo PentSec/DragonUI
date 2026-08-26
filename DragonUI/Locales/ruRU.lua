@@ -761,6 +761,13 @@ L["Details! skin applied."] = "Скин Details! применён."
 L["Could not apply the skin - Details! is not ready yet."] = "Не удалось применить скин - Details! ещё не готов."
 L["Details! is not installed."] = "Details! не установлен."
 
+-- MERCHANT MODULE
+L["Merchant"] = "Торговец"
+L["Retail-style vendor window chrome"] = "Современный интерфейс окна торговца"
+L["Sell all junk items"] = "Продать весь хлам"
+L["Sell all of your junk (gray) items?"] = "Продать весь твой хлам (серый)?"
+L["Sold %d junk item(s)."] = "Продано %d предмет(а/ов) хлама."
+
 -- WORLD MAP MODULE
 -- ============================================================================
 

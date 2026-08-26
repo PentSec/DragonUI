@@ -743,6 +743,15 @@ L["Details! skin applied."] = "Skin de Details! aplicada."
 L["Could not apply the skin - Details! is not ready yet."] = "No se pudo aplicar la skin - Details! aún no está listo."
 L["Details! is not installed."] = "Details! no está instalado."
 
+L["Details! is not installed."] = "Details! no está instalado."
+
+-- MERCHANT MODULE
+L["Merchant"] = "Mercader"
+L["Retail-style vendor window chrome"] = "Marco estilo Retail para la ventana de vendedor"
+L["Sell all junk items"] = "Vender todos los objetos basura"
+L["Sell all of your junk (gray) items?"] = "¿Vender todos tus objetos basura (grises)?"
+L["Sold %d junk item(s)."] = "Vendido %d objeto(s) basura."
+
 -- WORLD MAP MODULE
 -- ============================================================================
 

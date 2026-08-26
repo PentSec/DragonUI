@@ -766,6 +766,13 @@ L["Details! skin applied."] = "Details! 스킨이 적용되었습니다."
 L["Could not apply the skin - Details! is not ready yet."] = "스킨을 적용할 수 없습니다 - Details!가 아직 준비되지 않았습니다."
 L["Details! is not installed."] = "Details!가 설치되어 있지 않습니다."
 
+-- MERCHANT MODULE
+L["Merchant"] = "상인"
+L["Retail-style vendor window chrome"] = "상인 창 모던 스타일"
+L["Sell all junk items"] = "모든 잡동사니 아이템 판매"
+L["Sell all of your junk (gray) items?"] = "모든 잡동사니(회색) 아이템을 판매하시겠습니까?"
+L["Sold %d junk item(s)."] = "%d 개의 잡동사니 아이템이 판매되었습니다."
+
 -- WORLD MAP MODULE
 -- ============================================================================
 

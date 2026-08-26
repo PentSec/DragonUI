@@ -920,6 +920,9 @@ local defaults = {
                 enabled = true, -- Apply DragonUI main action bars, status bars (XP/Rep), scaling, and positioning system
                 disable_form_page_switching = false -- When true, the main action bar stays on the same page regardless of stance/form changes (druid shapeshift, warrior stance, CoA custom classes, etc.)
             },
+            merchant = {
+                enabled = true -- Retail-style vendor window chrome, sell-all-junk button, and buyback undo arrow
+            },
             minimap = {
                 enabled = true -- Apply DragonUI minimap enhancements including custom styling, positioning, tracking icons, and calendar
             },

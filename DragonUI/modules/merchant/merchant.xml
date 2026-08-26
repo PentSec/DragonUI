@@ -1,0 +1,16 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- Merchant module — retail-style vendor window reskin.
+         Paths are relative to THIS file's directory (modules/merchant/). -->
+
+    <!-- 1. Texture registrations (must load before anything that calls NE.tex.Set or SetAtlas) -->
+    <Script file="Assets.lua"/>
+
+    <!-- 2. Main chrome reskin (builds MerchantFrame modern look) -->
+    <Script file="MerchantFrame.lua"/>
+
+    <!-- 3. Sell All Junk button -->
+    <Script file="SellAllJunk.lua"/>
+
+    <!-- 4. Buyback Undo arrow -->
+    <Script file="BuybackUndo.lua"/>
+</Ui>
