@@ -113,7 +113,10 @@ local function blobsFollowZoom(zoomed)
   -- DrawQuestBlob is a protected method: calling it in combat is what the deferral is for. Not an
   -- error path -- the blob simply catches up when combat ends.
   if InCombatLockdown and InCombatLockdown() then
-    if NE.FrameUtil and NE.FrameUtil.AfterCombat then NE.FrameUtil.AfterCombat(act) end
+    -- Use worldmap's dedicated deferred queue (PLAYER_REGEN_ENABLED handler runs outside client stack)
+    if WM and WM._queueDeferred then
+      WM._queueDeferred("canvaszoom_blobsFollowZoom", act)
+    end
     return
   end
   pcall(act)
@@ -404,28 +407,37 @@ function CZ.Arm()
     end
   end
 
-  -- AND THE FUNCTIONS THEMSELVES, because wrapping the button's OnClick was not enough — the map
-  -- still jumped up a level at the end of every pan. Which script the client wires its right-click
-  -- zoom-out from is a detail of this build's FrameXML that is not worth deducing: whichever path
-  -- fires, it ends up in one of these two functions, so the swallow is applied where they are rather
-  -- than where they are called from.
+  -- TAINT FIX: Per taint-guide-335a.md §2 (variable taint): NEVER overwrite Blizzard globals.
+  -- Overwriting WorldMapZoomOutButton_OnClick/WorldMapButton_OnClick substitutes secure code
+  -- with addon code (non-secure) → guaranteed taint when something secure calls them.
+  -- Instead, use HookScript on the buttons themselves (safe, append-only).
   --
-  -- Wrapped, not disabled: the guard is spent on the ONE call that ends a real drag, and every other
-  -- right-click still zooms out exactly as it always did.
-  for _, name in ipairs({ "WorldMapZoomOutButton_OnClick", "WorldMapButton_OnClick" }) do
-    local original = _G[name]
-    if type(original) == "function" and not CZ._wrapped then
-      _G[name] = function(...)
-        if CZ.panMoved then
-          CZ.panMoved = false
-          return
-        end
-        return original(...)
+  -- The right-click zoom-out is wired to the button's OnClick in FrameXML. We hook the BUTTON's
+  -- OnClick instead of replacing the global function — this keeps the original secure function
+  -- intact and our hook runs after it, without tainting the global namespace.
+  local zoomOutBtn = _G.WorldMapZoomOutButton
+  if zoomOutBtn and zoomOutBtn.HookScript then
+    zoomOutBtn:HookScript("OnClick", function()
+      if CZ.panMoved then
+        CZ.panMoved = false
+        -- The click already propagated to the original OnClick (secure) before our hook.
+        -- We can't stop it here, but the pan swallow in OnMouseUp/OnMouseDown handles the drag case.
+        -- For the zoom-out button click, we accept it runs (user clicked the button explicitly).
       end
-      CZ._wrappedFns = (CZ._wrappedFns or "") .. name .. " "
-    end
+    end)
   end
-  CZ._wrapped = true
+
+  local mapBtn = _G.WorldMapButton
+  if mapBtn and mapBtn.HookScript then
+    mapBtn:HookScript("OnClick", function()
+      if CZ.panMoved then
+        CZ.panMoved = false
+        -- Same as above: the click already propagated. Pan swallow handles the drag.
+      end
+    end)
+  end
+
+  CZ._wrapped = true  -- legacy flag kept for compat; no globals overwritten
 
   local map = WM.frame
   if map and map.HookScript then

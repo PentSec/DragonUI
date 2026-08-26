@@ -42,7 +42,10 @@
 --
 -- COMBAT. `WorldMapBlobFrame` is PROTECTED on this client — touching its parent, points, scale or
 -- visibility in combat throws. Every geometry pass here therefore runs through
--- NE.FrameUtil.AfterCombat. See §5.1 of PORT_PLAN.md.
+-- our dedicated PLAYER_REGEN_ENABLED deferred queue (see WM._deferredOps). Per the taint guide,
+-- hooksecurefunc/HookScript callbacks MUST use pure early return during combat (no AfterCombat,
+-- no CombatQueue:Add) because they run in the client's call stack. The dedicated handler runs
+-- OUTSIDE the client's stack on PLAYER_REGEN_ENABLED. See §4/§5 of taint-guide-335a.md.
 
 local NE = DragonUIWorldMapHost
 if not NE or NE.disabled then return end
@@ -684,18 +687,25 @@ local function layoutCanvas(f)
     if w and w.SetScale then w:SetScale(scale) end
   end
 
-  -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Defer via AfterCombat so it runs
-  -- after PLAYER_REGEN_ENABLED. The blob frame caches hit translations against scale; clearing
-  -- xRatio + recalc is also deferred (see CanvasZoom.lua _BlobsFollowZoom).
+  -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Queue via our dedicated deferred handler.
+  -- The blob frame caches hit translations against scale; clearing xRatio + recalc is also deferred.
   local blob = _G.WorldMapBlobFrame
   if blob and blob.SetScale then
-    NE.FrameUtil.AfterCombat(function()
+    if InCombatLockdown and InCombatLockdown() then
+      _queueDeferred("layoutCanvas_blob", function()
+        if blob.SetScale then blob:SetScale(scale) end
+        blob.xRatio = nil
+        if _G.WorldMapBlobFrame_CalculateHitTranslations then
+          pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
+        end
+      end)
+    else
       if blob.SetScale then blob:SetScale(scale) end
       blob.xRatio = nil
       if _G.WorldMapBlobFrame_CalculateHitTranslations then
         pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
       end
-    end)
+    end
   end
 
   -- Anchor offsets are read in the ANCHORED frame's own units, and this frame is scaled — so the
@@ -746,7 +756,7 @@ end
 -- and a local referenced before its `local` statement would silently resolve to a global instead.
 local maxMinButton
 
-local applyGeometryNow   -- forward declaration; ApplyGeometry defers this through AfterCombat
+local applyGeometryNow   -- forward declaration; ApplyGeometry queues this via dedicated deferred handler
 
 applyGeometryNow = function()
   local f = _G.WorldMapFrame
@@ -783,10 +793,58 @@ applyGeometryNow = function()
   end
 end
 
+-- ============================================================================
+-- COMBAT DEFERRED QUEUE — dedicated for worldmap
+-- ============================================================================
+-- Per the taint guide: hooksecurefunc/HookScript callbacks run in the SAME call stack
+-- as the client's protected operations (WorldMapBlobFrame:Hide/Show). Even calling
+-- AfterCombat() inside them taints because we're in the stack. The fix is PURE early
+-- return during combat + a dedicated PLAYER_REGEN_ENABLED handler that processes
+-- queued work OUTSIDE the client's call stack.
+
+WM._deferredOps = WM._deferredOps or {}
+WM._deferredWatcher = WM._deferredWatcher or nil
+
+local function _ensureDeferredWatcher()
+  if WM._deferredWatcher then return end
+  local w = CreateFrame("Frame")
+  w:Hide()
+  w:RegisterEvent("PLAYER_REGEN_ENABLED")
+  w:SetScript("OnEvent", function()
+    local ops = WM._deferredOps
+    WM._deferredOps = {}
+    for _, op in pairs(ops) do
+      local ok, err = pcall(op)
+      if not ok and NE.Log then
+        NE.Log("WORLDMAP", "Deferred op failed: " .. tostring(err))
+      end
+    end
+  end)
+  WM._deferredWatcher = w
+end
+
+local function _queueDeferred(id, fn)
+  if not id or not fn then return end
+  _ensureDeferredWatcher()
+  WM._deferredOps[id] = fn
+end
+
+local function _clearDeferred(id)
+  if WM._deferredOps[id] then
+    WM._deferredOps[id] = nil
+  end
+end
+
 -- The public entry. WorldMapBlobFrame is protected on this client, so every pass that touches the
 -- canvas stack waits for combat to end (PORT_PLAN.md §5.1).
+-- In combat: pure early-return, queue for dedicated PLAYER_REGEN_ENABLED handler.
+-- Out of combat: run immediately.
 function WM.ApplyGeometry()
-  NE.FrameUtil.AfterCombat(applyGeometryNow)
+  if InCombatLockdown and InCombatLockdown() then
+    _queueDeferred("applyGeometry", applyGeometryNow)
+    return
+  end
+  applyGeometryNow()
 end
 
 -- Switch between our windowed and our maximized size. `persist` writes the preference; the
@@ -979,14 +1037,14 @@ local function wireControls(f, border)
   -- The resize grip, bottom-right, in retail's own chat-window grabber art (this client ships it).
   --
   -- The drag is FREE -- the player pulls the corner wherever they like -- but only the resulting
-  -- CANVAS WIDTH is kept, and the height is re-derived from it. So the window can never end up at an
-  -- aspect the map does not fill, and letting go always snaps to a shape with no dead space in it.
-  -- Either axis works, because the width is taken from whichever of the two fits is tighter.
-  --
-  -- NOT IN COMBAT. Re-laying the canvas out touches WorldMapBlobFrame's scale, and that frame is
-  -- protected on this client -- a live drag would throw on the first mouse-move. Every other
-  -- geometry pass defers through AfterCombat, which a drag cannot do: there is nothing to defer,
-  -- the player is holding the mouse down NOW. So the grip refuses, and says so.
+-- CANVAS WIDTH is kept, and the height is re-derived from it. So the window can never end up at an
+-- aspect the map does not fill, and letting go always snaps to a shape with no dead space in it.
+-- Either axis works, because the width is taken from whichever of the two fits is tighter.
+--
+-- NOT IN COMBAT. Re-laying the canvas out touches WorldMapBlobFrame's scale, and that frame is
+-- protected on this client -- a live drag would throw on the first mouse-move. Every other
+-- geometry pass queues via dedicated deferred handler, which a drag cannot do: there is nothing to
+-- defer, the player is holding the mouse down NOW. So the grip refuses, and says so.
   if not f._neSizeGrip then
     local grip = CreateFrame("Button", "NE_WorldMapSizeGrip", border)
     grip:SetSize(16, 16)
@@ -1154,16 +1212,24 @@ local function forceWindowedMode()
       if w and w.SetScale then w:SetScale(scale) end
     end
 
-    -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Defer via AfterCombat.
+    -- WorldMapBlobFrame is PROTECTED: SetScale in combat taints. Queue via our dedicated deferred handler.
     local blob = _G.WorldMapBlobFrame
     if blob and blob.SetScale then
-      NE.FrameUtil.AfterCombat(function()
+      if InCombatLockdown and InCombatLockdown() then
+        _queueDeferred("forceWindowedMode_blob", function()
+          if blob.SetScale then blob:SetScale(scale) end
+          blob.xRatio = nil
+          if _G.WorldMapBlobFrame_CalculateHitTranslations then
+            pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
+          end
+        end)
+      else
         if blob.SetScale then blob:SetScale(scale) end
         blob.xRatio = nil
         if _G.WorldMapBlobFrame_CalculateHitTranslations then
           pcall(_G.WorldMapBlobFrame_CalculateHitTranslations)
         end
-      end)
+      end
     end
 
     -- UIPanelWindows bookkeeping (same as client's toggle)
@@ -1210,29 +1276,41 @@ end
 WM.DetachFromPanelSystem = detachFromPanelSystem
 
 -- Re-assert our layout after anything the client does that re-anchors or re-scales the map stack.
+-- TAINT FIX: Per taint guide §4/§5, hooksecurefunc/HookScript callbacks run in the SAME call stack
+-- as the client's protected operations (WorldMapBlobFrame:Hide/Show). Even calling AfterCombat()
+-- inside them taints. The fix: PURE early return during combat (no AfterCombat, no CombatQueue:Add),
+-- queue work for our dedicated PLAYER_REGEN_ENABLED handler which runs OUTSIDE the client's stack.
 local function installHooks(f)
   if f._neHooked then return end
   f._neHooked = true
 
   -- While the corner is held the frame's rect changes every frame, and the map has to follow it --
   -- otherwise the player drags an empty stone box around and only sees the result on release.
-  -- layoutCanvas touches protected frames (WorldMapBlobFrame:SetScale) — defer in combat.
+  -- layoutCanvas touches protected frames (WorldMapBlobFrame:SetScale) — MUST early-return in combat.
   f:HookScript("OnSizeChanged", function(self)
     if not WM.sizing then return end
-    NE.FrameUtil.AfterCombat(function()
-      layoutCanvas(self)
-      paintBody(self)
-      if WM.RefreshSidePanelToggle then WM.RefreshSidePanelToggle() end
-      if WM.OnGeometryChanged then pcall(WM.OnGeometryChanged, self) end
-    end)
+    -- TAINT FIX: pure early return in combat; queue for dedicated PLAYER_REGEN_ENABLED handler
+    if InCombatLockdown and InCombatLockdown() then
+      _queueDeferred("onSizeChanged", function()
+        layoutCanvas(self)
+        paintBody(self)
+        if WM.RefreshSidePanelToggle then WM.RefreshSidePanelToggle() end
+        if WM.OnGeometryChanged then pcall(WM.OnGeometryChanged, self) end
+      end)
+      return
+    end
+    layoutCanvas(self)
+    paintBody(self)
+    if WM.RefreshSidePanelToggle then WM.RefreshSidePanelToggle() end
+    if WM.OnGeometryChanged then pcall(WM.OnGeometryChanged, self) end
   end)
 
   f:HookScript("OnShow", function()
     -- The client re-runs its own size logic on show; ours goes on top of it.
     -- In combat the client's OnShow touches protected frames (WorldMapBlobFrame:Hide/Show).
-    -- Defer our pass so we're not in the call stack when the client taints.
+    -- TAINT FIX: pure early return in combat; queue for dedicated PLAYER_REGEN_ENABLED handler
     if InCombatLockdown and InCombatLockdown() then
-      NE.FrameUtil.AfterCombat(function()
+      _queueDeferred("onShow", function()
         detachFromPanelSystem(f)
         -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
         -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
@@ -1241,57 +1319,32 @@ local function installHooks(f)
         WM.ApplyGeometry()
         if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
       end)
-    else
-      detachFromPanelSystem(f)
-      -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
-      -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
-      -- button produced, and it is cheap to make impossible rather than merely fixed.
-      if f._neBorder and not f._neBorder:IsShown() then f._neBorder:Show() end
-      WM.ApplyGeometry()
-      if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
+      return
     end
+    detachFromPanelSystem(f)
+    -- Belt: if anything hid the chrome while the map was closed, the window would open gutted and
+    -- STAY gutted, because nothing else ever shows it again. That is the shape the reparented close
+    -- button produced, and it is cheap to make impossible rather than merely fixed.
+    if f._neBorder and not f._neBorder:IsShown() then f._neBorder:Show() end
+    WM.ApplyGeometry()
+    if NE.panelmgr and NE.panelmgr.Promote then NE.panelmgr.Promote(f) end
   end)
 
-  -- Both size toggles rewrite WORLDMAP_SETTINGS.size, the four scales and the detail anchor. Hook
-  -- rather than replace: the functions stay secure and we run at their tail.
-  for _, name in ipairs({ "WorldMap_ToggleSizeUp", "WorldMap_ToggleSizeDown" }) do
-    if type(_G[name]) == "function" then
-      hooksecurefunc(name, function()
-        -- Client's toggle runs first and touches protected frames (WorldMapBlobFrame:Hide/Show).
-        -- In combat that taints and the blame falls on the last addon in the stack (us).
-        -- Defer our cleanup to after combat so we're not in the call stack when the client taints.
-        if InCombatLockdown and InCombatLockdown() then
-          NE.FrameUtil.AfterCombat(function()
-            detachFromPanelSystem(f)
-            WM.ApplyGeometry()
-          end)
-        else
-          detachFromPanelSystem(f)
-          WM.ApplyGeometry()
-        end
-      end)
-    end
-  end
-
-  -- Map changes (a new continent/zone, entering an instance) re-run the client's update, which
-  -- re-places POIs against WORLDMAP_SETTINGS.size. Re-assert the bounds so they clamp to ours.
-  if type(_G.WorldMapFrame_Update) == "function" then
-    hooksecurefunc("WorldMapFrame_Update", function()
-      -- Client's update may touch protected frames in combat. Defer our pass.
-      if InCombatLockdown and InCombatLockdown() then
-        NE.FrameUtil.AfterCombat(function()
-          if _G.WorldMapFrame_SetPOIMaxBounds then pcall(_G.WorldMapFrame_SetPOIMaxBounds) end
-          if WM.OnMapChanged then pcall(WM.OnMapChanged) end
-        end)
-      else
-        if _G.WorldMapFrame_SetPOIMaxBounds then pcall(_G.WorldMapFrame_SetPOIMaxBounds) end
-        if WM.OnMapChanged then
-          local okm, err = pcall(WM.OnMapChanged)
-          if not okm and NE.Log then NE.Log("WORLDMAP", "OnMapChanged: " .. tostring(err)) end
-        end
-      end
-    end)
-  end
+  -- TAINT FIX: Per taint-guide-335a.md §2/§4, we CANNOT use hooksecurefunc on Blizzard functions
+  -- that touch protected frames in combat (WorldMap_ToggleSizeUp/Down call WorldMapBlobFrame:Hide/Show,
+  -- WorldMapFrame_Update may touch protected frames). The wrapper would be in the call stack → taint.
+  --
+  -- Instead, we rely on our frame's own HookScript handlers (OnShow, OnSizeChanged) which fire
+  -- AFTER the client's operations complete, and our dedicated PLAYER_REGEN_ENABLED queue which runs
+  -- completely outside the client's call stack. The client's size toggles and map updates will
+  -- change the frame, triggering our OnSizeChanged/OnShow hooks naturally.
+  --
+  -- NO hooksecurefunc on WorldMap_ToggleSizeUp/Down or WorldMapFrame_Update.
+  -- Our OnShow/OnSizeChanged hooks on WorldMapFrame (our frame) handle re-asserting layout.
+  --
+  -- Note: If we need to react to map ID changes specifically, we could use RegisterStateDriver
+  -- with a custom state (per guide §4: "state driver once in init, manages show/hide reactively
+  -- even in combat"), but OnShow/OnSizeChanged covers the geometry changes we care about.
 
   -- ASCENSION COMPAT: WorldMapButton_OnUpdate does unguarded arithmetic on GetCenter(), which is
   -- nil for the frames between a ClearAllPoints and its next SetPoint — exactly the state our
