@@ -15,7 +15,7 @@
 
     <!-- Action Bar Sub-modules (stance, vehicle, petbar, multicast) -->
     <Include file="actionbars\actionbars.xml"/>
-    
+
     <!-- Pets & Mounts window (its micro button must exist before micromenu.lua loads) -->
     <Script file="..\data\companion_traits.lua"/>
     <Include file="collections\collections.xml"/>
@@ -34,9 +34,11 @@
     <Script file="minimap_collector.lua"/>
     <Script file="minimap.lua"/>
     <Script file="minimap_decorations.lua"/>
-    <Script file="questtracker.lua"/>   
+    <Script file="questtracker.lua"/>
     <Script file="lootroll.lua"/>
 
+    <!-- Blizzard loot window skin (the paginated LootFrame, not the roll popup above) -->
+    <Script file="loot_skin.lua"/>
 
     <!-- UnitFrames -->
     <Include file="unitframes\unitframes.xml"/>
@@ -92,7 +94,7 @@
 
     <!-- Bag Skin module -->
     <Script file="bags_skin.lua"/>
-    
+
     <!-- Bag item usability tint (shared by bagster and bags_skin; must load before both) -->
     <Script file="bags_usability.lua"/>
 

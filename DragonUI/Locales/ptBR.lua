@@ -164,6 +164,8 @@ L["You've Reached"] = "You've Reached"
 L["Level %d"] = "Level %d"
 L["Bag Skin"] = "Visual das bolsas"
 L["Retail-style skin for Blizzard bag windows"] = "Visual estilo Retail para as janelas de bolsas da Blizzard"
+L["Loot Window"] = "Janela de saque"
+L["Retail-style skin for the Blizzard loot window"] = "Visual estilo Retail para a janela de saque da Blizzard"
 
 -- Version Check Module
 L["Version Check"] = "Verificação de versão"

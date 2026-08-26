@@ -166,6 +166,8 @@ L["UI Warmup"] = "Préchauffage de l'UI"
 L["Pre-loads select Blizzard panels on login to avoid first-use freezes during gameplay."] = "Précharge certains panneaux Blizzard à la connexion pour éviter des gelées lors de la première utilisation en jeu."
 L["Bag Skin"] = "Apparence des sacs"
 L["Retail-style skin for Blizzard bag windows"] = "Apparence Retail pour les fenêtres de sacs Blizzard"
+L["Loot Window"] = "Fenêtre de butin"
+L["Retail-style skin for the Blizzard loot window"] = "Apparence Retail pour la fenêtre de butin Blizzard"
 
 -- Version Check Module
 L["Version Check"] = "Vérification de version"
