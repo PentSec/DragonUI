@@ -690,8 +690,18 @@ local function applyLayout()
     end
     local pageText = _G.MerchantPageText
     if pageText then
+        -- FontStrings lack SetFrameLevel; parent to a Frame we can lift above the inset background.
+        local pw = pageText._duiWrapper
+        if not pw then
+            pw = CreateFrame("Frame", nil, f)
+            pageText:SetParent(pw)
+            pageText._duiWrapper = pw
+        end
+        pw:ClearAllPoints()
+        pw:SetPoint("CENTER", f, "BOTTOMLEFT", PANEL_W / 2, PAGENAV_Y)
+        pw:SetSize(140, 20)
         pageText:ClearAllPoints()
-        pageText:SetPoint("CENTER", f, "BOTTOMLEFT", PANEL_W / 2, PAGENAV_Y)
+        pageText:SetPoint("CENTER", pw, "CENTER", 0, 0)
         pageText:SetWidth(140)
         pageText:SetJustifyH("CENTER")
     end
@@ -722,6 +732,7 @@ local function applyLayout()
     if _G.MerchantBuyBackItem then _G.MerchantBuyBackItem:SetFrameLevel(above) end
     if prev then prev:SetFrameLevel(above) end
     if nxt  then nxt:SetFrameLevel(above)  end
+    if pageText and pageText._duiWrapper then pageText._duiWrapper:SetFrameLevel(above) end
     if money then money:SetFrameLevel(above) end
 end
 
