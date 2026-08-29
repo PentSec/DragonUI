@@ -132,7 +132,7 @@
     <Script file="detailsskin.lua"/>
 
     <!-- World Map — retail-styled chrome, breadcrumb, pins, quest panel, fog reveal -->
-    <Include file="worldmap\worldmap.xml"/>
+    <!-- <Include file="worldmap\worldmap.xml"/> -->
 
     <!-- Merchant — retail-style vendor window chrome (uses worldmap's PanelChrome/NineSlice libs) -->
     <Include file="merchant\merchant.xml"/>
