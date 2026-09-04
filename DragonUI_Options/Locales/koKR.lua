@@ -310,6 +310,19 @@ L["Rare"] = "희귀"
 L["Epic"] = "영웅"
 L["Legendary"] = "전설"
 
+-- 전리품 창
+L["Loot Window"] = "전리품 창"
+L["Configure the DragonUI loot window."] = "DragonUI 전리품 창을 설정합니다."
+L["Enable Loot Window"] = "전리품 창 사용"
+L["Apply the DragonUI skin to the Blizzard loot window."] = "Blizzard 전리품 창에 DragonUI 스킨을 적용합니다."
+L["Open at Cursor"] = "커서에서 열기"
+L["Open the loot window at the cursor instead of its saved position."] = "저장된 위치 대신 커서 위치에 전리품 창을 엽니다."
+L["Disable Open at Cursor, then drag the loot window to save its position."] = "커서에서 열기를 끈 후 전리품 창을 끌어 위치를 저장합니다."
+L["Animate Loot Reflow"] = "전리품 재정렬 애니메이션"
+L["Smoothly close gaps and resize the loot window after collecting items."] = "아이템을 획득한 후 빈 공간을 부드럽게 메우고 전리품 창 크기를 조절합니다."
+L["Reset Loot Window Position"] = "전리품 창 위치 초기화"
+L["Clear the saved position. The Blizzard default will be used next time you open the loot window."] = "저장된 위치를 지웁니다. 다음에 전리품 창을 열면 Blizzard 기본 위치가 사용됩니다."
+
 -- Item Level
 L["Item Level"] = "아이템 레벨"
 L["Enable Item Level"] = "아이템 레벨 활성화"
@@ -2028,14 +2041,18 @@ L["Apply the DragonUI Skin"] = "DragonUI 스킨 적용"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "모든 Details! 창을 이 스킨으로 전환하고 K/M 숫자 축약을 설정합니다. 창 크기와 위치는 그대로 유지됩니다 - 크기는 Details! 자체 슬라이더를 사용하세요. 선택은 기억되며 재시작 후 복원됩니다. Details!에서 다른 스킨을 고르면 해제됩니다. Details!에서 무언가를 변경한 후 테마를 되찾으려면 다시 실행하세요."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "채팅에서 적용하려면 |cffffcc55/duidetails|r를 입력하세요."
 
--- WORLD MAP TAB
--- ============================================================================
-
+-- World Map
 L["World Map"] = "세계 지도"
-L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "브레드크럼 네비게이션, 드래그 크기 조절, 퀘스트 기록 옆 패널이 있는 리테일 스타일 세계 지도. 전환 후 완전한 /reload 필요."
-L["Enable World Map"] = "세계 지도 활성화"
-L["Activates the modern world map frame. Requires /reload to take effect."] = "최신 스타일 세계 지도 프레임을 활성화합니다. /reload가 필요합니다."
-L["Enable Fog Reveal"] = "안개 표시 활성화"
-L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "캐릭터 간 공유된 탐험 데이터를 사용하여 미발견 지역에 회색 틴트를 그립니다."
-L["Enable Wheel Zoom"] = "휠 줌 활성화"
-L["Mouse wheel zooms and pans the map canvas."] = "마우스 휠로 지도 확대/축소 및 이동."
+L["Retail-style world map with breadcrumb navigation and a quest log side panel."] = "탐색 경로와 퀘스트 목록 옆 패널을 갖춘 리테일 스타일 세계 지도입니다."
+L["Enable World Map"] = "세계 지도 사용"
+L["Apply the DragonUI reskin to the world map."] = "세계 지도에 DragonUI 스킨을 적용합니다."
+L["Show Undiscovered Areas"] = "미발견 지역 표시"
+L["Draw the map art of areas you have not explored yet, dimmed."] = "아직 탐험하지 않은 지역의 지도 그림을 어둡게 그립니다."
+L["Show Landmarks"] = "주요 지점 표시"
+L["Show towns, flight points and other landmark pins on the map."] = "지도에 마을, 비행 지점 등 주요 지점을 표시합니다."
+L["Show Dungeon Entrances"] = "던전 입구 표시"
+L["Show dungeon and raid entrance pins on zone maps."] = "지역 지도에 던전과 공격대 입구를 표시합니다."
+L["Show Graveyards"] = "묘지 표시"
+L["Show graveyard pins on zone maps."] = "지역 지도에 묘지를 표시합니다."
+L["Show Flight Points"] = "비행 지점 표시"
+L["Show flight master pins on zone maps."] = "지역 지도에 비행 조련사를 표시합니다."

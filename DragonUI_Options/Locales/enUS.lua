@@ -347,6 +347,19 @@ L["Rare"] = true
 L["Epic"] = true
 L["Legendary"] = true
 
+-- Loot Window
+L["Loot Window"] = true
+L["Configure the DragonUI loot window."] = true
+L["Enable Loot Window"] = true
+L["Apply the DragonUI skin to the Blizzard loot window."] = true
+L["Open at Cursor"] = true
+L["Open the loot window at the cursor instead of its saved position."] = true
+L["Disable Open at Cursor, then drag the loot window to save its position."] = true
+L["Animate Loot Reflow"] = true
+L["Smoothly close gaps and resize the loot window after collecting items."] = true
+L["Reset Loot Window Position"] = true
+L["Clear the saved position. The Blizzard default will be used next time you open the loot window."] = true
+
 -- Item Level
 L["Item Level"] = true
 L["Enable Item Level"] = true
@@ -1957,14 +1970,18 @@ L["Apply the DragonUI Skin"] = true
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = true
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = true
 
--- WORLD MAP TAB
--- ============================================================================
-
+-- World Map
 L["World Map"] = true
-L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = true
+L["Retail-style world map with breadcrumb navigation and a quest log side panel."] = true
 L["Enable World Map"] = true
-L["Activates the modern world map frame. Requires /reload to take effect."] = true
-L["Enable Fog Reveal"] = true
-L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = true
-L["Enable Wheel Zoom"] = true
-L["Mouse wheel zooms and pans the map canvas."] = true
+L["Apply the DragonUI reskin to the world map."] = true
+L["Show Undiscovered Areas"] = true
+L["Draw the map art of areas you have not explored yet, dimmed."] = true
+L["Show Landmarks"] = true
+L["Show towns, flight points and other landmark pins on the map."] = true
+L["Show Dungeon Entrances"] = true
+L["Show dungeon and raid entrance pins on zone maps."] = true
+L["Show Graveyards"] = true
+L["Show graveyard pins on zone maps."] = true
+L["Show Flight Points"] = true
+L["Show flight master pins on zone maps."] = true

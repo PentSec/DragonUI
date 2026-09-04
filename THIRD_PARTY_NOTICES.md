@@ -28,14 +28,14 @@ The retail-style Collections textures under `DragonUI/Textures/Collections/` (ro
 star, model backdrop, faction crests, search glyph, journal portraits) are taken from EZCollections
 by ZEUStiger.
 
-## Details! Damage Meter theme
+## World map artwork
 
-The Details! skin in `DragonUI/modules/detailsskin.lua` structures its skin keys after
-Details_TWW by Karl-Heinz Schneider (MIT); the license text is shared with the DragonflightUI
-notice above and included in `LICENSES/MIT-DragonflightUI.txt`. The four textures under
-`DragonUI/Textures/DetailsSkin/` are cut from retail's own Blizzard_DamageMeter sheets
-(© Blizzard Entertainment) and repacked power-of-two for 3.3.5a; they arrived via
-DragonUI_NewEra's downport of the same theme.
+The textures under `DragonUI/Textures/WorldMap/` (breadcrumb bar, quest log panel, quest type
+icons, quest page parchment, experience icon, filter button, landmark icons, side panel toggle)
+are cut from retail's own sheets (© Blizzard Entertainment) and repacked power-of-two for
+3.3.5a; they arrived via DragonUI_NewEra's downport through a world map module contributed by
+PentSec. The magnifier on the filter button is the client's own
+`Interface\Minimap\Tracking\None` (© Blizzard Entertainment), composited over that sheet's disc.
 
 ## Bundled Fonts
 

@@ -300,6 +300,19 @@ L["Rare"] = "Selten"
 L["Epic"] = "Episch"
 L["Legendary"] = "Legendär"
 
+-- Beutefenster
+L["Loot Window"] = "Beutefenster"
+L["Configure the DragonUI loot window."] = "Das DragonUI-Beutefenster konfigurieren."
+L["Enable Loot Window"] = "Beutefenster aktivieren"
+L["Apply the DragonUI skin to the Blizzard loot window."] = "Das DragonUI-Design auf Blizzards Beutefenster anwenden."
+L["Open at Cursor"] = "Am Cursor öffnen"
+L["Open the loot window at the cursor instead of its saved position."] = "Das Beutefenster am Cursor statt an seiner gespeicherten Position öffnen."
+L["Disable Open at Cursor, then drag the loot window to save its position."] = "Am Cursor öffnen deaktivieren und dann das Beutefenster ziehen, um seine Position zu speichern."
+L["Animate Loot Reflow"] = "Beute-Neuanordnung animieren"
+L["Smoothly close gaps and resize the loot window after collecting items."] = "Lücken sanft schließen und das Beutefenster beim Aufheben von Gegenständen anpassen."
+L["Reset Loot Window Position"] = "Position des Beutefensters zurücksetzen"
+L["Clear the saved position. The Blizzard default will be used next time you open the loot window."] = "Die gespeicherte Position löschen. Beim nächsten Öffnen des Beutefensters wird Blizzards Standardposition verwendet."
+
 -- Item Level
 L["Item Level"] = "Gegenstandsstufe"
 L["Enable Item Level"] = "Gegenstandsstufe aktivieren"
@@ -2029,14 +2042,18 @@ L["Apply the DragonUI Skin"] = "DragonUI-Skin anwenden"
 L["Switches every Details! window to the skin and sets K/M number abbreviation. Window size and position stay yours - use Details!' own scale slider for those. Your choice is remembered and put back after a reload; picking another skin in Details! ends that. Run this again after you customise something in Details! and want the theme back."] = "Stellt alle Details!-Fenster auf den Skin um und aktiviert die K/M-Zahlenabkürzung. Größe und Position der Fenster bleiben deine Sache - dafür gibt es den Scale-Regler in Details!. Deine Wahl wird gemerkt und nach einem /reload wiederhergestellt; wer in Details! eine andere Skin wählt, beendet das. Führe dies erneut aus, wenn du etwas in Details! angepasst hast und das Thema zurück möchtest."
 L["Run |cffffcc55/duidetails|r to apply it from chat."] = "Führe |cffffcc55/duidetails|r aus, um sie über den Chat anzuwenden."
 
--- WORLD MAP TAB
--- ============================================================================
-
+-- World Map
 L["World Map"] = "Weltkarte"
-L["Retail-styled world map with breadcrumb navigation, drag-to-resize and quest log side panel. Requires a full /reload after toggling."] = "Retail-Stil Weltkarte mit Breadcrumb-Navigation, Größenänderung durch Ziehen und Questlog-Seitenpanel. Vollständiges /reload nach dem Umschalten erforderlich."
+L["Retail-style world map with breadcrumb navigation and a quest log side panel."] = "Weltkarte im Retail-Stil mit Brotkrumen-Navigation und einem Questlog-Seitenpanel."
 L["Enable World Map"] = "Weltkarte aktivieren"
-L["Activates the modern world map frame. Requires /reload to take effect."] = "Aktiviert das moderne Weltkarten-Fenster. /reload erforderlich."
-L["Enable Fog Reveal"] = "Nebel aufdecken aktivieren"
-L["Draw grey tint over undiscovered zones using account-wide exploration data. Each alt sees your main's exploration immediately."] = "Zeichnet einen grauen Schleier über unentdeckte Zonen mit kontoweiten Erkundungsdaten."
-L["Enable Wheel Zoom"] = "Radzoom aktivieren"
-L["Mouse wheel zooms and pans the map canvas."] = "Mausrad zoomt und schwenkt die Kartenleinwand."
+L["Apply the DragonUI reskin to the world map."] = "Wendet das DragonUI-Design auf die Weltkarte an."
+L["Show Undiscovered Areas"] = "Unentdeckte Gebiete anzeigen"
+L["Draw the map art of areas you have not explored yet, dimmed."] = "Zeichnet die Kartengrafik noch nicht erkundeter Gebiete abgedunkelt."
+L["Show Landmarks"] = "Orientierungspunkte anzeigen"
+L["Show towns, flight points and other landmark pins on the map."] = "Zeigt Städte, Flugpunkte und andere Markierungen auf der Karte."
+L["Show Dungeon Entrances"] = "Dungeoneingänge anzeigen"
+L["Show dungeon and raid entrance pins on zone maps."] = "Zeigt Dungeon- und Schlachtzugseingänge auf Gebietskarten."
+L["Show Graveyards"] = "Friedhöfe anzeigen"
+L["Show graveyard pins on zone maps."] = "Zeigt Friedhöfe auf Gebietskarten."
+L["Show Flight Points"] = "Flugpunkte anzeigen"
+L["Show flight master pins on zone maps."] = "Zeigt Flugmeister auf Gebietskarten."

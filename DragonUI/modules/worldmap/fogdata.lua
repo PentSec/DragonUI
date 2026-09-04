@@ -1,27 +1,10 @@
--- DragonUIWorldMapHost/modules/worldmap/OverlayData.lua
---
--- GENERATED. Do not hand-edit -- re-run tools/worldmap-overlays/gen_overlays.py.
---
--- Every subzone overlay this client knows about, read from its own
--- WorldMapOverlay.dbc (988 rows, patch-enUS.MPQ) joined to WorldMapArea.dbc (patch-M.mpq) for the texture
--- folder name -- which is what GetMapInfo() returns at runtime, and so is the key.
---
--- This is what lets the map show ground nobody on the account has walked. Without it
--- FogClear can only redraw what it has watched somebody discover, because
--- GetNumMapOverlays() reports only the current character's own discoveries and no API
--- enumerates the rest.
---
--- Values are packed exactly as FogClear packs a harvested overlay:
---     width + height * 2^10 + offsetX * 2^20 + offsetY * 2^30
--- so a seeded entry and a harvested one are the same kind of thing to the renderer.
+-- Copyright (c) 2026 NeticSoul. Licensed under the MIT License; see LICENSE.
 
-local NE = DragonUIWorldMapHost
-if not NE or NE.disabled then return end
+-- GENERATED from WorldMapOverlay.dbc, packed as width + height * 2^10 + x * 2^20 + y * 2^30.
 
-NE.worldmap = NE.worldmap or {}
+local addon = select(2, ...)
 
--- 61 maps, 886 subzone overlays.
-NE.worldmap.overlaySeed = {
+addon.WorldMap.FogData = {
   ["Alterac"] = {
     ["CHILLWINDPOINT"] = 272313469278,
     ["CORRAHNSDAGGER"] = 408440570051,

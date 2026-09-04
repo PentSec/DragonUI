@@ -35,6 +35,7 @@
     <Script file="minimap.lua"/>
     <Script file="minimap_decorations.lua"/>
     <Script file="questtracker.lua"/>
+    <Script file="objectivetracker.lua"/>   
     <Script file="lootroll.lua"/>
 
     <!-- Blizzard loot window skin (the paginated LootFrame, not the roll popup above) -->
@@ -115,6 +116,9 @@
     <Script file="levelupenhance.lua"/>
     <!-- Alt Gold module (other characters' money on the bag coin tooltip) -->
     <Script file="altmoney.lua"/>
+
+    <!-- Retail-style world map -->
+    <Include file="worldmap\worldmap.xml"/>
 
     <!-- Version Check module (cross-player version broadcast) -->
     <Script file="versioncheck.lua"/>

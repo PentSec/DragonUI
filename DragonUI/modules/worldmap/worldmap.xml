@@ -1,49 +1,14 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/">
-    <!-- World Map module — retail-styled chrome, breadcrumb, pins, quest panel, fog reveal.
-         Paths are relative to THIS file's directory (modules/worldmap/). -->
-
-    <!-- 1. Host shim: creates DragonUIWorldMapHost global (= NE surface) + stubs -->
-    <Script file="host.lua"/>
-
-    <!-- 2. Vendored NewEra core libs: self-assign onto DragonUIWorldMapHost.tex / .FrameUtil / etc.
-         NineSlice must load after Texture (routes piece atlases through NE.tex.SetAtlas) and
-         before Assets (its layouts' atlas coords register here; Assets registers their BLPs).
-         PanelChrome loads after NineSliceLayouts (uses its redbutton atlases).
-         Portrait loads after NineSliceLayouts (uses its corner cutout coords). -->
-    <Script file="lib\Texture.lua"/>
-    <Script file="lib\NineSlice.lua"/>
-    <Script file="lib\NineSliceLayouts.lua"/>
-    <Script file="lib\PanelChrome.lua"/>
-    <Script file="lib\Portrait.lua"/>
-    <Script file="lib\FrameUtil.lua"/>
-    <Script file="lib\Squelch.lua"/>
-    <Script file="lib\MaxMin.lua"/>
-    <Script file="lib\NavBar.lua"/>
-
-    <!-- 3. Texture registrations (must load before anything that calls NE.tex.Set) -->
-    <Script file="Assets.lua"/>
-
-    <!-- 4. Core chrome: builds NE.worldmap namespace, canvas, drag, squelch -->
-    <Script file="WorldMap.lua"/>
-
-    <!-- 5. Sub-features (order within this block is flexible) -->
-    <Script file="FogClear.lua"/>
-    <Script file="CanvasZoom.lua"/>
-    <Script file="WheelZoom.lua"/>
-    <Script file="Pins.lua"/>
-    <Script file="PinFilter.lua"/>
-    <Script file="NavBar.lua"/>
-    <Script file="DungeonMap.lua"/>
-    <Script file="DungeonMapData.lua"/>
-    <Script file="OverlayData.lua"/>
-
-    <!-- 6. Quest log side panel (QuestLogPanel creates NE.questlogpanel; Detail uses it) -->
-    <Script file="QuestLogPanel.lua"/>
-    <Script file="QuestLogDetail.lua"/>
-
-    <!-- 7. Diagnostics (/neworldmap debug command) -->
-    <Script file="Diagnostics.lua"/>
-
-    <!-- 8. Boot: registers the module with DragonUI's ModuleRegistry and wires PLAYER_LOGIN -->
-    <Script file="Register.lua"/>
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+    <Script file="core.lua"/>
+    <Script file="navbar.lua"/>
+    <Script file="pins.lua"/>
+    <Script file="questlog.lua"/>
+    <Script file="questdetail.lua"/>
+    <Script file="fogdata.lua"/>
+    <Script file="fog.lua"/>
+    <Script file="entrancedata.lua"/>
+    <Script file="graveyarddata.lua"/>
+    <Script file="flightpointdata.lua"/>
+    <Script file="mappins.lua"/>
 </Ui>

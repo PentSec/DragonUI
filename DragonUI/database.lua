@@ -245,8 +245,8 @@ local defaults = {
             x = -210,
             y = -255,
             show_header = true,
+            collapsed = false,   -- Survives reloads; Blizzard's own tracker forgets it
             font_size = 10,      -- Point size for quest tracker text (WoW default: 11)
-            height = 600,        -- Default quest tracker height (max visible lines)
             show_on_hover = false,
             show_in_combat = false,
             hide_in_combat = false,
@@ -1222,7 +1222,8 @@ local defaults = {
                 enabled = true -- Experimental retail-style bag window skin
             },
             loot_skin = {
-                enabled = true -- Retail-style skin for the Blizzard loot window
+                enabled = true, -- Retail-style skin for the Blizzard loot window
+                animated_reflow = true, -- Compact collected loot with animated rows and panel resizing
             },
             bagsort = {
                 enabled = true, -- Sort bags and bank items with buttons
@@ -1288,14 +1289,15 @@ local defaults = {
                 chosen = false, -- true once the player applies the skin; cleared when another skin is picked or the module turns off
             },
             worldmap = {
-                enabled = true, -- Modern world map with retail chrome, breadcrumb, drag-resize and quest side panel
-                canvasW = 697, -- canvas width; height follows from the map child's 1002/668 aspect
-                maximized = false, -- true = maximize preset; false = player's dragged/default width
-                wheelZoom = false, -- mouse wheel zooms the map canvas
-                fog = false, -- fog-of-war reveal: draw grey over undiscovered zones using account-wide data
-                overlays = {}, -- accumulated overlay data: [zone] = { {name,x,y,w,h}, ... } harvested from GetMapOverlays
-                poiFilters = {}, -- per-pin show/hide preferences for the filter menu
-                panelCollapsed = false, -- quest log side panel collapsed state
+                enabled = true, -- Retail-style world map with breadcrumb navigation and a quest log side panel
+                questLog = true, -- Quest log side panel open
+                maximized = false, -- Window at its maximized size
+                objectives = true, -- The objective lines under each quest title in the side panel
+                landmarks = true, -- The client's own landmark pins (battlefield objectives) shown on the map
+                fog = true, -- Undiscovered areas drawn dimmed instead of hidden
+                entrances = true, -- Dungeon and raid entrance pins on zone maps
+                graveyards = true, -- Graveyard pins on zone maps
+                flightPoints = true, -- Flight master pins on zone maps
             }
         },
 
