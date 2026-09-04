@@ -297,8 +297,16 @@ function TextSystem.UpdateFrameText(frameType, unit, parentFrame, healthBar, man
 
     -- Update mana text
     if manaBar and shouldShowMana then
-        local power = UnitPower(actualUnit) or 0
-        local maxPower = UnitPowerMax(actualUnit) or 1
+        local power, maxPower
+        local override = textSystemRef and textSystemRef.powerTypeOverride
+        if override ~= nil then
+            -- Locked power type (e.g. keepManaInForms): read that type explicitly.
+            power = UnitPower(actualUnit, override) or 0
+            maxPower = UnitPowerMax(actualUnit, override) or 1
+        else
+            power = UnitPower(actualUnit) or 0
+            maxPower = UnitPowerMax(actualUnit) or 1
+        end
         local powerText = TextSystem.FormatStatusText(power, maxPower, config.textFormat, config.breakUpLargeNumbers,
             frameType)
         TextSystem.UpdateDualText(parentFrame, prefix .. "Mana", powerText, config.textFormat, true)
@@ -318,7 +326,7 @@ end
 -- ===============================================================
 
 -- Setup text system for any unit frame
-function TextSystem.SetupFrameTextSystem(frameType, unit, parentFrame, healthBar, manaBar, prefix)
+function TextSystem.SetupFrameTextSystem(frameType, unit, parentFrame, healthBar, manaBar, prefix, opts)
     -- Input validation
     if not parentFrame then
 
@@ -333,7 +341,12 @@ function TextSystem.SetupFrameTextSystem(frameType, unit, parentFrame, healthBar
     prefix = prefix or frameType:gsub("^%l", string.upper) .. "Frame"
 
     -- Store reference to returned textSystem for dynamic unit access
-    local textSystemRef = { unit = unit }
+    -- powerTypeOverride: when set, power text reads that power type (e.g. 0 = MANA)
+    -- instead of the unit's current display power (druid-form lock).
+    local textSystemRef = {
+        unit = unit,
+        powerTypeOverride = opts and opts.powerTypeOverride,
+    }
     
     --  COMMON UPDATE FUNCTION
     local function updateCallback()

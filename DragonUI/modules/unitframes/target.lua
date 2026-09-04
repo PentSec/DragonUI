@@ -486,6 +486,7 @@ local api = UF.TargetStyle.Create({
     },
 
     -- Feature flags
+    keepManaInForms         = true,   -- Custom server: mana bar stays MANA (classless bars own RAGE/ENERGY)
     forceLayoutOnUnitChange = true,   -- ReapplyElementPositions on every change
     hasTapDenied            = true,   -- Grey name bg for tapped-by-other targets
 
@@ -536,6 +537,24 @@ local api = UF.TargetStyle.Create({
                     end
                 end)
             ctx.Module.threatHooked = true
+        end
+
+        -- Nullify the vanilla combat hit-flash on TargetFrameFlash. hideListFn
+        -- hides it once at init, but Blizzard/custom-server re-Shows it with the
+        -- vanilla red-lines atlas (desynced on this server). DragonUI repurposes
+        -- the same texture for threat, so allow Show only while the DragonUI
+        -- THREAT skin is applied; otherwise keep it invisible (SetAlpha is a
+        -- visual-only op, always safe even during combat lockdown).
+        if not ctx.Module.flashNullified then
+            local threatFlash = _G.TargetFrameFlash
+            if threatFlash then
+                hooksecurefunc(threatFlash, "Show", function()
+                    if threatFlash:GetTexture() ~= ctx.TEXTURES.THREAT then
+                        threatFlash:SetAlpha(0)
+                    end
+                end)
+                ctx.Module.flashNullified = true
+            end
         end
 
         -- Classification delay frame + hooks

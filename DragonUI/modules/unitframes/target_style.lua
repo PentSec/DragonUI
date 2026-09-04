@@ -61,6 +61,9 @@ function UF.TargetStyle.Create(opts)
     local DeadText        = opts.deadText or _G[namePrefix .. "FrameTextureFrameDeadText"]
     local HighLevelTexture = _G[namePrefix .. "FrameTextureFrameHighLevelTexture"]
     local defaultPos      = opts.defaultPos
+    -- Custom server: keep the power bar bound to MANA (druid-form RAGE/ENERGY
+    -- is rendered by the classless bars defined in energy_bar.lua).
+    local keepManaInForms = opts.keepManaInForms
 
     -- Shared texture / constant tables from uf_core
     local TEXTURES    = UF.TEXTURES.targetStyle
@@ -353,13 +356,21 @@ function UF.TargetStyle.Create(opts)
     -- POWER BAR FORCE UPDATE
     -- ================================================================
 
+    -- Resolve the power texture name. Custom server (keepManaInForms): the bar stays
+    -- MANA even for druid-form units because the classless bars render RAGE/ENERGY.
+    local function GetPowerName()
+        if keepManaInForms then
+            return "Mana"
+        end
+        return POWER_MAP[UnitPowerType(unitToken)] or "Mana"
+    end
+
     local function ForceUpdatePowerBar()
         if not UnitExists(unitToken) or not ManaBar then return end
         local texture = ManaBar:GetStatusBarTexture()
         if not texture then return end
 
-        local powerType = UnitPowerType(unitToken)
-        local powerName = POWER_MAP[powerType] or "Mana"
+        local powerName = GetPowerName()
         texture:SetTexture(TEXTURES.BAR_PREFIX .. powerName)
         texture:SetDrawLayer("ARTWORK", 1)
         texture:SetVertexColor(1, 1, 1)
@@ -495,8 +506,7 @@ function UF.TargetStyle.Create(opts)
                 local texture = self:GetStatusBarTexture()
                 if not texture then return end
 
-                local powerType = UnitPowerType(unitToken)
-                local powerName = POWER_MAP[powerType] or "Mana"
+                local powerName = GetPowerName()
                 texture:SetTexture(TEXTURES.BAR_PREFIX .. powerName)
                 texture:SetDrawLayer("ARTWORK", 1)
                 texture:SetVertexColor(1, 1, 1)
@@ -509,6 +519,18 @@ function UF.TargetStyle.Create(opts)
                 end
             end)
             ManaBar.DragonUI_Setup = true
+
+            -- Custom server (keepManaInForms): force the bar type back to MANA after
+            -- Blizzard's UnitFrameManaBar_UpdateType. Runs before UnitFrameManaBar_Update
+            -- reads UnitPowerMax/UnitPower(unit, statusbar.powerType), so values stay mana.
+            if keepManaInForms and _G.UnitFrameManaBar_UpdateType and not ManaBar.DragonUI_KeepManaHooked then
+                hooksecurefunc("UnitFrameManaBar_UpdateType", function(manaBar)
+                    if manaBar == ManaBar then
+                        manaBar.powerType = 0
+                    end
+                end)
+                ManaBar.DragonUI_KeepManaHooked = true
+            end
         end
 
         -- Portrait hook for class portrait
@@ -1132,7 +1154,7 @@ function UF.TargetStyle.Create(opts)
 
                 -- Power bar with custom texture
                 if ManaBar then
-                    local pType    = UnitPowerType("player")
+                    local pType    = keepManaInForms and 0 or UnitPowerType("player")
                     local curPwr   = UnitPower("player", pType)
                     local maxPwr   = UnitPowerMax("player", pType)
                     ManaBar:SetMinMaxValues(0, maxPwr)
@@ -1140,7 +1162,7 @@ function UF.TargetStyle.Create(opts)
 
                     local tex = ManaBar:GetStatusBarTexture()
                     if tex then
-                        local pName = POWER_MAP[pType] or "Mana"
+                        local pName = keepManaInForms and "Mana" or (POWER_MAP[pType] or "Mana")
                         tex:SetTexture(TEXTURES.BAR_PREFIX .. pName)
                         tex:SetDrawLayer("ARTWORK", 1)
                         tex:SetVertexColor(1, 1, 1, 1)
@@ -1234,7 +1256,8 @@ function UF.TargetStyle.Create(opts)
             if addon.TextSystem and not Module.textSystem then
                 Module.textSystem = addon.TextSystem.SetupFrameTextSystem(
                     configKey, unitToken, BlizzFrame, HealthBar,
-                    ManaBar, namePrefix .. "Frame")
+                    ManaBar, namePrefix .. "Frame",
+                    { powerTypeOverride = keepManaInForms and 0 or nil })
             end
 
             if UnitExists(unitToken) then
