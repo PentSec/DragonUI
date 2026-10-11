@@ -94,6 +94,17 @@ local function BuildMicromenuTab(scroll)
         end,
     })
 
+    -- Same setting as Panels > Professions; without that module there is nothing for the button to open.
+    C:AddToggle(menu, {
+        label = LO["Professions Micro Button"],
+        desc = LO["Show the Professions button in the micro menu. It opens the professions overview."],
+        dbPath = "modules.professions.micro_button",
+        disabled = function() return not addon:IsModuleEnabled("professions") end,
+        callback = function()
+            if addon.RefreshProfessionsMicroButton then addon.RefreshProfessionsMicroButton(true) end
+        end,
+    })
+
     C:AddToggle(menu, {
         label = LO["Hide on Vehicle"],
         desc = LO["Hide micromenu and bags while in a vehicle."],

@@ -1610,3 +1610,17 @@ L["Lower rank selector"] = "하위 레벨 선택 방식"
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = "주문 카드가 하위 레벨을 보여주는 방식: 아이콘 아래 메뉴 또는 측면 펼침 목록."
 L["Menu under the icon"] = "아이콘 아래 메뉴"
 L["Side flyout"] = "측면 펼침 목록"
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = "전문 기술"
+L["Forever-style professions window with side tabs and an overview page."] = "측면 탭과 개요 페이지가 있는 Forever 스타일 전문 기술 창."
+L["Enable Professions"] = "전문 기술 사용"
+L["Use the Forever professions window instead of the stock one."] = "기본 창 대신 Forever 전문 기술 창을 사용합니다."
+L["Professions Window Scale"] = "전문 기술 창 크기"
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = "전문 기술 창 전체 크기를 조절합니다. 다른 창 옆에서 차지하는 공간도 함께 바뀝니다."
+L["Side Tabs Scale"] = "측면 탭 크기"
+L["Scales only the profession tabs beside the window, on top of the window scale."] = "창 크기와 별도로 창 옆의 전문 기술 탭 크기만 조절합니다."
+L["Professions Micro Button"] = "마이크로 메뉴 전문 기술 버튼"
+L["Show the Professions button in the micro menu. It opens the professions overview."] = "마이크로 메뉴에 전문 기술 버튼을 표시합니다. 전문 기술 개요를 엽니다."

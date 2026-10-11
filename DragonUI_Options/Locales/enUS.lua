@@ -1597,3 +1597,17 @@ L["Lower rank selector"] = true
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = true
 L["Menu under the icon"] = true
 L["Side flyout"] = true
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = true
+L["Forever-style professions window with side tabs and an overview page."] = true
+L["Enable Professions"] = true
+L["Use the Forever professions window instead of the stock one."] = true
+L["Professions Window Scale"] = true
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = true
+L["Side Tabs Scale"] = true
+L["Scales only the profession tabs beside the window, on top of the window scale."] = true
+L["Professions Micro Button"] = true
+L["Show the Professions button in the micro menu. It opens the professions overview."] = true

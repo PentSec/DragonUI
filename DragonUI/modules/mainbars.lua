@@ -2895,6 +2895,7 @@ end
 
 local MICROMENU_BUTTON_NAMES = {
     "CharacterMicroButton",
+    "ProfessionMicroButton",
     "SpellbookMicroButton",
     "TalentMicroButton",
     "AchievementMicroButton",

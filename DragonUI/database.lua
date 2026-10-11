@@ -1270,6 +1270,12 @@ local defaults = {
                 rankSelectorShown = true, -- Offer the lower-rank selector on spell cards at all
                 highlightUnbound = false, -- Pulse learned spells that sit on no action bar slot
             },
+            professions = {
+                enabled = true, -- Forever professions window built on Blizzard's TradeSkillFrame
+                scale = 1, -- Scale of the whole window (0.6–1.2); its UIPanel slot grows and shrinks with it
+                tabScale = 0.9, -- Scale of the side tabs alone (0.5–1), on top of the window's
+                micro_button = true, -- Professions button in the micro menu, after Character; it opens the Overview
+            },
             worldmap = {
                 enabled = true, -- Retail-style world map with breadcrumb navigation and a quest log side panel
                 questLog = true, -- Quest log side panel open

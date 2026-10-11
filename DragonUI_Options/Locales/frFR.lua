@@ -1441,3 +1441,17 @@ L["Lower rank selector"] = "Sélecteur de rangs inférieurs"
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = "Comment une carte de sort propose ses rangs inférieurs : un menu sous l'icône ou une barre latérale."
 L["Menu under the icon"] = "Menu sous l'icône"
 L["Side flyout"] = "Barre latérale"
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = "Métiers"
+L["Forever-style professions window with side tabs and an overview page."] = "Fenêtre des métiers style Forever avec onglets latéraux et une page d'aperçu."
+L["Enable Professions"] = "Activer les métiers"
+L["Use the Forever professions window instead of the stock one."] = "Utiliser la fenêtre des métiers Forever au lieu de celle d'origine."
+L["Professions Window Scale"] = "Échelle de la fenêtre des métiers"
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = "Met à l'échelle toute la fenêtre des métiers ; la place qu'elle occupe à côté des autres panneaux suit sa taille."
+L["Side Tabs Scale"] = "Échelle des onglets latéraux"
+L["Scales only the profession tabs beside the window, on top of the window scale."] = "Redimensionne uniquement les onglets de métier à côté de la fenêtre, en plus de l'échelle de la fenêtre."
+L["Professions Micro Button"] = "Bouton Métiers du micro-menu"
+L["Show the Professions button in the micro menu. It opens the professions overview."] = "Affiche le bouton Métiers dans le micro-menu. Il ouvre l'aperçu des métiers."

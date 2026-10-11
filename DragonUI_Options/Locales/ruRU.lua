@@ -1609,3 +1609,17 @@ L["Lower rank selector"] = "Выбор низших уровней"
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = "Как карточка заклинания предлагает низшие уровни: меню под значком или боковая панель."
 L["Menu under the icon"] = "Меню под значком"
 L["Side flyout"] = "Боковая панель"
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = "Профессии"
+L["Forever-style professions window with side tabs and an overview page."] = "Окно профессий в стиле Forever с боковыми вкладками и страницей обзора."
+L["Enable Professions"] = "Включить профессии"
+L["Use the Forever professions window instead of the stock one."] = "Использовать окно профессий Forever вместо стандартного."
+L["Professions Window Scale"] = "Масштаб окна профессий"
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = "Масштабирует всё окно профессий; место рядом с другими окнами меняется вместе с ним."
+L["Side Tabs Scale"] = "Масштаб боковых вкладок"
+L["Scales only the profession tabs beside the window, on top of the window scale."] = "Масштабирует только вкладки профессий рядом с окном, поверх масштаба окна."
+L["Professions Micro Button"] = "Кнопка профессий в микроменю"
+L["Show the Professions button in the micro menu. It opens the professions overview."] = "Показывать кнопку профессий в микроменю. Она открывает обзор профессий."

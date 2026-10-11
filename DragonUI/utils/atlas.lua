@@ -11,6 +11,7 @@ local assets = addon._dir
 local uiactionbar = assets..'ActionBars\\uiactionbar';
 local uiexperiencebar = assets..'XP\\uiexperiencebar';
 local uimicromenu2x = assets..'Micromenu\\Atlas\\uimicromenu2x';
+local professionsmicro = assets..'Professions\\MicroButton';
 local collapse = assets..'Micromenu\\uicollapsebutton';
 local bagmain2x = assets..'Bags\\bagslots2x';
 local uiactionbar2x_ = assets..'ActionBars\\uiactionbar2x_';
@@ -230,6 +231,13 @@ local retailHudSheets = {
 		{ "ui-hud-micromenu-spellbook-down-2x", nil, nil, 81, 119, 433, 485 },
 		{ "ui-hud-micromenu-spellbook-mouseover-2x", nil, nil, 189, 227, 433, 485 },
 		{ "ui-hud-micromenu-spellbook-up-2x", nil, nil, 121, 159, 55, 107 },
+	}),
+	-- The professions micro button's gold states, under its colour cells in the same file.
+	sheet(professionsmicro, 256, 256, {
+		{ "ui-hud-micromenu-profession-up-2x", nil, nil, 0, 38, 96, 148 },
+		{ "ui-hud-micromenu-profession-down-2x", nil, nil, 64, 102, 96, 148 },
+		{ "ui-hud-micromenu-profession-mouseover-2x", nil, nil, 128, 166, 96, 148 },
+		{ "ui-hud-micromenu-profession-disabled-2x", nil, nil, 192, 230, 96, 148 },
 	}),
 	sheet(bagmain2x, 512, 128, {
 		{ "bag-main-2x", nil, nil, 1, 97, 1, 97 },

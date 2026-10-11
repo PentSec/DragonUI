@@ -1616,3 +1616,17 @@ L["Lower rank selector"] = "低等級選擇方式"
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = "法術卡片提供低等級的方式：圖示下方的選單，或側邊展開列。"
 L["Menu under the icon"] = "圖示下方的選單"
 L["Side flyout"] = "側邊展開列"
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = "專業"
+L["Forever-style professions window with side tabs and an overview page."] = "帶側邊標籤和總覽頁的 Forever 風格專業視窗。"
+L["Enable Professions"] = "啟用專業"
+L["Use the Forever professions window instead of the stock one."] = "使用 Forever 專業視窗代替原版視窗。"
+L["Professions Window Scale"] = "專業視窗縮放"
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = "縮放整個專業視窗；它在其他面板旁佔用的空間隨之變化。"
+L["Side Tabs Scale"] = "側邊標籤縮放"
+L["Scales only the profession tabs beside the window, on top of the window scale."] = "僅縮放視窗旁的專業標籤，疊加在視窗縮放之上。"
+L["Professions Micro Button"] = "微型選單專業按鈕"
+L["Show the Professions button in the micro menu. It opens the professions overview."] = "在微型選單中顯示專業按鈕，點擊開啟專業總覽。"

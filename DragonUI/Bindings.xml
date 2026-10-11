@@ -18,4 +18,8 @@
     <Binding name="DRAGONUI_TOGGLE_COLLECTIONS">
         if DragonUI and DragonUI.ToggleCollections then DragonUI.ToggleCollections() end
     </Binding>
+    <!-- BINDING_NAME_* set in modules/professions/prof_microbutton.lua -->
+    <Binding name="DRAGONUI_TOGGLE_PROFESSIONS">
+        if DragonUI and DragonUI.ToggleProfessionsBook then DragonUI.ToggleProfessionsBook() end
+    </Binding>
 </Bindings>

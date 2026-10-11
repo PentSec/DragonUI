@@ -1,0 +1,15 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\..\FrameXML\UI.xsd">
+    <Script file="prof_core.lua"/>
+    <Script file="prof_atlas.lua"/>
+    <Script file="prof_art.lua"/>
+    <Script file="prof_fill.lua"/>
+    <Script file="prof_model.lua"/>
+    <Script file="prof_filters.lua"/>
+    <Script file="prof_professions.lua"/>
+    <Script file="prof_frame.lua"/>
+    <Script file="prof_list.lua"/>
+    <Script file="prof_details.lua"/>
+    <Script file="prof_tabs.lua"/>
+    <Script file="prof_overview.lua"/>
+    <Script file="prof_track.lua"/>
+</Ui>

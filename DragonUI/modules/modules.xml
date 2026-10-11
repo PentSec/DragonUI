@@ -17,6 +17,8 @@
     <Script file="..\data\companion_traits.lua"/>
     <Script file="..\data\mount_speeds.lua"/>
     <Include file="collections\collections.xml"/>
+    <!-- Professions micro button (must exist before micromenu.lua loads; the window itself loads further down) -->
+    <Script file="professions\prof_microbutton.lua"/>
 
     <!-- Micro Menu & Bag module -->
     <Script file="micromenu.lua"/>
@@ -80,6 +82,8 @@
     <Script file="questdialog.lua"/>
     <!-- Spellbook module (own window; takes over the book's keys, micro button and Blizzard's frame after login) -->
     <Include file="spellbook\spellbook.xml"/>
+    <!-- Professions module (Forever professions window built on Blizzard's TradeSkillFrame) -->
+    <Include file="professions\professions.xml"/>
 
     <!-- Chat Mods module -->
     <Script file="chatmods.lua"/>

@@ -1042,3 +1042,28 @@ L["Parent Disabled"] = true
 L["Protected"] = true
 L["Turn it back on from the AddOns button in the Esc menu."] = true
 L["Turn it back on from the AddOns list at character selection."] = true
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = true
+L["Forever-style professions window that keeps every stock function."] = true
+L["Skill-up recipes only"] = true
+L["Categories"] = true
+L["Slots"] = true
+L["Reset filters"] = true
+L["Expand All"] = true
+L["Collapse All"] = true
+L["No recipes found"] = true
+L["Not available in combat"] = true
+L["First Profession"] = true
+L["Second Profession"] = true
+L["Visit a profession trainer in a major city to learn a new profession. You may have two professions. You may have any combination of gathering and production professions."] = true
+L["Visit a trainer to learn cooking. Cooking lets you learn recipes to create food that heals you out of combat and grants you temporary buffs."] = true
+L["Visit a trainer to learn fishing. Fishing lets you catch fish and other strange things from water. Fish can be cooked into delicious meals with the Cooking skill."] = true
+L["Visit a trainer to learn first aid. First aid lets you turn cloth into bandages for healing yourself and others."] = true
+L["Track Recipe"] = true
+L["Set Favorite"] = true
+L["Guaranteed chance of gaining %d skill ups"] = true
+L["High chance of gaining skill"] = true
+L["Low chance of gaining skill"] = true

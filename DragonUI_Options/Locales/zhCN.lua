@@ -1606,3 +1606,17 @@ L["Lower rank selector"] = "低等级选择方式"
 L["How a spell card offers its lower ranks: a menu under the icon or a side flyout."] = "法术卡片提供低等级的方式：图标下方的菜单，或侧边展开栏。"
 L["Menu under the icon"] = "图标下方的菜单"
 L["Side flyout"] = "侧边展开栏"
+
+-- ============================================================================
+-- PROFESSIONS
+-- ============================================================================
+L["Professions"] = "专业"
+L["Forever-style professions window with side tabs and an overview page."] = "带侧边标签和总览页的 Forever 风格专业窗口。"
+L["Enable Professions"] = "启用专业"
+L["Use the Forever professions window instead of the stock one."] = "使用 Forever 专业窗口代替原版窗口。"
+L["Professions Window Scale"] = "专业窗口缩放"
+L["Scales the whole professions window; the room it takes beside other panels follows its size."] = "缩放整个专业窗口；它在其他面板旁占用的空间随之变化。"
+L["Side Tabs Scale"] = "侧边标签缩放"
+L["Scales only the profession tabs beside the window, on top of the window scale."] = "仅缩放窗口旁的专业标签，叠加在窗口缩放之上。"
+L["Professions Micro Button"] = "微型菜单专业按钮"
+L["Show the Professions button in the micro menu. It opens the professions overview."] = "在微型菜单中显示专业按钮，点击打开专业总览。"

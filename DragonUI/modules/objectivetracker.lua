@@ -213,6 +213,13 @@ local function collectTimers(blocks)
     end
 end
 
+-- Other modules' blocks (tracked recipes), listed after the quests; a block may bring its own menu and click.
+OT.collectors = OT.collectors or {}
+
+function OT.AddCollector(collector)
+    table.insert(OT.collectors, collector)
+end
+
 local function collect()
     local blocks = {}
     local counters = { numeric = 0 }
@@ -220,6 +227,7 @@ local function collect()
     collectTimers(blocks)
     collectAchievements(blocks)
     collectQuests(blocks, counters)
+    for _, collector in ipairs(OT.collectors) do collector(blocks) end
     return blocks
 end
 
@@ -237,7 +245,7 @@ end
 
 -- Same entries WatchFrameDropDown_Initialize builds, in the same order.
 local function blockMenu(block)
-    local entries = { { text = block.title, isTitle = true } }
+    local entries = { { text = block.title:GetText(), isTitle = true } }
     if block.kind == "quest" then
         local index = GetQuestIndexForWatch(block.watchIndex)
         if not index then return entries end
@@ -260,6 +268,8 @@ local function blockMenu(block)
             RemoveTrackedAchievement(block.achievementID)
             OT.Refresh()
         end }
+    elseif block.menu then
+        for _, entry in ipairs(block.menu(block)) do entries[#entries + 1] = entry end
     end
     return entries
 end
@@ -298,8 +308,11 @@ local function onBlockClick(block, button)
         AchievementFrame_SelectAchievement(block.achievementID)
     elseif block.kind == "timer" and block.questLogIndex then
         openQuestLogTo(block.questLogIndex)
+    elseif block.onClick then
+        block.onClick(block, button)
     end
 end
+OT.ClickBlock = onBlockClick
 
 local function highlight(block, onEnter)
     if onEnter then
@@ -320,6 +333,7 @@ local function highlight(block, onEnter)
         end
     end
 end
+OT.Highlight = highlight
 
 -- ============================================================================
 -- ROWS
@@ -539,8 +553,14 @@ local function acquireBlock(index)
 
     block.lines = {}
     block:SetScript("OnClick", function(self, button) onBlockClick(self, button) end)
-    block:SetScript("OnEnter", function(self) highlight(self, true) end)
-    block:SetScript("OnLeave", function(self) highlight(self, false) end)
+    block:SetScript("OnEnter", function(self)
+        highlight(self, true)
+        if self.onEnter then self.onEnter(self) end
+    end)
+    block:SetScript("OnLeave", function(self)
+        highlight(self, false)
+        if self.onLeave then self.onLeave(self) end
+    end)
     blockPool[index] = block
     return block
 end
@@ -562,6 +582,8 @@ local function fillBlock(block, data, width, size)
     block.watchIndex, block.questLogIndex = data.watchIndex, data.questLogIndex
     block.questID, block.achievementID = data.questID, data.achievementID
     block.hasItem = data.hasItem
+    block.menu, block.onClick, block.ref = data.menu, data.onClick, data.ref
+    block.onEnter, block.onLeave = data.onEnter, data.onLeave
     block.title:SetText(data.title or "")
 
     if data.icon then

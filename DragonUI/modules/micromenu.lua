@@ -97,9 +97,9 @@ if isAscensionServer then
     EIGHTH_STEM, NINTH_STEM = "PathToAscension", "Challenges"
 end
 
--- One constructor keeps a nil slot for a button missing at load, so # still counts all eleven.
+-- A nil slot for a button missing at load keeps # at twelve; Professions follows Character, as in Forever.
 local MICRO_BUTTONS = {
-    MicroButtonFor("Character"), MicroButtonFor("Spellbook"), MicroButtonFor("Talent"),
+    MicroButtonFor("Character"), MicroButtonFor("Profession"), MicroButtonFor("Spellbook"), MicroButtonFor("Talent"),
     MicroButtonFor("Achievement"), MicroButtonFor("QuestLog"), MicroButtonFor("Socials"),
     MicroButtonFor("LFD"), MicroButtonFor(EIGHTH_STEM), MicroButtonFor(NINTH_STEM),
     MicroButtonFor("MainMenu"), (MicroButtonFor("Help")),
@@ -179,6 +179,13 @@ else
     MicromenuAtlas["UI-HUD-MicroMenu-Collections-Mouseover"] = {0.129883, 0.192383, 0.00195312, 0.162109}
     MicromenuAtlas["UI-HUD-MicroMenu-Collections-Up"] = {0.129883, 0.192383, 0.166016, 0.326172}
 end
+
+-- The fifth field names the file: DragonUI's colour sheet predates the professions icon.
+local PROFESSIONS_MICRO = 'Interface\\AddOns\\DragonUI\\Textures\\Professions\\MicroButton'
+MicromenuAtlas["UI-HUD-MicroMenu-Professions-Up"] = {0, 0.25, 0, 0.3203125, PROFESSIONS_MICRO}
+MicromenuAtlas["UI-HUD-MicroMenu-Professions-Down"] = {0.25, 0.5, 0, 0.3203125, PROFESSIONS_MICRO}
+MicromenuAtlas["UI-HUD-MicroMenu-Professions-Mouseover"] = {0.5, 0.75, 0, 0.3203125, PROFESSIONS_MICRO}
+MicromenuAtlas["UI-HUD-MicroMenu-Professions-Disabled"] = {0.75, 1, 0, 0.3203125, PROFESSIONS_MICRO}
 
 
 -- ============================================================================
@@ -413,6 +420,7 @@ local function GetAtlasKey(buttonName)
     if isAscensionServer then
         buttonMap = {
             character = nil, -- Uses portrait
+            profession = "UI-HUD-MicroMenu-Professions",
             spellbook = "UI-HUD-MicroMenu-SpellbookAbilities",
             talent = "UI-HUD-MicroMenu-SpecTalents",
             achievement = "UI-HUD-MicroMenu-Achievements",
@@ -427,6 +435,7 @@ local function GetAtlasKey(buttonName)
     else
         buttonMap = {
             character = nil,
+            profession = "UI-HUD-MicroMenu-Professions",
             spellbook = "UI-HUD-MicroMenu-SpellbookAbilities",
             talent = "UI-HUD-MicroMenu-SpecTalents",
             achievement = "UI-HUD-MicroMenu-Achievements",
@@ -630,6 +639,7 @@ local function StoreOriginalMicroButtonStates()
                     parent = button:GetParent(),
                     points = {},
                     size = {button:GetSize()},
+                    shown = button:IsShown(),
                     scripts = {
                         OnEnter = button:GetScript('OnEnter'),
                         OnLeave = button:GetScript('OnLeave'),
@@ -772,6 +782,11 @@ local function RestoreMicromenuSystem()
                 -- Restore size
                 if original.size then
                     button:SetSize(unpack(original.size))
+                end
+
+                -- DragonUI's own buttons (Collections, Professions) start hidden and have no stock slot to go back to.
+                if not original.shown then
+                    button:Hide()
                 end
 
                 -- Restore textures
@@ -1889,7 +1904,7 @@ local function SetMicroStateTexture(button, getter, setter, path, coords)
         tex = button[getter](button)
         if not tex then return end
     end
-    tex:SetTexture(path)
+    tex:SetTexture(coords[5] or path)
     tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
     tex:ClearAllPoints()
     tex:SetAllPoints(button)
@@ -2400,6 +2415,15 @@ LayoutMicroButtons()
 
 addon.RefreshMicromenuVehicle()
 UpdateCharacterPortraitVisibility()
+end
+
+-- For a button switched back on while playing: RefreshMicromenu only re-places, it never skins.
+function addon.RefreshMicromenuButtons()
+    if not MicromenuModule.applied or not IsModuleEnabled() or not _G.DragonUI_MicroButtonBar then
+        return
+    end
+    layoutMicroButtons(HasCollectionsButton() and -180 or -166)
+    addon.RefreshMicromenu()
 end
 
 function addon.RefreshBags()
